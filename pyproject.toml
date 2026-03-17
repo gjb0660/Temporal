@@ -26,6 +26,62 @@ default-groups = ["dev"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 
+[tool.pyright]
+include = [
+    "src",
+    "tests",
+]
+exclude = [
+    "**/node_modules",
+    "**/__pycache__",
+]
+ignore = [
+    "*:/**/Python*/Lib",
+    "**/qml",
+]
+typeCheckingMode = "basic"
+reportCallIssue = "none"
+reportOperatorIssue = "none"
+reportAttributeAccessIssue = "none"
+reportMissingParameterType = "none"
+reportMissingTypeArgument = "none"
+reportUnknownArgumentType = "none"
+reportUnknownLambdaType = "none"
+reportUnknownMemberType = "none"
+reportUnknownParameterType = "none"
+reportUnknownVariableType = "none"
+reportInvalidStubStatement = "warning"
+reportMissingTypeStubs = "warning"
+
+[[tool.pyright.executionEnvironments]]
+root = "src"
+typeCheckingMode = "strict"
+reportCallIssue = "warning"
+reportOperatorIssue = "warning"
+reportAttributeAccessIssue = "warning"
+reportUntypedClassDecorator = "error"
+reportUntypedFunctionDecorator = "error"
+reportDuplicateImport = "error"
+reportImportCycles = "error"
+reportShadowedImports = "error"
+reportConstantRedefinition = "warning"
+reportDeprecated = "warning"
+reportUninitializedInstanceVariable = "warning"
+reportUnusedClass = "warning"
+reportUnusedFunction = "warning"
+reportUnusedImport = "warning"
+reportUnusedVariable = "warning"
+reportUnreachable = "warning"
+reportUnnecessaryCast = "warning"
+reportUnnecessaryComparison = "warning"
+reportUnnecessaryContains = "warning"
+reportUnnecessaryIsInstance = "warning"
+reportUnnecessaryTypeIgnoreComment = "warning"
+
+[[tool.pyright.executionEnvironments]]
+root = "tests"
+extraPaths = ["src"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
