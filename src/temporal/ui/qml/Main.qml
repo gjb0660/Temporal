@@ -26,7 +26,9 @@ ApplicationWindow {
                 font.bold: true
             }
 
-            Item { Layout.fillWidth: true }
+            Item {
+                Layout.fillWidth: true
+            }
 
             Repeater {
                 model: ["Configure", "Record", "Camera"]
@@ -77,33 +79,109 @@ ApplicationWindow {
                         ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 12
-                            Label { text: "Local System Monitor"; font.pixelSize: 32; color: "#3e3e3e" }
-                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 48; color: "#f4f7f5"; border.color: "#d1dbd6"; radius: 4
-                                RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-                                    Label { text: "CPU Usage"; font.pixelSize: 24; color: "#666" }
-                                    Item { Layout.fillWidth: true }
-                                    Label { text: "26.1 %"; font.pixelSize: 24; color: "#666" }
+                            Label {
+                                text: "Local System Monitor"
+                                font.pixelSize: 32
+                                color: "#3e3e3e"
+                            }
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 48
+                                color: "#f4f7f5"
+                                border.color: "#d1dbd6"
+                                radius: 4
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    Label {
+                                        text: "CPU Usage"
+                                        font.pixelSize: 24
+                                        color: "#666"
+                                    }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
+                                    Label {
+                                        text: "26.1 %"
+                                        font.pixelSize: 24
+                                        color: "#666"
+                                    }
                                 }
                             }
-                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 48; color: "#f4f7f5"; border.color: "#d1dbd6"; radius: 4
-                                RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-                                    Label { text: "CPU Temp."; font.pixelSize: 24; color: "#666" }
-                                    Item { Layout.fillWidth: true }
-                                    Label { text: "-1.0 °C"; font.pixelSize: 24; color: "#666" }
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 48
+                                color: "#f4f7f5"
+                                border.color: "#d1dbd6"
+                                radius: 4
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    Label {
+                                        text: "CPU Temp."
+                                        font.pixelSize: 24
+                                        color: "#666"
+                                    }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
+                                    Label {
+                                        text: "-1.0 °C"
+                                        font.pixelSize: 24
+                                        color: "#666"
+                                    }
                                 }
                             }
-                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 48; color: "#f4f7f5"; border.color: "#d1dbd6"; radius: 4
-                                RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-                                    Label { text: "Memory Usage"; font.pixelSize: 24; color: "#666" }
-                                    Item { Layout.fillWidth: true }
-                                    Label { text: "82 %"; font.pixelSize: 24; color: "#666" }
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 48
+                                color: "#f4f7f5"
+                                border.color: "#d1dbd6"
+                                radius: 4
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    Label {
+                                        text: "Memory Usage"
+                                        font.pixelSize: 24
+                                        color: "#666"
+                                    }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
+                                    Label {
+                                        text: "82 %"
+                                        font.pixelSize: 24
+                                        color: "#666"
+                                    }
                                 }
                             }
-                            Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 48; color: "#f4f7f5"; border.color: "#d1dbd6"; radius: 4
-                                RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
-                                    Label { text: "IP"; font.pixelSize: 24; color: "#666" }
-                                    Item { Layout.fillWidth: true }
-                                    Label { text: "198.18.0.1"; font.pixelSize: 24; color: "#666" }
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 48
+                                color: "#f4f7f5"
+                                border.color: "#d1dbd6"
+                                radius: 4
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+                                    Label {
+                                        text: "IP"
+                                        font.pixelSize: 24
+                                        color: "#666"
+                                    }
+                                    Item {
+                                        Layout.fillWidth: true
+                                    }
+                                    Label {
+                                        text: "198.18.0.1"
+                                        font.pixelSize: 24
+                                        color: "#666"
+                                    }
                                 }
                             }
                         }
@@ -111,21 +189,43 @@ ApplicationWindow {
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 130
+                        Layout.preferredHeight: 220
                         color: "#e9efec"
                         radius: 6
                         border.color: "#c6d2cc"
 
-                        Column {
+                        ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 12
                             spacing: 8
-                            Label { text: "ODAS Control"; font.pixelSize: 34; color: "#4a4a4a" }
-                            Label { text: "Status: " + appBridge.status; font.pixelSize: 26; color: "#5d6762" }
+
+                            Label {
+                                text: "ODAS Control"
+                                font.pixelSize: 34
+                                color: "#4a4a4a"
+                            }
+                            Label {
+                                text: "Status: " + appBridge.status
+                                font.pixelSize: 22
+                                color: "#5d6762"
+                            }
+                            RowLayout {
+                                spacing: 8
+                                Button { text: "Connect"; onClicked: appBridge.connectRemote() }
+                                Button { text: "Start"; onClicked: appBridge.startRemoteOdas() }
+                                Button { text: "Stop"; onClicked: appBridge.stopRemoteOdas() }
+                            }
+                            RowLayout {
+                                spacing: 8
+                                Button { text: "Listen"; onClicked: appBridge.startStreams() }
+                                Button { text: "Close Streams"; onClicked: appBridge.stopStreams() }
+                            }
                         }
                     }
 
-                    Item { Layout.fillHeight: true }
+                    Item {
+                        Layout.fillHeight: true
+                    }
                 }
             }
 
@@ -141,17 +241,49 @@ ApplicationWindow {
                     anchors.margins: 12
                     spacing: 10
 
-                    Label { text: "Source Elevation"; font.pixelSize: 36; color: "#3f3f3f" }
-                    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 180; color: "#ffffff"; border.color: "#d2dad6"; radius: 4
-                        Label { anchors.centerIn: parent; text: "Elevation chart placeholder"; font.pixelSize: 24; color: "#919191" }
+                    Label {
+                        text: "Source Elevation"
+                        font.pixelSize: 36
+                        color: "#3f3f3f"
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 180
+                        color: "#ffffff"
+                        border.color: "#d2dad6"
+                        radius: 4
+                        Label {
+                            anchors.centerIn: parent
+                            text: "Elevation chart placeholder"
+                            font.pixelSize: 24
+                            color: "#919191"
+                        }
                     }
 
-                    Label { text: "Source Azimut"; font.pixelSize: 36; color: "#3f3f3f" }
-                    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 180; color: "#ffffff"; border.color: "#d2dad6"; radius: 4
-                        Label { anchors.centerIn: parent; text: "Azimut chart placeholder"; font.pixelSize: 24; color: "#919191" }
+                    Label {
+                        text: "Source Azimut"
+                        font.pixelSize: 36
+                        color: "#3f3f3f"
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 180
+                        color: "#ffffff"
+                        border.color: "#d2dad6"
+                        radius: 4
+                        Label {
+                            anchors.centerIn: parent
+                            text: "Azimut chart placeholder"
+                            font.pixelSize: 24
+                            color: "#919191"
+                        }
                     }
 
-                    Label { text: "Active sources locations"; font.pixelSize: 36; color: "#3f3f3f" }
+                    Label {
+                        text: "Active sources locations"
+                        font.pixelSize: 36
+                        color: "#3f3f3f"
+                    }
                     Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
@@ -179,7 +311,11 @@ ApplicationWindow {
                     anchors.margins: 12
                     spacing: 16
 
-                    Label { text: "Sources"; font.pixelSize: 50; color: "#2e2e2e" }
+                    Label {
+                        text: "Sources"
+                        font.pixelSize: 50
+                        color: "#2e2e2e"
+                    }
 
                     Repeater {
                         model: ["Source", "Source 15", "Source", "Source"]
@@ -190,12 +326,32 @@ ApplicationWindow {
                         }
                     }
 
-                    Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#b9cac2" }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 1
+                        color: "#b9cac2"
+                    }
 
-                    Label { text: "Filters"; font.pixelSize: 50; color: "#2e2e2e" }
-                    CheckBox { text: "Sources"; checked: true; font.pixelSize: 28 }
-                    CheckBox { text: "Potentials"; checked: false; font.pixelSize: 28 }
-                    Label { text: "Potential sources\nenergy range:"; font.pixelSize: 28; color: "#4d5651" }
+                    Label {
+                        text: "Filters"
+                        font.pixelSize: 50
+                        color: "#2e2e2e"
+                    }
+                    CheckBox {
+                        text: "Sources"
+                        checked: true
+                        font.pixelSize: 28
+                    }
+                    CheckBox {
+                        text: "Potentials"
+                        checked: false
+                        font.pixelSize: 28
+                    }
+                    Label {
+                        text: "Potential sources\nenergy range:"
+                        font.pixelSize: 28
+                        color: "#4d5651"
+                    }
                     RangeSlider {
                         from: 0
                         to: 1
@@ -203,7 +359,9 @@ ApplicationWindow {
                         second.value: 1
                     }
 
-                    Item { Layout.fillHeight: true }
+                    Item {
+                        Layout.fillHeight: true
+                    }
                 }
             }
         }
@@ -216,9 +374,19 @@ ApplicationWindow {
             anchors.fill: parent
             anchors.leftMargin: 14
             anchors.rightMargin: 14
-            Label { text: "Temporal interface for ODAS"; color: "white"; font.pixelSize: 24 }
-            Item { Layout.fillWidth: true }
-            Label { text: "Legal"; color: "white"; font.pixelSize: 24 }
+            Label {
+                text: "Temporal interface for ODAS"
+                color: "white"
+                font.pixelSize: 24
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+            Label {
+                text: "Legal"
+                color: "white"
+                font.pixelSize: 24
+            }
         }
     }
 }
