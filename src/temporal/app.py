@@ -18,6 +18,9 @@ class AppBridge(QObject):
     sourceItemsChanged = Signal()
     sourceCountChanged = Signal()
     potentialCountChanged = Signal()
+    sourcesEnabledChanged = Signal()
+    potentialsEnabledChanged = Signal()
+    potentialRangeChanged = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -26,8 +29,14 @@ class AppBridge(QObject):
         self._cfg_path = self._root / "config" / "odas.example.toml"
         self._cfg = load_config(self._cfg_path)
         self._remote = RemoteOdasController(self._cfg.remote)
+        self._last_sst: dict = {}
+        self._last_ssl: dict = {}
         self._source_items: list[str] = []
         self._potential_count = 0
+        self._sources_enabled = True
+        self._potentials_enabled = False
+        self._potential_min = 0.0
+        self._potential_max = 1.0
         self._client = OdasClient(
             config=self._cfg.streams,
             on_sst=self._on_sst,
@@ -51,6 +60,22 @@ class AppBridge(QObject):
     @Property(int, notify=potentialCountChanged)  # type: ignore[reportCallIssue]
     def potentialCount(self) -> int:
         return self._potential_count
+
+    @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
+    def sourcesEnabled(self) -> bool:
+        return self._sources_enabled
+
+    @Property(bool, notify=potentialsEnabledChanged)  # type: ignore[reportCallIssue]
+    def potentialsEnabled(self) -> bool:
+        return self._potentials_enabled
+
+    @Property(float, notify=potentialRangeChanged)  # type: ignore[reportCallIssue]
+    def potentialEnergyMin(self) -> float:
+        return self._potential_min
+
+    @Property(float, notify=potentialRangeChanged)  # type: ignore[reportCallIssue]
+    def potentialEnergyMax(self) -> float:
+        return self._potential_max
 
     @Slot(str)
     def setStatus(self, status: str) -> None:
@@ -93,19 +118,44 @@ class AppBridge(QObject):
         self._client.stop()
         self.setStatus("Streams stopped")
 
+    @Slot(bool)
+    def setSourcesEnabled(self, enabled: bool) -> None:
+        if self._sources_enabled == enabled:
+            return
+        self._sources_enabled = enabled
+        self.sourcesEnabledChanged.emit()
+        self._refresh_sources()
+        self._update_stream_status("Source filter update")
+
+    @Slot(bool)
+    def setPotentialsEnabled(self, enabled: bool) -> None:
+        if self._potentials_enabled == enabled:
+            return
+        self._potentials_enabled = enabled
+        self.potentialsEnabledChanged.emit()
+        self._refresh_potentials()
+        self._update_stream_status("Potential filter update")
+
+    @Slot(float, float)
+    def setPotentialEnergyRange(self, minimum: float, maximum: float) -> None:
+        low = min(minimum, maximum)
+        high = max(minimum, maximum)
+        if self._potential_min == low and self._potential_max == high:
+            return
+        self._potential_min = low
+        self._potential_max = high
+        self.potentialRangeChanged.emit()
+        self._refresh_potentials()
+        self._update_stream_status("Potential range update")
+
     def _on_sst(self, message: dict) -> None:
-        items = build_source_items(message)
-        if items != self._source_items:
-            self._source_items = items
-            self.sourceItemsChanged.emit()
-            self.sourceCountChanged.emit()
+        self._last_sst = message
+        self._refresh_sources()
         self._update_stream_status("SST update")
 
     def _on_ssl(self, message: dict) -> None:
-        count = count_potentials(message)
-        if count != self._potential_count:
-            self._potential_count = count
-            self.potentialCountChanged.emit()
+        self._last_ssl = message
+        self._refresh_potentials()
         self._update_stream_status("SSL update")
 
     def _on_sep_audio(self, _chunk: bytes) -> None:
@@ -116,6 +166,24 @@ class AppBridge(QObject):
 
     def _update_stream_status(self, prefix: str) -> None:
         self.setStatus(f"{prefix} | sources={self.sourceCount} potentials={self._potential_count}")
+
+    def _refresh_sources(self) -> None:
+        items = build_source_items(self._last_sst, enabled=self._sources_enabled)
+        if items != self._source_items:
+            self._source_items = items
+            self.sourceItemsChanged.emit()
+            self.sourceCountChanged.emit()
+
+    def _refresh_potentials(self) -> None:
+        count = count_potentials(
+            self._last_ssl,
+            min_energy=self._potential_min,
+            max_energy=self._potential_max,
+            enabled=self._potentials_enabled,
+        )
+        if count != self._potential_count:
+            self._potential_count = count
+            self.potentialCountChanged.emit()
 
 
 def run() -> int:

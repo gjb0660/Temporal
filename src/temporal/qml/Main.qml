@@ -362,24 +362,34 @@ ApplicationWindow {
                     }
                     CheckBox {
                         text: "Sources (" + appBridge.sourceCount + ")"
-                        checked: true
+                        checked: appBridge.sourcesEnabled
                         font.pixelSize: 28
+                        onToggled: appBridge.setSourcesEnabled(checked)
                     }
                     CheckBox {
                         text: "Potentials (" + appBridge.potentialCount + ")"
-                        checked: false
+                        checked: appBridge.potentialsEnabled
                         font.pixelSize: 28
+                        onToggled: appBridge.setPotentialsEnabled(checked)
                     }
                     Label {
                         text: "Potential sources\nenergy range:"
                         font.pixelSize: 28
                         color: "#4d5651"
                     }
+                    Label {
+                        text: appBridge.potentialEnergyMin.toFixed(2) + " - "
+                            + appBridge.potentialEnergyMax.toFixed(2)
+                        font.pixelSize: 22
+                        color: "#5f6863"
+                    }
                     RangeSlider {
                         from: 0
                         to: 1
-                        first.value: 0
-                        second.value: 1
+                        first.value: appBridge.potentialEnergyMin
+                        second.value: appBridge.potentialEnergyMax
+                        onFirstValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
+                        onSecondValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
                     }
 
                     Item {
