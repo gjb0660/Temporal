@@ -35,6 +35,7 @@
 
 - Clarify ambiguity with vscode_askQuestions before implementation.
 - Prepare or update a PRD before feature implementation.
+- Place PRD files only under docs/prd.
 - Execute in order: Explore -> Plan -> Approval -> Code.
 - After bug fixes, append a local preventive rule.
 

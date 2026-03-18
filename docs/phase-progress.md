@@ -8,12 +8,21 @@
 - Phase E: Agent governance files
   (`.github/copilot-instructions.md`, `AGENTS.md`, `.github/instructions/*`)
 
+## PRD Index
+
+- docs/prd/phase-a-project-skeleton.md
+- docs/prd/phase-b-remote-control-and-streams.md
+- docs/prd/phase-c-sources-filters.md
+- docs/prd/phase-d-auto-recording.md
+- docs/prd/phase-e-agent-governance.md
+- docs/prd/phase-f-validation-and-delivery.md
+
 ## Git Commits
 
-- `dfb75f3` phase-a: bootstrap temporal skeleton and runnable qml shell
-- `1c5d485` chore: align pyright config and use namespace packages
-- `8d5f3bd` phase-b: add ssh control and odas stream client scaffolding
-- `b97e9a7` phase-e: add agent governance instructions and skill pack
+- `7111e7e` phase-a: bootstrap temporal skeleton and runnable qml shell
+- `541f7e6` chore: align pyright config and use namespace packages
+- `28d5325` phase-b: add ssh control and odas stream client scaffolding
+- `4235d96` phase-e: add agent governance instructions and skill pack
 
 ## Next (Phase C/D/F)
 

@@ -47,7 +47,7 @@ Run these checks before merge:
 
 - pyright
 - qmllint src/temporal/ui/qml/Main.qml
-- `markdownlint AGENTS.md docs/*.md .github/instructions/*.md`
+- `markdownlint AGENTS.md docs/**/*.md .github/instructions/*.md`
 - ruff check src tests
 - `python -m unittest discover -s tests -p "test_*.py" -v`
 
@@ -63,6 +63,7 @@ Run these checks before merge:
 - Write AI-facing docs and code comments in concise English imperative style.
 - Write human-facing docs and chat responses in concise Chinese technical style.
 - Deliver or update a PRD before implementing a feature.
+- Store all PRDs under docs/prd; do not place PRDs in docs root.
 - Follow Explore -> Plan -> Approval -> Code before implementation.
 - After each bug fix, record a local lesson-learned rule.
 - Only use git add and git commit; never rewrite or delete git history.
