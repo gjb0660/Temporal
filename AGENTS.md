@@ -1,5 +1,10 @@
 # AGENTS
 
+## Ownership
+
+- This file defines agent roles, handoff contract, and execution workflow.
+- Keep repository-wide technical constraints in .github/copilot-instructions.md.
+
 ## Roles
 
 ### Explore Agent
@@ -35,16 +40,15 @@
 
 - Clarify ambiguity with vscode_askQuestions before implementation.
 - Prepare or update a PRD before feature implementation.
+- Follow technical boundaries and quality gates in .github/copilot-instructions.md.
 - Place PRD files only under docs/prd.
-- Keep Python code in src layout with PEP 420 namespace packages.
-- Keep QML in flat layout under src/temporal/qml.
 - Execute in order: Explore -> Plan -> Approval -> Code.
+- Commit implementation and corresponding tests together in one atomic commit.
 - After bug fixes, append a local preventive rule.
 
 ## Forbidden
 
 - No cross-layer shortcut (QML direct socket access).
 - No destructive git cleanup (`git reset --hard`, `git clean -fd`).
-- No adding `__init__.py` in Python source tree.
 - No git history rewrite or deletion.
 - No modification outside workspace scope.

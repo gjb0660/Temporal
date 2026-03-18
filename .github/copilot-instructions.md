@@ -1,5 +1,10 @@
 # Temporal Repository Instructions
 
+## Ownership
+
+- This file defines repository-wide technical constraints and quality gates.
+- Keep agent workflow, role handoff, and execution process in AGENTS.md.
+
 ## Project Intent
 
 Temporal is a Python + QML ODAS upper-computer client focused on:
@@ -62,13 +67,11 @@ Run these checks before merge:
 
 ## Collaboration Rules
 
-- Ask via vscode_askQuestions whenever requirements are ambiguous.
 - Run markdownlint for markdown changes and fix syntax violations.
 - Write AI-facing docs and code comments in concise English imperative style.
 - Write human-facing docs and chat responses in concise Chinese technical style.
 - Deliver or update a PRD before implementing a feature.
 - Store all PRDs under docs/prd; do not place PRDs in docs root.
-- Follow Explore -> Plan -> Approval -> Code before implementation.
-- After each bug fix, record a local lesson-learned rule.
+- Commit implementation and corresponding tests together in one atomic commit.
 - Only use git add and git commit; never rewrite or delete git history.
 - Never modify or delete files outside the current workspace.
