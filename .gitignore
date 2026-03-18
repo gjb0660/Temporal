@@ -1,12 +1,27 @@
-.venv/
+# Python-generated files
 __pycache__/
-*.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Build and test artifacts
 .coverage
+.env
+.mypy_cache/
+.pyright/
+coverage.xml
+.pytest_cache/
+.ruff_cache/
 htmlcov/
+
+# Temporal runtime outputs
 *.wav
 *.log
 *.tmp
-.vscode/settings.json
+
+# Local developer tools and notes
