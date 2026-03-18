@@ -1,34 +1,32 @@
 # Temporal
 
-Temporal is an ODAS-oriented array speech upper-computer client built with
-Python + QML.
+Temporal 是一个面向 ODAS 的阵列语音上位机客户端，采用 Python + QML 实现。
 
-## Stack
+## 产品定位
 
-- Python 3.10
-- uv + venv
-- PySide6 (QML)
+- 连接并控制远端 odaslive 运行状态
+- 实时查看 SST / SSL / SSS 数据联动
+- 通过 Sources / Filters 面板进行快速筛选
+- 按声源生命周期自动触发录制
 
-## Quick Start
+## 一键启动
 
 ```powershell
-uv venv --python 3.10
-.\.venv\Scripts\Activate.ps1
-uv sync
 uv run temporal
 ```
 
-## MVP Scope
+## 当前能力边界
 
-- SSH private-key based remote ODAS lifecycle control
-- SST/SSL/SSS data pipeline scaffolding
-- Source Elevation and Azimut chart placeholders
-- 3D source sphere placeholder + source/filter side panel
-- Auto recording state machine skeleton
+- 已完成：Phase A / B / C
+- 进行中：Phase D（录制链路完善）
 
-## Structure
+## 文档入口
 
-- src/temporal: application code
-- src/temporal/qml: QML pages and components (flat layout)
-- src/temporal/core: SSH/network/recording services
-- .github/instructions: agent-scoped instructions
+- 阶段进度：docs/phase-progress.md
+- 阶段 PRD：docs/prd/
+- 会话交接：docs/session-handoff-2026-03-18.md
+
+## 说明
+
+README 面向使用者与协作者，不展开开发流程细节。
+如需参与开发，请查看仓库中的规则与阶段文档。
