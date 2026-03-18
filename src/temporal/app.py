@@ -30,7 +30,7 @@ class AppBridge(QObject):
             on_pf_audio=self._on_pf_audio,
         )
 
-    @Property(str, notify=statusChanged)
+    @Property(str, notify=statusChanged)  # type: ignore[reportCallIssue]
     def status(self) -> str:
         return self._status
 

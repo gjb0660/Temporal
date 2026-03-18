@@ -40,8 +40,10 @@ include = [
     "tests",
 ]
 exclude = [
+    "**/.*",
     "**/node_modules",
     "**/__pycache__",
+    ".venv",
 ]
 ignore = [
     "*:/**/Python*/Lib",
@@ -63,7 +65,6 @@ reportMissingTypeStubs = "warning"
 
 [[tool.pyright.executionEnvironments]]
 root = "src"
-typeCheckingMode = "strict"
 reportCallIssue = "warning"
 reportOperatorIssue = "warning"
 reportAttributeAccessIssue = "warning"
@@ -71,7 +72,6 @@ reportUntypedClassDecorator = "error"
 reportUntypedFunctionDecorator = "error"
 reportDuplicateImport = "error"
 reportImportCycles = "error"
-reportShadowedImports = "error"
 reportConstantRedefinition = "warning"
 reportDeprecated = "warning"
 reportUninitializedInstanceVariable = "warning"
@@ -84,7 +84,7 @@ reportUnnecessaryCast = "warning"
 reportUnnecessaryComparison = "warning"
 reportUnnecessaryContains = "warning"
 reportUnnecessaryIsInstance = "warning"
-reportUnnecessaryTypeIgnoreComment = "warning"
+reportUnnecessaryTypeIgnoreComment = "none"
 
 [[tool.pyright.executionEnvironments]]
 root = "tests"

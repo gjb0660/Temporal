@@ -1,6 +1,6 @@
 ---
 description: "Use when: building or modifying QML pages and components for ODAS visualization and operator interactions."
-applyTo: ["src/temporal/ui/qml/**"]
+applyTo: "src/temporal/ui/qml/**"
 ---
 
 # QML Instructions

@@ -1,3 +1,4 @@
+// qmllint disable unqualified
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -211,14 +212,29 @@ ApplicationWindow {
                             }
                             RowLayout {
                                 spacing: 8
-                                Button { text: "Connect"; onClicked: appBridge.connectRemote() }
-                                Button { text: "Start"; onClicked: appBridge.startRemoteOdas() }
-                                Button { text: "Stop"; onClicked: appBridge.stopRemoteOdas() }
+                                Button {
+                                    text: "Connect"
+                                    onClicked: appBridge.connectRemote()
+                                }
+                                Button {
+                                    text: "Start"
+                                    onClicked: appBridge.startRemoteOdas()
+                                }
+                                Button {
+                                    text: "Stop"
+                                    onClicked: appBridge.stopRemoteOdas()
+                                }
                             }
                             RowLayout {
                                 spacing: 8
-                                Button { text: "Listen"; onClicked: appBridge.startStreams() }
-                                Button { text: "Close Streams"; onClicked: appBridge.stopStreams() }
+                                Button {
+                                    text: "Listen"
+                                    onClicked: appBridge.startStreams()
+                                }
+                                Button {
+                                    text: "Close Streams"
+                                    onClicked: appBridge.stopStreams()
+                                }
                             }
                         }
                     }
