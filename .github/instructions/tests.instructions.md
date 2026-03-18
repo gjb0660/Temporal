@@ -1,4 +1,5 @@
 ---
+description: "Use when: writing unit or integration tests for protocol parsing, reconnect behavior, and recording correctness."
 applyTo: ["tests/**"]
 ---
 

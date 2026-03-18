@@ -3,9 +3,9 @@
 ## Roles
 
 ### Explore Agent
-- Purpose: protocol and reference discovery.
-- Input: target repo/path, specific question list.
-- Output: file paths, concrete data contracts, risks.
+- Purpose: read-only protocol and reference discovery.
+- Input: target repo/path, focused question list, expected depth.
+- Output: file paths, concrete data contracts, open risks.
 
 ### Implement Agent
 - Purpose: code delivery under repository constraints.
@@ -29,5 +29,5 @@
 
 ## Forbidden
 - No cross-layer shortcut (QML direct socket access).
-- No hard reset of git state.
+- No destructive git cleanup (`git reset --hard`, `git clean -fd`).
 - No adding `__init__.py` in Python source tree.

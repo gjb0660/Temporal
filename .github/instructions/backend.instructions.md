@@ -1,5 +1,6 @@
 ---
-applyTo: ["src/temporal/core/**", "src/temporal/app.py"]
+description: "Use when: implementing Python backend services for ODAS control, SSH lifecycle, stream parsing, and recording pipelines."
+applyTo: ["src/temporal/core/**", "src/temporal/app.py", "src/temporal/main.py"]
 ---
 
 # Backend Instructions
