@@ -80,6 +80,68 @@ class TestAutoRecorder(unittest.TestCase):
             self.assertTrue(path.exists())
             self.assertGreater(path.stat().st_size, 44)
 
+    def test_sessions_snapshot_returns_sorted_items(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            recorder = AutoRecorder(output_dir=temp_dir, now_fn=clock.now)
+
+            recorder.start(3, "pf")
+            recorder.start(1, "sp")
+
+            sessions = recorder.sessions_snapshot()
+            pairs = [(item.source_id, item.mode) for item in sessions]
+            self.assertEqual(pairs, [(1, "sp"), (3, "pf")])
+            recorder.stop_all()
+
+    def test_timeout_refresh_prevents_jitter_stop(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            recorder = AutoRecorder(
+                output_dir=temp_dir,
+                inactive_timeout_sec=1.0,
+                now_fn=clock.now,
+            )
+
+            recorder.update_active_sources([7])
+            clock.advance(0.9)
+            recorder.update_active_sources([7])
+            clock.advance(0.2)
+
+            stopped = recorder.sweep_inactive()
+
+            self.assertEqual(stopped, [])
+            self.assertTrue(recorder.is_recording(7, "sp"))
+            self.assertTrue(recorder.is_recording(7, "pf"))
+            recorder.stop_all()
+
+    def test_timeout_stop_then_reconnect_restarts_sessions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            recorder = AutoRecorder(
+                output_dir=temp_dir,
+                inactive_timeout_sec=1.0,
+                now_fn=clock.now,
+            )
+
+            recorder.update_active_sources([9])
+            before_paths = [session.filepath for session in recorder.sessions_snapshot()]
+            self.assertEqual(len(before_paths), 2)
+
+            clock.advance(1.2)
+            stopped = recorder.sweep_inactive()
+            self.assertEqual(stopped, [9])
+            self.assertEqual(recorder.sessions_snapshot(), [])
+
+            clock.advance(0.1)
+            recorder.update_active_sources([9])
+            after_paths = [session.filepath for session in recorder.sessions_snapshot()]
+
+            self.assertEqual(len(after_paths), 2)
+            self.assertNotEqual(set(before_paths), set(after_paths))
+            self.assertTrue(recorder.is_recording(9, "sp"))
+            self.assertTrue(recorder.is_recording(9, "pf"))
+            recorder.stop_all()
+
 
 if __name__ == "__main__":
     unittest.main()

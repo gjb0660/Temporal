@@ -1,4 +1,3 @@
-// qmllint disable unqualified
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -101,6 +100,7 @@ ApplicationWindow {
             RightSidebar {
                 theme: root.theme
                 sourceRows: root.sourceRows()
+                recordingSessions: appBridge.recordingSessions
             }
         }
     }

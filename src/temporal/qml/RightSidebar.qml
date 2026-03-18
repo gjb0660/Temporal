@@ -7,6 +7,7 @@ Rectangle {
     id: root
     required property QtObject theme
     required property var sourceRows
+    required property var recordingSessions
 
     Layout.preferredWidth: theme.rightPanelWidth
     Layout.fillHeight: true
@@ -197,6 +198,38 @@ Rectangle {
 
         Item {
             Layout.fillHeight: true
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: "#c9d9d2"
+        }
+
+        Label {
+            text: "录音会话"
+            color: theme.titleColor
+            font.pixelSize: Math.max(20, theme.sideTitleFont)
+        }
+
+        Repeater {
+            model: root.recordingSessions
+
+            delegate: Label {
+                required property string modelData
+                Layout.fillWidth: true
+                text: modelData
+                color: theme.mutedText
+                font.pixelSize: theme.codeFont
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        Label {
+            visible: root.recordingSessions.length === 0
+            text: "暂无活跃录音会话"
+            color: theme.mutedText
+            font.pixelSize: theme.bodyFont
         }
     }
 }

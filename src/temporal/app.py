@@ -20,6 +20,9 @@ from temporal.core.ssh.remote_odas import RemoteOdasController
 
 
 class AppBridge(QObject):
+    _AUDIO_CHANNELS = 4
+    _AUDIO_SAMPLE_WIDTH = 2
+
     statusChanged = Signal()
     sourceItemsChanged = Signal()
     sourceIdsChanged = Signal()
@@ -28,6 +31,7 @@ class AppBridge(QObject):
     remoteLogLinesChanged = Signal()
     potentialCountChanged = Signal()
     recordingSourceCountChanged = Signal()
+    recordingSessionsChanged = Signal()
     sourcesEnabledChanged = Signal()
     potentialsEnabledChanged = Signal()
     potentialRangeChanged = Signal()
@@ -43,11 +47,14 @@ class AppBridge(QObject):
         self._last_ssl: dict = {}
         self._source_ids: list[int] = []
         self._selected_source_ids: set[int] = set()
+        self._source_channel_map: dict[int, int] = {}
+        self._channel_source_map: dict[int, int] = {}
         self._source_items: list[str] = []
         self._source_positions: list[dict[str, float | int]] = []
         self._remote_log_lines = ["等待连接远程 odaslive..."]
         self._potential_count = 0
         self._recording_source_count = 0
+        self._recording_sessions: list[str] = []
         self._sources_enabled = True
         self._potentials_enabled = False
         self._potential_min = 0.0
@@ -95,6 +102,10 @@ class AppBridge(QObject):
     @Property(int, notify=recordingSourceCountChanged)  # type: ignore[reportCallIssue]
     def recordingSourceCount(self) -> int:
         return self._recording_source_count
+
+    @Property(list, notify=recordingSessionsChanged)  # type: ignore[reportCallIssue]
+    def recordingSessions(self) -> list[str]:
+        return self._recording_sessions
 
     @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
     def sourcesEnabled(self) -> bool:
@@ -165,7 +176,10 @@ class AppBridge(QObject):
     def stopStreams(self) -> None:
         self._client.stop()
         self._recorder.stop_all()
+        self._source_channel_map.clear()
+        self._channel_source_map.clear()
         self._set_recording_source_count(0)
+        self._set_recording_sessions([])
         self.setStatus("数据流已关闭")
 
     @Slot(bool)
@@ -224,9 +238,11 @@ class AppBridge(QObject):
     def _on_sst(self, message: dict) -> None:
         self._last_sst = message
         self._refresh_sources()
+        self._update_source_channel_map(self._source_ids)
         self._recorder.update_active_sources(self._source_ids)
         self._recorder.sweep_inactive()
         self._set_recording_source_count(len(self._recorder.active_sources()))
+        self._refresh_recording_sessions()
         self._update_stream_status("SST 数据已更新")
 
     def _on_ssl(self, message: dict) -> None:
@@ -234,11 +250,73 @@ class AppBridge(QObject):
         self._refresh_potentials()
         self._update_stream_status("SSL 数据已更新")
 
-    def _on_sep_audio(self, _chunk: bytes) -> None:
-        return
+    def _on_sep_audio(self, chunk: bytes) -> None:
+        self._route_audio_chunk(chunk, mode="sp")
 
-    def _on_pf_audio(self, _chunk: bytes) -> None:
-        return
+    def _on_pf_audio(self, chunk: bytes) -> None:
+        self._route_audio_chunk(chunk, mode="pf")
+
+    def _route_audio_chunk(self, chunk: bytes, mode: str) -> None:
+        if not self._channel_source_map:
+            return
+
+        frame_width = self._AUDIO_CHANNELS * self._AUDIO_SAMPLE_WIDTH
+        usable = len(chunk) - (len(chunk) % frame_width)
+        if usable <= 0:
+            return
+
+        buffers = {
+            channel_index: bytearray()
+            for channel_index in self._channel_source_map
+            if 0 <= channel_index < self._AUDIO_CHANNELS
+        }
+        if not buffers:
+            return
+
+        for offset in range(0, usable, frame_width):
+            frame = chunk[offset : offset + frame_width]
+            for channel_index in buffers:
+                sample_offset = channel_index * self._AUDIO_SAMPLE_WIDTH
+                sample = frame[sample_offset : sample_offset + self._AUDIO_SAMPLE_WIDTH]
+                buffers[channel_index].extend(sample)
+
+        for channel_index, channel_pcm in buffers.items():
+            source_id = self._channel_source_map.get(channel_index)
+            if source_id is None or not channel_pcm:
+                continue
+            self._recorder.push(source_id, mode, bytes(channel_pcm))
+
+    def _update_source_channel_map(self, source_ids: list[int]) -> None:
+        next_source_map: dict[int, int] = {}
+        used_channels: set[int] = set()
+
+        for source_id in source_ids:
+            channel_index = self._source_channel_map.get(source_id)
+            if channel_index is None or channel_index in used_channels:
+                continue
+            if not 0 <= channel_index < self._AUDIO_CHANNELS:
+                continue
+            next_source_map[source_id] = channel_index
+            used_channels.add(channel_index)
+
+        free_channels = [
+            channel_index
+            for channel_index in range(self._AUDIO_CHANNELS)
+            if channel_index not in used_channels
+        ]
+        for source_id in source_ids:
+            if source_id in next_source_map:
+                continue
+            if not free_channels:
+                break
+            channel_index = free_channels.pop(0)
+            next_source_map[source_id] = channel_index
+
+        self._source_channel_map = next_source_map
+        self._channel_source_map = {
+            channel_index: source_id
+            for source_id, channel_index in self._source_channel_map.items()
+        }
 
     def _update_stream_status(self, prefix: str) -> None:
         self.setStatus(
@@ -279,6 +357,22 @@ class AppBridge(QObject):
             self._set_remote_log_lines(["远程日志为空，等待 odaslive 输出..."])
             return
         self._set_remote_log_lines(lines)
+
+    def _set_recording_sessions(self, sessions: list[str]) -> None:
+        if self._recording_sessions == sessions:
+            return
+        self._recording_sessions = sessions
+        self.recordingSessionsChanged.emit()
+
+    def _refresh_recording_sessions(self) -> None:
+        snapshot_fn = getattr(self._recorder, "sessions_snapshot", None)
+        if snapshot_fn is None or not callable(snapshot_fn):
+            self._set_recording_sessions([])
+            return
+
+        sessions = snapshot_fn()
+        items = [f"Source {item.source_id} [{item.mode}] {item.filepath.name}" for item in sessions]
+        self._set_recording_sessions(items)
 
     def _refresh_sources(self) -> None:
         source_ids = extract_source_ids(self._last_sst)
