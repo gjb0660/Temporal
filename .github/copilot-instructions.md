@@ -68,6 +68,8 @@ Run these checks before merge:
 ## Collaboration Rules
 
 - Run markdownlint for markdown changes and fix syntax violations.
+- For Python and QML changes, run lint first, fix findings,
+  then run format before final checks.
 - Write AI-facing docs and code comments in concise English imperative style.
 - Write human-facing docs and chat responses in concise Chinese technical style.
 - Deliver or update a PRD before implementing a feature.
