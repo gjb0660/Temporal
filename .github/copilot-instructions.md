@@ -21,7 +21,9 @@ Temporal is a Python + QML ODAS upper-computer client focused on:
   - ssh: remote odaslive lifecycle control
   - recording: source-driven recorder state and file writing
 - Bridge and startup: src/temporal/app.py, src/temporal/main.py
-- QML presentation: src/temporal/ui/qml
+- QML presentation: src/temporal/qml (flat QML layout)
+
+Prefer src layout with PEP 420 namespace packages for Python source tree.
 
 QML must not open sockets directly. All service actions go through appBridge slots/signals.
 
@@ -46,14 +48,16 @@ and reconnect scenarios.
 Run these checks before merge:
 
 - pyright
-- qmllint src/temporal/ui/qml/Main.qml
+- qmllint src/temporal/qml/Main.qml
 - `markdownlint AGENTS.md docs/**/*.md .github/instructions/*.md`
 - ruff check src tests
 - `python -m unittest discover -s tests -p "test_*.py" -v`
 
 ## Additional Rules
 
-- Python source tree uses namespace packages; do not add __init__.py files.
+- Python source tree uses PEP 420 namespace packages; do not add __init__.py files.
+- Keep Python modules under src layout (src/temporal/**).
+- Keep QML files under flat layout (src/temporal/qml/**).
 - Keep Pyright enabled and aligned with pyproject.toml settings.
 
 ## Collaboration Rules

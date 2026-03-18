@@ -4,7 +4,7 @@
     ],
     "qt-qml.qmlls.useQmlImportPathEnvVar": true,
     "terminal.integrated.env.windows": {
-        "PYTHONPATH": "."
+        "PYTHONPATH": "src"
     },
     "files.readonlyInclude": {
         ".venv/**": true
@@ -18,5 +18,4 @@
     ],
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": true,
-    "python-envs.defaultEnvManager": "ms-python.python:system"
 }

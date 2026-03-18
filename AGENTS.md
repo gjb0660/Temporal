@@ -36,6 +36,8 @@
 - Clarify ambiguity with vscode_askQuestions before implementation.
 - Prepare or update a PRD before feature implementation.
 - Place PRD files only under docs/prd.
+- Keep Python code in src layout with PEP 420 namespace packages.
+- Keep QML in flat layout under src/temporal/qml.
 - Execute in order: Explore -> Plan -> Approval -> Code.
 - After bug fixes, append a local preventive rule.
 

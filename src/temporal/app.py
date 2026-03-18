@@ -125,7 +125,7 @@ def run() -> int:
     bridge = AppBridge()
     engine.rootContext().setContextProperty("appBridge", bridge)
 
-    qml_path = Path(__file__).resolve().parent / "ui" / "qml" / "Main.qml"
+    qml_path = Path(__file__).resolve().parent / "qml" / "Main.qml"
     engine.load(str(qml_path))
 
     if not engine.rootObjects():

@@ -14,7 +14,7 @@ dependencies = [
     "tomli>=2.2.1,<3.0.0",
 ]
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "pyright>=1.1.390,<2.0.0",
     "ruff>=0.8.0,<1.0.0",
@@ -22,17 +22,6 @@ dev = [
 
 [project.scripts]
 temporal = "temporal.main:main"
-
-[tool.uv]
-default-groups = ["dev"]
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["temporal*"]
-namespaces = true
 
 [tool.pyright]
 include = [
