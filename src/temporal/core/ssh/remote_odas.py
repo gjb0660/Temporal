@@ -63,3 +63,8 @@ class RemoteOdasController:
 
     def status(self) -> CommandResult:
         return self._exec("pgrep -af odaslive || true")
+
+    def read_log_tail(self, lines: int = 80) -> CommandResult:
+        safe_lines = max(1, min(lines, 200))
+        cmd = f"sh -lc 'if [ -f /tmp/odaslive.log ]; then tail -n {safe_lines} /tmp/odaslive.log; fi'"
+        return self._exec(cmd)

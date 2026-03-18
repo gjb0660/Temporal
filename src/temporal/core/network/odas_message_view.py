@@ -21,6 +21,49 @@ def extract_source_ids(sst_message: dict) -> list[int]:
     return source_ids
 
 
+def extract_source_positions(
+    sst_message: dict,
+    selected_ids: set[int] | None = None,
+    enabled: bool = True,
+) -> list[dict[str, float | int]]:
+    if not enabled:
+        return []
+
+    src = sst_message.get("src", [])
+    if not isinstance(src, list):
+        return []
+
+    points: list[dict[str, float | int]] = []
+    seen: set[int] = set()
+    for item in src:
+        if not isinstance(item, dict):
+            continue
+
+        source_id = item.get("id")
+        x = item.get("x")
+        y = item.get("y")
+        z = item.get("z")
+        if not isinstance(source_id, int) or source_id == 0:
+            continue
+        if source_id in seen:
+            continue
+        if selected_ids is not None and source_id not in selected_ids:
+            continue
+        if not all(isinstance(value, (int, float)) for value in (x, y, z)):
+            continue
+
+        seen.add(source_id)
+        points.append(
+            {
+                "id": source_id,
+                "x": float(x),
+                "y": float(y),
+                "z": float(z),
+            }
+        )
+    return points
+
+
 def build_source_items(
     sst_message: dict,
     enabled: bool = True,

@@ -29,7 +29,7 @@ class TestAppBridgeRecording(unittest.TestCase):
             bridge._on_sst({"src": [{"id": 2}, {"id": 0}, {"id": 5}]})
 
             self.assertEqual(bridge.recordingSourceCount, 2)
-            self.assertIn("recording=2", bridge.status)
+            self.assertIn("录制中=2", bridge.status)
 
     def test_stop_streams_resets_recording_count(self) -> None:
         with patch("temporal.app.AutoRecorder", _FakeRecorder):
@@ -39,7 +39,7 @@ class TestAppBridgeRecording(unittest.TestCase):
             bridge.stopStreams()
 
             self.assertEqual(bridge.recordingSourceCount, 0)
-            self.assertEqual(bridge.status, "Streams stopped")
+            self.assertEqual(bridge.status, "数据流已关闭")
 
 
 if __name__ == "__main__":

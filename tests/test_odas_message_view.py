@@ -3,6 +3,7 @@ import unittest
 from temporal.core.network.odas_message_view import (
     build_source_items,
     count_potentials,
+    extract_source_positions,
     extract_source_ids,
 )
 
@@ -42,6 +43,36 @@ class TestOdasMessageView(unittest.TestCase):
         self.assertEqual(
             build_source_items(sst, enabled=True, selected_ids={2, 3}),
             ["Source 2", "Source 3"],
+        )
+
+    def test_extract_source_positions_returns_xyz_points(self) -> None:
+        sst = {
+            "src": [
+                {"id": 1, "x": 0.1, "y": 0.2, "z": 0.3},
+                {"id": 2, "x": -0.2, "y": 0.0, "z": 0.6},
+            ]
+        }
+        self.assertEqual(
+            extract_source_positions(sst),
+            [
+                {"id": 1, "x": 0.1, "y": 0.2, "z": 0.3},
+                {"id": 2, "x": -0.2, "y": 0.0, "z": 0.6},
+            ],
+        )
+
+    def test_extract_source_positions_skips_invalid_and_applies_selection(self) -> None:
+        sst = {
+            "src": [
+                {"id": 0, "x": 0.0, "y": 0.1, "z": 0.2},
+                {"id": 2, "x": 0.1, "y": 0.2, "z": 0.3},
+                {"id": 2, "x": 0.5, "y": 0.5, "z": 0.5},
+                {"id": 3, "x": "bad", "y": 0.4, "z": 0.5},
+                {"id": 4, "x": 0.4, "y": 0.3, "z": 0.2},
+            ]
+        }
+        self.assertEqual(
+            extract_source_positions(sst, selected_ids={4}),
+            [{"id": 4, "x": 0.4, "y": 0.3, "z": 0.2}],
         )
 
     def test_count_potentials(self) -> None:

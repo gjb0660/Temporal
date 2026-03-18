@@ -2,22 +2,23 @@
 
 ## Goal
 
-Deliver a QML live-data page that visually matches the original odas_web page
-while preserving Temporal branding and responsive behavior across window sizes.
+Deliver a QML live-data page that visually matches the original odas_web page,
+switches human-facing UI copy to Chinese, and upgrades the source-location area
+from a placeholder into a real rotatable QtQuick3D scene.
 
 ## Scope
 
 - Rebuild the main page layout with responsive QML layouts.
 - Match the reference page structure, spacing, typography, colors, and panel rhythm.
-- Replace plain placeholders with high-fidelity visual stand-ins for charts and
-  the source-location sphere.
+- Replace the local monitor card with remote odaslive log output.
+- Replace the placeholder source-location sphere with a rotatable QtQuick3D scene.
+- Unify ODAS control button styling and align the energy-range labels with the slider.
 - Keep existing appBridge actions and bindings working.
 - Validate with local screenshots and iterative visual adjustment.
 
 ## Non-Goals
 
 - Full production chart rendering from live SST history.
-- Real 3D source sphere rendering engine.
 - Backend protocol changes beyond minimal read-only UI support if required.
 
 ## Functional Requirements
@@ -25,9 +26,11 @@ while preserving Temporal branding and responsive behavior across window sizes.
 1. The page keeps a stable three-column structure when the window is resized.
 2. Header, content panels, and footer remain aligned without absolute page positioning.
 3. Source and filter panels continue to bind to appBridge state.
-4. The ODAS control area keeps all current actions callable from the UI.
-5. Central visualization areas look close to the reference even before real
-   plotting data is implemented.
+4. The ODAS control area keeps all current actions callable from the UI and uses
+   a consistent custom button style.
+5. The central 3D visualization supports drag rotation and displays active SST
+   source positions when available.
+6. The left log panel displays remote `/tmp/odaslive.log` tail output through the bridge.
 
 ## Quality Requirements
 

@@ -1,61 +1,63 @@
 // qmllint disable unqualified
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Basic as Basic
 import QtQuick.Layouts
+import QtQuick3D
 
 ApplicationWindow {
     id: root
     width: 1188
     height: 794
-    minimumWidth: 920
-    minimumHeight: 620
+    minimumWidth: 940
+    minimumHeight: 640
     visible: true
-    title: "Temporal Live Data"
+    title: "Temporal 实时数据"
     color: "#dce9e2"
+    font.family: "Microsoft YaHei UI"
 
     readonly property color pageBackground: "#dce9e2"
-    readonly property color panelBackground: "#d6e7df"
+    readonly property color panelBackground: "#d8e8e1"
     readonly property color cardBackground: "#f9fbfa"
-    readonly property color borderColor: "#c8d9d0"
-    readonly property color accentGreen: "#069a47"
-    readonly property color accentPurple: "#c955e0"
-    readonly property color accentCyan: "#44c7cf"
-    readonly property color titleColor: "#2d2d2d"
-
+    readonly property color borderColor: "#cadbd2"
+    readonly property color accentGreen: "#079b49"
+    readonly property color accentPurple: "#cf54ea"
+    readonly property color accentCyan: "#47c8cf"
+    readonly property color titleColor: "#333333"
+    readonly property color mutedText: "#5f6d67"
+    readonly property int menuHeight: 22
+    readonly property int brandHeight: Math.max(46, Math.round(height * 0.064))
+    readonly property int footerHeightValue: Math.max(28, Math.round(height * 0.040))
     readonly property int pageMargin: Math.max(14, Math.round(width * 0.013))
     readonly property int columnGap: Math.max(12, Math.round(width * 0.010))
     readonly property int panelInset: Math.max(14, Math.round(width * 0.012))
     readonly property int sectionGap: Math.max(12, Math.round(height * 0.016))
-    readonly property int headerHeightValue: Math.max(50, Math.round(height * 0.064))
-    readonly property int footerHeightValue: Math.max(30, Math.round(height * 0.040))
     readonly property int leftPanelWidth: Math.max(255, Math.min(305, Math.round(width * 0.245)))
-    readonly property int rightPanelWidth: Math.max(160, Math.min(210, Math.round(width * 0.160)))
-    readonly property int heroFont: Math.max(30, Math.round(height * 0.048))
-    readonly property int panelHeaderFont: Math.max(21, Math.round(height * 0.029))
-    readonly property int majorSectionFont: Math.max(14, Math.round(height * 0.022))
-    readonly property int bodyFont: Math.max(12, Math.round(height * 0.020))
+    readonly property int rightPanelWidth: Math.max(170, Math.min(210, Math.round(width * 0.160)))
+    readonly property int brandFont: Math.max(22, Math.round(height * 0.040))
+    readonly property int sideTitleFont: Math.max(17, Math.round(height * 0.031))
+    readonly property int sectionTitleFont: Math.max(14, Math.round(height * 0.024))
+    readonly property int bodyFont: Math.max(12, Math.round(height * 0.019))
     readonly property int smallFont: Math.max(11, Math.round(height * 0.017))
-    readonly property int cardRadius: 4
-    readonly property int chartHeight: Math.max(165, Math.round(height * 0.190))
-    readonly property int sphereHeight: Math.max(210, Math.round(height * 0.330))
-    readonly property int sourceRowHeight: Math.max(44, Math.round(height * 0.072))
+    readonly property int codeFont: Math.max(11, Math.round(height * 0.016))
+    readonly property int chartHeight: Math.max(165, Math.round(height * 0.194))
+    readonly property int sphereHeight: Math.max(228, Math.round(height * 0.340))
+    readonly property real sphereRadius: 118
 
-    property var monitorRows: [
-        { label: "CPU Usage", value: "26.1 %" },
-        { label: "CPU Temp.", value: "-1.00 deg C" },
-        { label: "Memory Usage", value: "82 %" },
-        { label: "IP", value: "198.18.0.1" }
-    ]
+    property real sphereYaw: -18
+    property real spherePitch: 14
+    property var latitudeAngles: [-75, -60, -45, -30, -15, 0, 15, 30, 45, 60, 75]
+    property var longitudeAngles: [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345]
 
-    function previewSourceRows() {
+    function sourceRows() {
         const ids = appBridge.sourceIds
         const rows = []
         if (ids.length === 0) {
             for (let index = 0; index < 4; index += 1) {
                 rows.push({
                     sourceId: -1,
-                    label: "Source",
-                    checked: false,
+                    label: "声源",
+                    checked: true,
                     enabled: false,
                     badge: index === 1 ? "15" : ""
                 })
@@ -67,84 +69,241 @@ ApplicationWindow {
             const sourceId = ids[index]
             rows.push({
                 sourceId: sourceId,
-                label: "Source",
+                label: "声源",
                 checked: appBridge.isSourceSelected(sourceId),
                 enabled: true,
-                badge: index === 1 ? String(sourceId) : ""
+                badge: String(sourceId)
             })
         }
         return rows
     }
 
-    menuBar: MenuBar {
-        Menu {
-            title: "File"
+    function spherePreviewSources() {
+        if (appBridge.sourcePositions.length > 0) {
+            return appBridge.sourcePositions
         }
-        Menu {
-            title: "Edit"
+        return [{ id: 15, x: -0.42, y: 0.14, z: 0.60 }]
+    }
+
+    component ActionButton: Basic.Button {
+        id: control
+        implicitHeight: 32
+        implicitWidth: 84
+        font.pixelSize: root.bodyFont
+        padding: 0
+
+        contentItem: Text {
+            text: control.text
+            color: control.enabled ? "#2f3a36" : "#89948f"
+            font.pixelSize: root.bodyFont
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
         }
-        Menu {
-            title: "View"
-        }
-        Menu {
-            title: "Window"
-        }
-        Menu {
-            title: "Help"
+
+        background: Rectangle {
+            radius: 3
+            color: control.pressed ? "#d8e4de" : "#f7faf8"
+            border.color: control.enabled ? "#b9cbc2" : "#d7dfdb"
         }
     }
 
-    header: Rectangle {
-        height: root.headerHeightValue
-        color: root.accentGreen
+    component SideCheckBox: Basic.CheckBox {
+        id: control
+        spacing: 8
 
-        RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: root.pageMargin
-            anchors.rightMargin: root.pageMargin
-            spacing: Math.max(18, root.columnGap)
+        indicator: Rectangle {
+            implicitWidth: 13
+            implicitHeight: 13
+            radius: 2
+            border.color: "#7f8a85"
+            color: "#ffffff"
+            opacity: control.enabled ? 1.0 : 0.55
 
             Rectangle {
-                Layout.preferredWidth: 26
-                Layout.preferredHeight: 26
-                radius: 3
-                color: "transparent"
-                border.color: "white"
-                border.width: 2
+                anchors.centerIn: parent
+                width: 7
+                height: 7
+                radius: 1
+                color: "#6e7773"
+                visible: control.checked
+            }
+        }
 
-                Repeater {
-                    model: 4
-                    delegate: Rectangle {
-                        width: 6
-                        height: 6
-                        radius: 1
-                        color: "white"
-                        x: 4 + (index % 2) * 10
-                        y: 4 + Math.floor(index / 2) * 10
+        contentItem: Text {
+            text: control.text
+            color: control.enabled ? "#4f5854" : "#7a8480"
+            font.pixelSize: root.bodyFont
+            verticalAlignment: Text.AlignVCenter
+        }
+    }
+
+    component ChartCanvas: Canvas {
+        property var yTicks: []
+        property var xTicks: []
+        property var firstSeries: []
+        property var secondSeries: []
+        property color firstColor: root.accentCyan
+        property color secondColor: root.accentPurple
+        property string xAxisLabel: "样本"
+
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+
+        onPaint: {
+            const ctx = getContext("2d")
+            const w = width
+            const h = height
+            const leftPad = 44
+            const rightPad = 10
+            const topPad = 8
+            const bottomPad = 34
+            const plotW = w - leftPad - rightPad
+            const plotH = h - topPad - bottomPad
+
+            ctx.reset()
+            ctx.fillStyle = "#ffffff"
+            ctx.fillRect(0, 0, w, h)
+            ctx.font = "12px sans-serif"
+            ctx.textBaseline = "middle"
+            ctx.textAlign = "left"
+
+            ctx.strokeStyle = "#d7dede"
+            ctx.lineWidth = 1
+            for (let row = 0; row <= 6; row += 1) {
+                const y = topPad + row * plotH / 6
+                ctx.beginPath()
+                ctx.moveTo(leftPad, y)
+                ctx.lineTo(leftPad + plotW, y)
+                ctx.stroke()
+            }
+            for (let col = 0; col <= 8; col += 1) {
+                const x = leftPad + col * plotW / 8
+                ctx.beginPath()
+                ctx.moveTo(x, topPad)
+                ctx.lineTo(x, topPad + plotH)
+                ctx.stroke()
+            }
+
+            ctx.fillStyle = "#747b78"
+            for (let index = 0; index < yTicks.length; index += 1) {
+                const y = topPad + index * plotH / Math.max(1, yTicks.length - 1)
+                ctx.fillText(String(yTicks[index]), 8, y)
+            }
+
+            ctx.textAlign = "center"
+            for (let index = 0; index < xTicks.length; index += 1) {
+                const x = leftPad + index * plotW / Math.max(1, xTicks.length - 1)
+                ctx.fillText(String(xTicks[index]), x, topPad + plotH + 16)
+            }
+            ctx.fillText(xAxisLabel, leftPad + plotW / 2, h - 4)
+
+            function plot(points, color) {
+                if (points.length === 0) {
+                    return
+                }
+                ctx.strokeStyle = color
+                ctx.lineWidth = 2
+                ctx.beginPath()
+                for (let index = 0; index < points.length; index += 1) {
+                    const px = leftPad + index * plotW / Math.max(1, points.length - 1)
+                    const py = topPad + plotH * (1 - points[index])
+                    if (index === 0) {
+                        ctx.moveTo(px, py)
+                    } else {
+                        ctx.lineTo(px, py)
                     }
                 }
+                ctx.stroke()
             }
 
-            Label {
-                text: "Temporal Studio"
-                color: "white"
-                font.pixelSize: root.heroFont
-                font.bold: true
-                Layout.alignment: Qt.AlignVCenter
-            }
+            plot(firstSeries, firstColor)
+            plot(secondSeries, secondColor)
+        }
+    }
 
-            Item {
-                Layout.fillWidth: true
-            }
+    header: Column {
+        width: root.width
+        spacing: 0
 
-            Repeater {
-                model: ["Configure", "Record", "Camera"]
-                delegate: Label {
-                    text: modelData
+        Rectangle {
+            width: parent.width
+            height: root.menuHeight
+            color: "#ffffff"
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 6
+                spacing: 16
+
+                Repeater {
+                    model: ["文件", "编辑", "视图", "窗口", "帮助"]
+                    delegate: Label {
+                        text: modelData
+                        color: "#111111"
+                        font.pixelSize: root.smallFont + 1
+                        Layout.alignment: Qt.AlignVCenter
+                    }
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+            }
+        }
+
+        Rectangle {
+            width: parent.width
+            height: root.brandHeight
+            color: root.accentGreen
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: root.pageMargin
+                anchors.rightMargin: root.pageMargin
+                spacing: Math.max(14, root.columnGap)
+
+                Rectangle {
+                    Layout.preferredWidth: 26
+                    Layout.preferredHeight: 26
+                    radius: 3
+                    color: "transparent"
+                    border.color: "white"
+                    border.width: 2
+
+                    Repeater {
+                        model: 4
+                        delegate: Rectangle {
+                            width: 6
+                            height: 6
+                            radius: 1
+                            color: "white"
+                            x: 4 + (index % 2) * 10
+                            y: 4 + Math.floor(index / 2) * 10
+                        }
+                    }
+                }
+
+                Label {
+                    text: "Temporal Studio"
                     color: "white"
-                    font.pixelSize: Math.max(12, root.bodyFont + 1)
-                    Layout.leftMargin: Math.max(14, root.columnGap)
+                    font.pixelSize: root.brandFont
+                    font.bold: true
                     Layout.alignment: Qt.AlignVCenter
+                }
+
+                Item {
+                    Layout.fillWidth: true
+                }
+
+                Repeater {
+                    model: ["配置", "录制", "相机"]
+                    delegate: Label {
+                        text: modelData
+                        color: "white"
+                        font.pixelSize: root.bodyFont + 1
+                        Layout.leftMargin: Math.max(12, root.columnGap)
+                        Layout.alignment: Qt.AlignVCenter
+                    }
                 }
             }
         }
@@ -160,7 +319,7 @@ ApplicationWindow {
             anchors.rightMargin: root.pageMargin
 
             Label {
-                text: "Temporal interface for ODAS"
+                text: "ODAS 图形界面客户端"
                 color: "white"
                 font.pixelSize: root.bodyFont
             }
@@ -170,7 +329,7 @@ ApplicationWindow {
             }
 
             Label {
-                text: "Legal"
+                text: "法律声明"
                 color: "white"
                 font.pixelSize: root.bodyFont
             }
@@ -189,7 +348,7 @@ ApplicationWindow {
             Rectangle {
                 Layout.preferredWidth: root.leftPanelWidth
                 Layout.fillHeight: true
-                radius: root.cardRadius
+                radius: 4
                 color: root.panelBackground
 
                 ColumnLayout {
@@ -198,134 +357,117 @@ ApplicationWindow {
                     spacing: root.sectionGap
 
                     Label {
-                        text: "ODAS Data"
+                        text: "ODAS 数据"
                         color: root.titleColor
-                        font.pixelSize: Math.max(32, root.heroFont - 2)
+                        font.pixelSize: Math.max(30, root.sideTitleFont + 8)
                     }
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: Math.max(280, root.height * 0.375)
-                        radius: root.cardRadius
+                        Layout.preferredHeight: Math.max(300, root.height * 0.405)
+                        radius: 4
                         color: root.cardBackground
                         border.color: root.borderColor
 
                         ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: root.panelInset
-                            spacing: Math.max(12, root.sectionGap - 2)
+                            spacing: Math.max(10, root.smallFont)
 
                             Label {
-                                text: "Local System Monitor"
+                                text: "远程 odaslive 日志"
                                 color: "#414141"
-                                font.pixelSize: Math.max(14, root.bodyFont + 1)
+                                font.pixelSize: root.sectionTitleFont
                             }
 
-                            Repeater {
-                                model: root.monitorRows
-                                delegate: Rectangle {
-                                    required property var modelData
-                                    Layout.fillWidth: true
-                                    Layout.preferredHeight: Math.max(34, root.height * 0.045)
-                                    radius: 3
-                                    color: "#ffffff"
-                                    border.color: "#ccd9d2"
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                radius: 3
+                                color: "#ffffff"
+                                border.color: "#d1ddd7"
 
-                                    RowLayout {
-                                        anchors.fill: parent
-                                        spacing: 0
+                                ScrollView {
+                                    anchors.fill: parent
+                                    anchors.margins: 8
+                                    clip: true
 
-                                        Rectangle {
-                                            Layout.fillHeight: true
-                                            Layout.preferredWidth: Math.max(88, parent.width * 0.43)
-                                            color: "#eef1ef"
-                                            border.color: "transparent"
-                                            radius: 3
-
-                                            Label {
-                                                anchors.verticalCenter: parent.verticalCenter
-                                                anchors.left: parent.left
-                                                anchors.leftMargin: 12
-                                                text: modelData.label
-                                                color: "#666666"
-                                                font.pixelSize: root.bodyFont
-                                            }
-                                        }
-
-                                        Item {
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-
-                                            Label {
-                                                anchors.centerIn: parent
-                                                text: modelData.value
-                                                color: "#666666"
-                                                font.pixelSize: root.bodyFont
-                                            }
-                                        }
+                                    TextArea {
+                                        width: parent.width
+                                        readOnly: true
+                                        wrapMode: TextArea.NoWrap
+                                        selectByMouse: true
+                                        text: appBridge.remoteLogLines.join("\n")
+                                        color: "#2e3532"
+                                        font.family: "Consolas"
+                                        font.pixelSize: root.codeFont
+                                        padding: 0
+                                        background: null
                                     }
                                 }
-                            }
-
-                            Item {
-                                Layout.fillHeight: true
                             }
                         }
                     }
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: Math.max(128, root.height * 0.178)
-                        radius: root.cardRadius
+                        Layout.preferredHeight: Math.max(168, root.height * 0.220)
+                        radius: 4
                         color: root.cardBackground
                         border.color: root.borderColor
 
                         ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: root.panelInset
-                            spacing: Math.max(8, root.smallFont)
+                            spacing: 8
 
                             Label {
-                                text: "ODAS Control"
+                                text: "ODAS 控制"
                                 color: "#414141"
-                                font.pixelSize: Math.max(14, root.bodyFont + 1)
+                                font.pixelSize: root.sectionTitleFont
                             }
 
                             Label {
-                                text: "ODAS Remote is connected"
-                                color: "#4f5b56"
+                                text: appBridge.status
+                                color: root.mutedText
                                 font.pixelSize: root.bodyFont
+                                wrapMode: Text.WordWrap
                             }
 
-                            RowLayout {
-                                spacing: 8
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 3
+                                columnSpacing: 8
+                                rowSpacing: 8
 
-                                Button {
-                                    text: "Connect"
+                                ActionButton {
+                                    text: "连接"
+                                    Layout.fillWidth: true
                                     onClicked: appBridge.connectRemote()
                                 }
 
-                                Button {
-                                    text: "Start"
+                                ActionButton {
+                                    text: "启动"
+                                    Layout.fillWidth: true
                                     onClicked: appBridge.startRemoteOdas()
                                 }
 
-                                Button {
-                                    text: "Stop"
+                                ActionButton {
+                                    text: "停止"
+                                    Layout.fillWidth: true
                                     onClicked: appBridge.stopRemoteOdas()
                                 }
-                            }
 
-                            RowLayout {
-                                spacing: 8
-
-                                Button {
-                                    text: "Listen"
+                                ActionButton {
+                                    text: "监听"
+                                    Layout.fillWidth: true
                                     onClicked: appBridge.startStreams()
                                 }
 
-                                Button {
-                                    text: "Close Streams"
+                                ActionButton {
+                                    text: "关闭流"
+                                    Layout.fillWidth: true
+                                    Layout.columnSpan: 2
                                     onClicked: appBridge.stopStreams()
                                 }
                             }
@@ -352,9 +494,9 @@ ApplicationWindow {
                     spacing: Math.max(8, root.smallFont)
 
                     Label {
-                        text: "Source Elevation"
+                        text: "声源俯仰角"
                         color: "#4a4a4a"
-                        font.pixelSize: Math.max(16, root.majorSectionFont + 2)
+                        font.pixelSize: root.sideTitleFont
                     }
 
                     Rectangle {
@@ -363,123 +505,20 @@ ApplicationWindow {
                         color: "#ffffff"
                         border.color: "#d9e1dd"
 
-                        ColumnLayout {
+                        ChartCanvas {
                             anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 8
-                            anchors.topMargin: 6
-                            anchors.bottomMargin: 6
-                            spacing: 4
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                spacing: 6
-
-                                ColumnLayout {
-                                    Layout.preferredWidth: 32
-                                    Layout.fillHeight: true
-                                    spacing: 0
-
-                                    Repeater {
-                                        model: ["90", "60", "30", "0", "-30", "-60", "-90"]
-                                        delegate: Label {
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            text: modelData
-                                            color: "#747b78"
-                                            font.pixelSize: root.smallFont
-                                            horizontalAlignment: Text.AlignRight
-                                            verticalAlignment: Text.AlignVCenter
-                                        }
-                                    }
-                                }
-
-                                Canvas {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-
-                                    onPaint: {
-                                        const ctx = getContext("2d")
-                                        const w = width
-                                        const h = height
-                                        ctx.reset()
-                                        ctx.fillStyle = "#ffffff"
-                                        ctx.fillRect(0, 0, w, h)
-
-                                        ctx.strokeStyle = "#d7dede"
-                                        ctx.lineWidth = 1
-                                        for (let row = 0; row <= 6; row += 1) {
-                                            const y = row * h / 6
-                                            ctx.beginPath()
-                                            ctx.moveTo(0, y)
-                                            ctx.lineTo(w, y)
-                                            ctx.stroke()
-                                        }
-                                        for (let col = 0; col <= 8; col += 1) {
-                                            const x = col * w / 8
-                                            ctx.beginPath()
-                                            ctx.moveTo(x, 0)
-                                            ctx.lineTo(x, h)
-                                            ctx.stroke()
-                                        }
-
-                                        function plot(points, color) {
-                                            ctx.strokeStyle = color
-                                            ctx.lineWidth = 2
-                                            ctx.beginPath()
-                                            for (let index = 0; index < points.length; index += 1) {
-                                                const px = index * w / (points.length - 1)
-                                                const py = h * (1 - points[index])
-                                                if (index === 0) {
-                                                    ctx.moveTo(px, py)
-                                                } else {
-                                                    ctx.lineTo(px, py)
-                                                }
-                                            }
-                                            ctx.stroke()
-                                        }
-
-                                        plot([0.58, 0.57, 0.56, 0.54, 0.53, 0.52, 0.52, 0.52, 0.52], root.accentCyan)
-                                        plot([0.42, 0.45, 0.50, 0.56, 0.61, 0.63, 0.62, 0.60, 0.59], root.accentPurple)
-                                    }
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 6
-
-                                Item {
-                                    Layout.preferredWidth: 32
-                                }
-
-                                Repeater {
-                                    model: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
-                                    delegate: Label {
-                                        Layout.fillWidth: true
-                                        text: modelData
-                                        color: "#747b78"
-                                        font.pixelSize: root.smallFont
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                }
-                            }
-
-                            Label {
-                                Layout.fillWidth: true
-                                text: "Sample"
-                                color: "#6e7472"
-                                font.pixelSize: root.smallFont
-                                horizontalAlignment: Text.AlignHCenter
-                            }
+                            anchors.margins: 6
+                            yTicks: ["90", "60", "30", "0", "-30", "-60", "-90"]
+                            xTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
+                            firstSeries: [0.58, 0.57, 0.56, 0.54, 0.53, 0.52, 0.52, 0.52, 0.52]
+                            secondSeries: [0.42, 0.45, 0.50, 0.56, 0.61, 0.63, 0.62, 0.60, 0.59]
                         }
                     }
 
                     Label {
-                        text: "Source Azimut"
+                        text: "声源方位角"
                         color: "#4a4a4a"
-                        font.pixelSize: Math.max(16, root.majorSectionFont + 2)
+                        font.pixelSize: root.sideTitleFont
                     }
 
                     Rectangle {
@@ -488,123 +527,20 @@ ApplicationWindow {
                         color: "#ffffff"
                         border.color: "#d9e1dd"
 
-                        ColumnLayout {
+                        ChartCanvas {
                             anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 8
-                            anchors.topMargin: 6
-                            anchors.bottomMargin: 6
-                            spacing: 4
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                spacing: 6
-
-                                ColumnLayout {
-                                    Layout.preferredWidth: 32
-                                    Layout.fillHeight: true
-                                    spacing: 0
-
-                                    Repeater {
-                                        model: ["180", "120", "60", "0", "-60", "-120", "-180"]
-                                        delegate: Label {
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            text: modelData
-                                            color: "#747b78"
-                                            font.pixelSize: root.smallFont
-                                            horizontalAlignment: Text.AlignRight
-                                            verticalAlignment: Text.AlignVCenter
-                                        }
-                                    }
-                                }
-
-                                Canvas {
-                                    Layout.fillWidth: true
-                                    Layout.fillHeight: true
-
-                                    onPaint: {
-                                        const ctx = getContext("2d")
-                                        const w = width
-                                        const h = height
-                                        ctx.reset()
-                                        ctx.fillStyle = "#ffffff"
-                                        ctx.fillRect(0, 0, w, h)
-
-                                        ctx.strokeStyle = "#d7dede"
-                                        ctx.lineWidth = 1
-                                        for (let row = 0; row <= 6; row += 1) {
-                                            const y = row * h / 6
-                                            ctx.beginPath()
-                                            ctx.moveTo(0, y)
-                                            ctx.lineTo(w, y)
-                                            ctx.stroke()
-                                        }
-                                        for (let col = 0; col <= 8; col += 1) {
-                                            const x = col * w / 8
-                                            ctx.beginPath()
-                                            ctx.moveTo(x, 0)
-                                            ctx.lineTo(x, h)
-                                            ctx.stroke()
-                                        }
-
-                                        function plot(points, color) {
-                                            ctx.strokeStyle = color
-                                            ctx.lineWidth = 2
-                                            ctx.beginPath()
-                                            for (let index = 0; index < points.length; index += 1) {
-                                                const px = index * w / (points.length - 1)
-                                                const py = h * (1 - points[index])
-                                                if (index === 0) {
-                                                    ctx.moveTo(px, py)
-                                                } else {
-                                                    ctx.lineTo(px, py)
-                                                }
-                                            }
-                                            ctx.stroke()
-                                        }
-
-                                        plot([0.10, 0.10, 0.11, 0.11, 0.12, 0.12, 0.12, 0.12, 0.12], root.accentCyan)
-                                        plot([0.72, 0.72, 0.73, 0.71, 0.69, 0.66, 0.63, 0.64, 0.68], root.accentPurple)
-                                    }
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 6
-
-                                Item {
-                                    Layout.preferredWidth: 32
-                                }
-
-                                Repeater {
-                                    model: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
-                                    delegate: Label {
-                                        Layout.fillWidth: true
-                                        text: modelData
-                                        color: "#747b78"
-                                        font.pixelSize: root.smallFont
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
-                                }
-                            }
-
-                            Label {
-                                Layout.fillWidth: true
-                                text: "Sample"
-                                color: "#6e7472"
-                                font.pixelSize: root.smallFont
-                                horizontalAlignment: Text.AlignHCenter
-                            }
+                            anchors.margins: 6
+                            yTicks: ["180", "120", "60", "0", "-60", "-120", "-180"]
+                            xTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
+                            firstSeries: [0.10, 0.10, 0.11, 0.11, 0.12, 0.12, 0.12, 0.12, 0.12]
+                            secondSeries: [0.72, 0.72, 0.73, 0.71, 0.69, 0.66, 0.63, 0.64, 0.68]
                         }
                     }
 
                     Label {
-                        text: "Active sources locations"
+                        text: "活跃声源位置"
                         color: "#4a4a4a"
-                        font.pixelSize: Math.max(16, root.majorSectionFont + 2)
+                        font.pixelSize: root.sideTitleFont
                     }
 
                     Rectangle {
@@ -614,81 +550,202 @@ ApplicationWindow {
                         color: "#ffffff"
                         border.color: "#ffffff"
 
-                        Canvas {
+                        View3D {
+                            id: sphereView
                             anchors.fill: parent
                             anchors.margins: 6
+                            renderMode: View3D.Offscreen
+                            camera: sphereCamera
 
-                            onPaint: {
-                                const ctx = getContext("2d")
-                                const w = width
-                                const h = height
-                                const cx = w * 0.51
-                                const cy = h * 0.53
-                                const radius = Math.min(w, h) * 0.34
+                            environment: SceneEnvironment {
+                                backgroundMode: SceneEnvironment.Color
+                                clearColor: "#ffffff"
+                                antialiasingMode: SceneEnvironment.MSAA
+                                antialiasingQuality: SceneEnvironment.VeryHigh
+                            }
 
-                                ctx.reset()
-                                ctx.fillStyle = "#ffffff"
-                                ctx.fillRect(0, 0, w, h)
+                            PerspectiveCamera {
+                                id: sphereCamera
+                                position: Qt.vector3d(0, 0, 520)
+                                clipFar: 2000
+                            }
 
-                                ctx.strokeStyle = "#4d63ff"
-                                ctx.lineWidth = 1.3
-                                for (let index = -3; index <= 3; index += 1) {
-                                    const scale = 1 - Math.abs(index) * 0.12
-                                    ctx.beginPath()
-                                    ctx.ellipse(cx, cy, radius, radius * scale, 0, 0, Math.PI * 2)
-                                    ctx.stroke()
-                                }
-                                for (let index = 0; index < 10; index += 1) {
-                                    const angle = index * Math.PI / 10
-                                    ctx.beginPath()
-                                    ctx.ellipse(cx, cy, radius * Math.cos(angle), radius, 0, 0, Math.PI * 2)
-                                    ctx.stroke()
-                                }
+                            DirectionalLight {
+                                eulerRotation: Qt.vector3d(-30, 35, 0)
+                                brightness: 0.8
+                            }
 
-                                ctx.fillStyle = "rgba(125, 173, 96, 0.45)"
-                                ctx.beginPath()
-                                ctx.ellipse(cx, cy + radius * 0.18, radius * 0.95, radius * 0.38, 0, 0, Math.PI * 2)
-                                ctx.fill()
+                            Node {
+                                id: globeRoot
+                                eulerRotation: Qt.vector3d(root.spherePitch, root.sphereYaw, 0)
 
-                                ctx.strokeStyle = "#a06a37"
-                                for (let index = 0; index < 6; index += 1) {
-                                    const ry = radius * (0.20 + index * 0.08)
-                                    ctx.beginPath()
-                                    ctx.ellipse(cx, cy + radius * 0.35, radius * 0.70, ry * 0.38, 0, 0, Math.PI * 2)
-                                    ctx.stroke()
+                                Model {
+                                    source: "#Sphere"
+                                    scale: Qt.vector3d(2.15, 0.10, 2.15)
+                                    position: Qt.vector3d(0, -18, 0)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: Qt.rgba(0.49, 0.68, 0.39, 0.50)
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
                                 }
 
-                                ctx.fillStyle = "#111111"
-                                ctx.fillRect(cx - 26, cy - 10, 52, 24)
-                                ctx.fillRect(cx - 12, cy - 18, 24, 36)
+                                Model {
+                                    source: "#Sphere"
+                                    scale: Qt.vector3d(1.95, 0.06, 1.95)
+                                    position: Qt.vector3d(0, -54, 0)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: Qt.rgba(0.66, 0.42, 0.24, 0.40)
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
+                                }
 
-                                ctx.fillStyle = root.accentPurple
-                                ctx.beginPath()
-                                ctx.arc(cx - radius * 0.55, cy - radius * 0.64, 7, 0, Math.PI * 2)
-                                ctx.fill()
+                                Model {
+                                    source: "#Cylinder"
+                                    scale: Qt.vector3d(0.018, 2.45, 0.018)
+                                    position: Qt.vector3d(0, 0, 0)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: "#3f5fff"
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
+                                }
 
-                                ctx.strokeStyle = "#2d4cff"
-                                ctx.beginPath()
-                                ctx.moveTo(cx, cy - radius * 1.25)
-                                ctx.lineTo(cx, cy + radius * 1.10)
-                                ctx.stroke()
+                                Model {
+                                    source: "#Cylinder"
+                                    scale: Qt.vector3d(0.018, 1.35, 0.018)
+                                    position: Qt.vector3d(68, 0, 0)
+                                    eulerRotation: Qt.vector3d(0, 0, 90)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: "#ff6a2d"
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
+                                }
 
-                                ctx.strokeStyle = "#ff5d2a"
-                                ctx.beginPath()
-                                ctx.moveTo(40, h - 32)
-                                ctx.lineTo(66, h - 32)
-                                ctx.stroke()
-                                ctx.strokeStyle = "#2d4cff"
-                                ctx.beginPath()
-                                ctx.moveTo(40, h - 32)
-                                ctx.lineTo(40, h - 58)
-                                ctx.stroke()
+                                Model {
+                                    source: "#Cube"
+                                    scale: Qt.vector3d(0.36, 0.22, 0.26)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: "#111111"
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
+                                }
 
-                                ctx.fillStyle = "#2d4cff"
-                                ctx.font = "12px sans-serif"
-                                ctx.fillText("Z", 36, h - 60)
-                                ctx.fillStyle = "#ff5d2a"
-                                ctx.fillText("X", 68, h - 30)
+                                Model {
+                                    source: "#Cube"
+                                    scale: Qt.vector3d(0.18, 0.34, 0.18)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: "#111111"
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
+                                }
+
+                                Repeater3D {
+                                    model: root.latitudeAngles.length * root.longitudeAngles.length
+
+                                    delegate: Model {
+                                        property int latIndex: Math.floor(index / root.longitudeAngles.length)
+                                        property int lonIndex: index % root.longitudeAngles.length
+                                        property real latRad: root.latitudeAngles[latIndex] * Math.PI / 180
+                                        property real lonRad: root.longitudeAngles[lonIndex] * Math.PI / 180
+
+                                        source: "#Sphere"
+                                        position: Qt.vector3d(
+                                            root.sphereRadius * Math.cos(latRad) * Math.cos(lonRad),
+                                            root.sphereRadius * Math.sin(latRad),
+                                            root.sphereRadius * Math.cos(latRad) * Math.sin(lonRad)
+                                        )
+                                        scale: Qt.vector3d(0.012, 0.012, 0.012)
+                                        materials: DefaultMaterial {
+                                            diffuseColor: "#5b6fff"
+                                            lighting: DefaultMaterial.NoLighting
+                                        }
+                                    }
+                                }
+
+                                Repeater3D {
+                                    model: root.spherePreviewSources()
+
+                                    delegate: Model {
+                                        required property var modelData
+                                        source: "#Sphere"
+                                        position: Qt.vector3d(
+                                            modelData.x * root.sphereRadius,
+                                            -modelData.z * root.sphereRadius,
+                                            modelData.y * root.sphereRadius
+                                        )
+                                        scale: Qt.vector3d(0.055, 0.055, 0.055)
+                                        materials: DefaultMaterial {
+                                            diffuseColor: root.accentPurple
+                                            lighting: DefaultMaterial.NoLighting
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton
+                            cursorShape: Qt.OpenHandCursor
+                            property real lastX: 0
+                            property real lastY: 0
+
+                            onPressed: {
+                                cursorShape = Qt.ClosedHandCursor
+                                lastX = mouse.x
+                                lastY = mouse.y
+                            }
+
+                            onReleased: cursorShape = Qt.OpenHandCursor
+
+                            onPositionChanged: {
+                                if (!(mouse.buttons & Qt.LeftButton)) {
+                                    return
+                                }
+                                root.sphereYaw += (mouse.x - lastX) * 0.45
+                                root.spherePitch = Math.max(-80, Math.min(80, root.spherePitch + (mouse.y - lastY) * 0.35))
+                                lastX = mouse.x
+                                lastY = mouse.y
+                            }
+                        }
+
+                        Item {
+                            anchors.left: parent.left
+                            anchors.bottom: parent.bottom
+                            anchors.leftMargin: 18
+                            anchors.bottomMargin: 16
+                            width: 54
+                            height: 42
+
+                            Rectangle {
+                                x: 12
+                                y: 26
+                                width: 22
+                                height: 2
+                                color: "#ff6a2d"
+                            }
+
+                            Rectangle {
+                                x: 12
+                                y: 6
+                                width: 2
+                                height: 22
+                                color: "#3f5fff"
+                            }
+
+                            Label {
+                                x: 10
+                                y: 0
+                                text: "Z"
+                                color: "#3f5fff"
+                                font.pixelSize: root.smallFont
+                            }
+
+                            Label {
+                                x: 36
+                                y: 22
+                                text: "X"
+                                color: "#ff6a2d"
+                                font.pixelSize: root.smallFont
                             }
                         }
                     }
@@ -698,7 +755,7 @@ ApplicationWindow {
             Rectangle {
                 Layout.preferredWidth: root.rightPanelWidth
                 Layout.fillHeight: true
-                radius: root.cardRadius
+                radius: 4
                 color: root.panelBackground
 
                 ColumnLayout {
@@ -710,13 +767,14 @@ ApplicationWindow {
                     spacing: Math.max(10, root.sectionGap - 1)
 
                     Label {
-                        text: "Sources"
+                        text: "声源"
                         color: root.titleColor
-                        font.pixelSize: root.panelHeaderFont
+                        font.pixelSize: Math.max(26, root.sideTitleFont + 3)
                     }
 
                     Repeater {
-                        model: root.previewSourceRows()
+                        model: root.sourceRows()
+
                         delegate: ColumnLayout {
                             required property var modelData
                             Layout.fillWidth: true
@@ -724,12 +782,11 @@ ApplicationWindow {
 
                             RowLayout {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: root.sourceRowHeight
 
-                                CheckBox {
-                                    enabled: modelData.enabled
+                                SideCheckBox {
                                     checked: modelData.checked
-                                    opacity: modelData.enabled ? 1.0 : 0.55
+                                    enabled: modelData.enabled
+                                    text: modelData.label
                                     onToggled: {
                                         if (modelData.enabled) {
                                             appBridge.setSourceSelected(modelData.sourceId, checked)
@@ -737,21 +794,15 @@ ApplicationWindow {
                                     }
                                 }
 
-                                Label {
-                                    text: modelData.label
-                                    color: modelData.enabled ? "#505854" : "#7d8783"
-                                    font.pixelSize: root.bodyFont
-                                }
-
                                 Rectangle {
                                     visible: modelData.badge !== ""
                                     radius: height / 2
                                     color: root.accentPurple
                                     Layout.preferredHeight: 20
-                                    Layout.preferredWidth: Math.max(24, badgeLabel.implicitWidth + 12)
+                                    Layout.preferredWidth: Math.max(24, badgeText.implicitWidth + 12)
 
                                     Label {
-                                        id: badgeLabel
+                                        id: badgeText
                                         anchors.centerIn: parent
                                         text: modelData.badge
                                         color: "white"
@@ -768,39 +819,9 @@ ApplicationWindow {
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 1
-                                color: "#cbd9d3"
+                                color: "#c9d9d2"
                             }
                         }
-                    }
-
-                    Item {
-                        Layout.preferredHeight: 16
-                    }
-
-                    Label {
-                        text: "Filters"
-                        color: root.titleColor
-                        font.pixelSize: root.panelHeaderFont
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 1
-                        color: "#cbd9d3"
-                    }
-
-                    CheckBox {
-                        text: "Sources"
-                        checked: appBridge.sourcesEnabled
-                        font.pixelSize: root.bodyFont
-                        onToggled: appBridge.setSourcesEnabled(checked)
-                    }
-
-                    CheckBox {
-                        text: "Potentials"
-                        checked: appBridge.potentialsEnabled
-                        font.pixelSize: root.bodyFont
-                        onToggled: appBridge.setPotentialsEnabled(checked)
                     }
 
                     Item {
@@ -808,60 +829,108 @@ ApplicationWindow {
                     }
 
                     Label {
-                        text: "Potential sources\nenergy range:"
-                        color: "#54625d"
-                        font.pixelSize: root.bodyFont
+                        text: "筛选器"
+                        color: root.titleColor
+                        font.pixelSize: Math.max(26, root.sideTitleFont + 3)
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 1
+                        color: "#c9d9d2"
+                    }
+
+                    SideCheckBox {
+                        text: "声源"
+                        checked: appBridge.sourcesEnabled
+                        onToggled: appBridge.setSourcesEnabled(checked)
+                    }
+
+                    SideCheckBox {
+                        text: "候选点"
+                        checked: appBridge.potentialsEnabled
+                        onToggled: appBridge.setPotentialsEnabled(checked)
+                    }
+
+                    Item {
+                        Layout.preferredHeight: 16
                     }
 
                     Label {
-                        text: appBridge.potentialEnergyMin.toFixed(0) + "\n" + appBridge.potentialEnergyMax.toFixed(0)
-                        color: "#454d49"
+                        text: "候选声源\n能量范围:"
+                        color: "#55635d"
                         font.pixelSize: root.bodyFont
                     }
 
-                    RangeSlider {
+                    Item {
                         Layout.fillWidth: true
-                        from: 0
-                        to: 1
-                        first.value: appBridge.potentialEnergyMin
-                        second.value: appBridge.potentialEnergyMax
+                        Layout.preferredHeight: 72
 
-                        first.onValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
-                        second.onValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
+                        Label {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            text: appBridge.potentialEnergyMin.toFixed(0)
+                            color: "#3f4743"
+                            font.pixelSize: root.bodyFont
+                        }
 
-                        background: Rectangle {
-                            x: parent.leftPadding
-                            y: parent.topPadding + parent.availableHeight / 2 - height / 2
-                            width: parent.availableWidth
-                            height: 4
-                            radius: 2
-                            color: "#d5d8d6"
+                        Basic.RangeSlider {
+                            id: energySlider
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.topMargin: 22
+                            from: 0
+                            to: 1
+                            first.value: appBridge.potentialEnergyMin
+                            second.value: appBridge.potentialEnergyMax
 
-                            Rectangle {
-                                x: parent.parent.first.visualPosition * parent.width
-                                width: parent.parent.second.visualPosition * parent.width - x
-                                height: parent.height
+                            first.onValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
+                            second.onValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
+
+                            background: Rectangle {
+                                x: parent.leftPadding
+                                y: parent.topPadding + parent.availableHeight / 2 - height / 2
+                                width: parent.availableWidth
+                                height: 4
                                 radius: 2
-                                color: "#2a95d6"
+                                color: "#d5d8d6"
+
+                                Rectangle {
+                                    x: parent.parent.first.visualPosition * parent.width
+                                    width: parent.parent.second.visualPosition * parent.width - x
+                                    height: parent.height
+                                    radius: 2
+                                    color: "#2a95d6"
+                                }
+                            }
+
+                            first.handle: Rectangle {
+                                x: parent.leftPadding + parent.first.visualPosition * (parent.availableWidth - width)
+                                y: parent.topPadding + parent.availableHeight / 2 - height / 2
+                                implicitWidth: 16
+                                implicitHeight: 22
+                                radius: 4
+                                color: "#1b92d5"
+                            }
+
+                            second.handle: Rectangle {
+                                x: parent.leftPadding + parent.second.visualPosition * (parent.availableWidth - width)
+                                y: parent.topPadding + parent.availableHeight / 2 - height / 2
+                                implicitWidth: 16
+                                implicitHeight: 22
+                                radius: 4
+                                color: "#1b92d5"
                             }
                         }
 
-                        first.handle: Rectangle {
-                            x: parent.leftPadding + parent.first.visualPosition * (parent.availableWidth - width)
-                            y: parent.topPadding + parent.availableHeight / 2 - height / 2
-                            implicitWidth: 16
-                            implicitHeight: 22
-                            radius: 2
-                            color: "#1b92d5"
-                        }
-
-                        second.handle: Rectangle {
-                            x: parent.leftPadding + parent.second.visualPosition * (parent.availableWidth - width)
-                            y: parent.topPadding + parent.availableHeight / 2 - height / 2
-                            implicitWidth: 16
-                            implicitHeight: 22
-                            radius: 2
-                            color: "#1b92d5"
+                        Label {
+                            anchors.left: parent.left
+                            anchors.top: energySlider.bottom
+                            anchors.topMargin: 4
+                            text: appBridge.potentialEnergyMax.toFixed(0)
+                            color: "#3f4743"
+                            font.pixelSize: root.bodyFont
                         }
                     }
 
