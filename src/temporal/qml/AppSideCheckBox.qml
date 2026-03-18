@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Controls.Basic as Basic
 
 Basic.CheckBox {
@@ -6,11 +7,16 @@ Basic.CheckBox {
 
     required property QtObject theme
 
+    implicitHeight: Math.max(20, contentItem.implicitHeight)
     spacing: 8
+    leftPadding: 0
+    topPadding: 0
+    bottomPadding: 0
 
     indicator: Rectangle {
         implicitWidth: 13
         implicitHeight: 13
+        y: control.topPadding + (control.availableHeight - height) / 2
         radius: 2
         border.color: "#7f8a85"
         color: "#ffffff"
@@ -26,10 +32,12 @@ Basic.CheckBox {
         }
     }
 
-    contentItem: Text {
+    contentItem: Label {
         text: control.text
         color: control.enabled ? "#4f5854" : "#7a8480"
         font.pixelSize: control.theme.bodyFont
         verticalAlignment: Text.AlignVCenter
+        leftPadding: control.indicator.width + control.spacing
+        height: control.availableHeight
     }
 }

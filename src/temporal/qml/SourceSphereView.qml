@@ -16,6 +16,7 @@ Rectangle {
     property real sphereRadius: 118
     property var latitudeAngles: [-75, -60, -45, -30, -15, 0, 15, 30, 45, 60, 75]
     property var longitudeAngles: [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345]
+    property int ringSegments: 36
 
     function previewSources() {
         if (sourcePositions.length > 0) {
@@ -110,24 +111,69 @@ Rectangle {
             }
 
             Repeater3D {
-                model: root.latitudeAngles.length * root.longitudeAngles.length
+                model: root.latitudeAngles
 
-                delegate: Model {
-                    property int latIndex: Math.floor(index / root.longitudeAngles.length)
-                    property int lonIndex: index % root.longitudeAngles.length
-                    property real latRad: root.latitudeAngles[latIndex] * Math.PI / 180
-                    property real lonRad: root.longitudeAngles[lonIndex] * Math.PI / 180
+                delegate: Node {
+                    required property real modelData
+                    property real latRad: modelData * Math.PI / 180
+                    property real ringRadiusValue: root.sphereRadius * Math.cos(latRad)
 
-                    source: "#Sphere"
-                    position: Qt.vector3d(
-                        root.sphereRadius * Math.cos(latRad) * Math.cos(lonRad),
-                        root.sphereRadius * Math.sin(latRad),
-                        root.sphereRadius * Math.cos(latRad) * Math.sin(lonRad)
-                    )
-                    scale: Qt.vector3d(0.012, 0.012, 0.012)
-                    materials: DefaultMaterial {
-                        diffuseColor: "#5b6fff"
-                        lighting: DefaultMaterial.NoLighting
+                    y: root.sphereRadius * Math.sin(latRad)
+                    eulerRotation: Qt.vector3d(90, 0, 0)
+
+                    Repeater3D {
+                        model: root.ringSegments
+
+                        delegate: Model {
+                            property real midDeg: (index + 0.5) * 360 / root.ringSegments
+                            property real midRad: midDeg * Math.PI / 180
+                            property real segmentLength: 2 * Math.PI * parent.parent.ringRadiusValue / root.ringSegments
+
+                            source: "#Cylinder"
+                            position: Qt.vector3d(
+                                parent.parent.ringRadiusValue * Math.cos(midRad),
+                                parent.parent.ringRadiusValue * Math.sin(midRad),
+                                0
+                            )
+                            eulerRotation: Qt.vector3d(0, 0, midDeg)
+                            scale: Qt.vector3d(0.010, Math.max(0.001, segmentLength / 100), 0.010)
+                            materials: DefaultMaterial {
+                                diffuseColor: "#5b6fff"
+                                lighting: DefaultMaterial.NoLighting
+                            }
+                        }
+                    }
+                }
+            }
+
+            Repeater3D {
+                model: root.longitudeAngles
+
+                delegate: Node {
+                    required property real modelData
+                    eulerRotation: Qt.vector3d(0, modelData, 0)
+
+                    Repeater3D {
+                        model: root.ringSegments
+
+                        delegate: Model {
+                            property real midDeg: (index + 0.5) * 360 / root.ringSegments
+                            property real midRad: midDeg * Math.PI / 180
+                            property real segmentLength: 2 * Math.PI * root.sphereRadius / root.ringSegments
+
+                            source: "#Cylinder"
+                            position: Qt.vector3d(
+                                root.sphereRadius * Math.cos(midRad),
+                                root.sphereRadius * Math.sin(midRad),
+                                0
+                            )
+                            eulerRotation: Qt.vector3d(0, 0, midDeg)
+                            scale: Qt.vector3d(0.010, Math.max(0.001, segmentLength / 100), 0.010)
+                            materials: DefaultMaterial {
+                                diffuseColor: "#5b6fff"
+                                lighting: DefaultMaterial.NoLighting
+                            }
+                        }
                     }
                 }
             }

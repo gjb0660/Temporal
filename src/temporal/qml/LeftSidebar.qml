@@ -24,7 +24,8 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.max(300, parent.height * 0.405)
+            Layout.fillHeight: true
+            Layout.minimumHeight: Math.max(300, parent.height * 0.405)
             radius: 4
             color: theme.cardBackground
             border.color: theme.borderColor
@@ -71,7 +72,7 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.max(168, parent.height * 0.220)
+            Layout.preferredHeight: Math.max(172, parent.height * 0.235)
             radius: 4
             color: theme.cardBackground
             border.color: theme.borderColor
@@ -87,22 +88,42 @@ Rectangle {
                     font.pixelSize: theme.sectionTitleFont
                 }
 
-                Label {
-                    text: appBridge.status
-                    color: theme.mutedText
-                    font.pixelSize: theme.bodyFont
-                    wrapMode: Text.WordWrap
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 54
+                    radius: 3
+                    color: "#ffffff"
+                    border.color: "#d1ddd7"
+
+                    ScrollView {
+                        anchors.fill: parent
+                        anchors.margins: 6
+                        clip: true
+
+                        TextArea {
+                            width: parent.width
+                            readOnly: true
+                            wrapMode: TextArea.Wrap
+                            selectByMouse: true
+                            text: appBridge.status
+                            color: theme.mutedText
+                            font.pixelSize: theme.bodyFont
+                            padding: 0
+                            background: null
+                        }
+                    }
                 }
 
                 GridLayout {
                     Layout.fillWidth: true
-                    columns: 3
+                    columns: 2
                     columnSpacing: 8
                     rowSpacing: 8
 
                     AppActionButton {
                         theme: root.theme
                         text: "连接"
+                        Layout.preferredWidth: 100
                         Layout.fillWidth: true
                         onClicked: appBridge.connectRemote()
                     }
@@ -110,6 +131,7 @@ Rectangle {
                     AppActionButton {
                         theme: root.theme
                         text: "启动"
+                        Layout.preferredWidth: 100
                         Layout.fillWidth: true
                         onClicked: appBridge.startRemoteOdas()
                     }
@@ -117,6 +139,7 @@ Rectangle {
                     AppActionButton {
                         theme: root.theme
                         text: "停止"
+                        Layout.preferredWidth: 100
                         Layout.fillWidth: true
                         onClicked: appBridge.stopRemoteOdas()
                     }
@@ -124,6 +147,7 @@ Rectangle {
                     AppActionButton {
                         theme: root.theme
                         text: "监听"
+                        Layout.preferredWidth: 100
                         Layout.fillWidth: true
                         onClicked: appBridge.startStreams()
                     }
@@ -131,6 +155,7 @@ Rectangle {
                     AppActionButton {
                         theme: root.theme
                         text: "关闭流"
+                        Layout.preferredWidth: 100
                         Layout.fillWidth: true
                         Layout.columnSpan: 2
                         onClicked: appBridge.stopStreams()

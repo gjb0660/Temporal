@@ -37,12 +37,14 @@ Rectangle {
 
                 RowLayout {
                     Layout.fillWidth: true
+                    Layout.preferredHeight: 22
 
                     AppSideCheckBox {
                         theme: root.theme
                         checked: modelData.checked
                         enabled: modelData.enabled
                         text: modelData.label
+                        Layout.alignment: Qt.AlignVCenter
                         onToggled: {
                             if (modelData.enabled) {
                                 appBridge.setSourceSelected(modelData.sourceId, checked)
@@ -56,6 +58,7 @@ Rectangle {
                         color: theme.accentPurple
                         Layout.preferredHeight: 20
                         Layout.preferredWidth: Math.max(24, badgeText.implicitWidth + 12)
+                        Layout.alignment: Qt.AlignVCenter
 
                         Label {
                             id: badgeText

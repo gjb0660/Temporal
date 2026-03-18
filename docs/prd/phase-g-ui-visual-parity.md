@@ -45,3 +45,8 @@ from a placeholder into a real rotatable QtQuick3D scene.
 2. At smaller and larger window sizes, columns and sections remain readable and aligned.
 3. Source list, filters, and control buttons still reflect live appBridge state.
 4. Local static checks pass for touched files.
+
+## Preventive Rules
+
+- Keep dynamic status or log text inside bounded containers; do not let it resize action-button rows.
+- Keep the source-location area as a recognizable interactive 3D view; do not regress it to a placeholder or unreadable point cloud.
