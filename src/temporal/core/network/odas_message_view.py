@@ -1,23 +1,38 @@
 from __future__ import annotations
 
 
-def build_source_items(sst_message: dict, enabled: bool = True) -> list[str]:
-    if not enabled:
-        return []
-
+def extract_source_ids(sst_message: dict) -> list[int]:
     src = sst_message.get("src", [])
     if not isinstance(src, list):
         return []
 
-    items: list[str] = []
+    source_ids: list[int] = []
+    seen: set[int] = set()
     for item in src:
         if not isinstance(item, dict):
             continue
         source_id = item.get("id")
         if not isinstance(source_id, int) or source_id == 0:
             continue
-        items.append(f"Source {source_id}")
-    return items
+        if source_id in seen:
+            continue
+        seen.add(source_id)
+        source_ids.append(source_id)
+    return source_ids
+
+
+def build_source_items(
+    sst_message: dict,
+    enabled: bool = True,
+    selected_ids: set[int] | None = None,
+) -> list[str]:
+    if not enabled:
+        return []
+
+    source_ids = extract_source_ids(sst_message)
+    if selected_ids is not None:
+        source_ids = [source_id for source_id in source_ids if source_id in selected_ids]
+    return [f"Source {source_id}" for source_id in source_ids]
 
 
 def _read_energy(potential: dict) -> float | None:

@@ -9,13 +9,14 @@ from PySide6.QtQml import QQmlApplicationEngine
 
 from temporal.core.config_loader import load_config
 from temporal.core.network.odas_client import OdasClient
-from temporal.core.network.odas_message_view import build_source_items, count_potentials
+from temporal.core.network.odas_message_view import build_source_items, count_potentials, extract_source_ids
 from temporal.core.ssh.remote_odas import RemoteOdasController
 
 
 class AppBridge(QObject):
     statusChanged = Signal()
     sourceItemsChanged = Signal()
+    sourceIdsChanged = Signal()
     sourceCountChanged = Signal()
     potentialCountChanged = Signal()
     sourcesEnabledChanged = Signal()
@@ -31,6 +32,8 @@ class AppBridge(QObject):
         self._remote = RemoteOdasController(self._cfg.remote)
         self._last_sst: dict = {}
         self._last_ssl: dict = {}
+        self._source_ids: list[int] = []
+        self._selected_source_ids: set[int] = set()
         self._source_items: list[str] = []
         self._potential_count = 0
         self._sources_enabled = True
@@ -52,6 +55,10 @@ class AppBridge(QObject):
     @Property(list, notify=sourceItemsChanged)  # type: ignore[reportCallIssue]
     def sourceItems(self) -> list[str]:
         return self._source_items
+
+    @Property(list, notify=sourceIdsChanged)  # type: ignore[reportCallIssue]
+    def sourceIds(self) -> list[int]:
+        return self._source_ids
 
     @Property(int, notify=sourceCountChanged)  # type: ignore[reportCallIssue]
     def sourceCount(self) -> int:
@@ -127,6 +134,29 @@ class AppBridge(QObject):
         self._refresh_sources()
         self._update_stream_status("Source filter update")
 
+    @Slot(int, bool)
+    def setSourceSelected(self, source_id: int, selected: bool) -> None:
+        if source_id not in self._source_ids:
+            return
+
+        has_changed = False
+        if selected and source_id not in self._selected_source_ids:
+            self._selected_source_ids.add(source_id)
+            has_changed = True
+        if not selected and source_id in self._selected_source_ids:
+            self._selected_source_ids.remove(source_id)
+            has_changed = True
+
+        if not has_changed:
+            return
+
+        self._refresh_sources()
+        self._update_stream_status("Source selection update")
+
+    @Slot(int, result=bool)
+    def isSourceSelected(self, source_id: int) -> bool:
+        return source_id in self._selected_source_ids
+
     @Slot(bool)
     def setPotentialsEnabled(self, enabled: bool) -> None:
         if self._potentials_enabled == enabled:
@@ -168,7 +198,21 @@ class AppBridge(QObject):
         self.setStatus(f"{prefix} | sources={self.sourceCount} potentials={self._potential_count}")
 
     def _refresh_sources(self) -> None:
-        items = build_source_items(self._last_sst, enabled=self._sources_enabled)
+        source_ids = extract_source_ids(self._last_sst)
+        if source_ids != self._source_ids:
+            current = set(source_ids)
+            self._selected_source_ids = {source_id for source_id in self._selected_source_ids if source_id in current}
+            for source_id in source_ids:
+                if source_id not in self._selected_source_ids:
+                    self._selected_source_ids.add(source_id)
+            self._source_ids = source_ids
+            self.sourceIdsChanged.emit()
+
+        items = build_source_items(
+            self._last_sst,
+            enabled=self._sources_enabled,
+            selected_ids=self._selected_source_ids,
+        )
         if items != self._source_items:
             self._source_items = items
             self.sourceItemsChanged.emit()

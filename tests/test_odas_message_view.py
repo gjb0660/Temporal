@@ -1,6 +1,10 @@
 import unittest
 
-from temporal.core.network.odas_message_view import build_source_items, count_potentials
+from temporal.core.network.odas_message_view import (
+    build_source_items,
+    count_potentials,
+    extract_source_ids,
+)
 
 
 class TestOdasMessageView(unittest.TestCase):
@@ -20,6 +24,25 @@ class TestOdasMessageView(unittest.TestCase):
     def test_build_source_items_returns_empty_when_disabled(self) -> None:
         sst = {"src": [{"id": 1}, {"id": 2}]}
         self.assertEqual(build_source_items(sst, enabled=False), [])
+
+    def test_extract_source_ids_deduplicates_and_skips_invalid(self) -> None:
+        sst = {
+            "src": [
+                {"id": 0},
+                {"id": 2},
+                {"id": 2},
+                {"id": "bad"},
+                {"id": 5},
+            ]
+        }
+        self.assertEqual(extract_source_ids(sst), [2, 5])
+
+    def test_build_source_items_applies_selected_ids(self) -> None:
+        sst = {"src": [{"id": 1}, {"id": 2}, {"id": 3}]}
+        self.assertEqual(
+            build_source_items(sst, enabled=True, selected_ids={2, 3}),
+            ["Source 2", "Source 3"],
+        )
 
     def test_count_potentials(self) -> None:
         ssl = {"src": [{"E": 0.5}, {"E": 0.7}, {"E": 0.9}]}

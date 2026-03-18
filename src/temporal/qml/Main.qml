@@ -334,10 +334,12 @@ ApplicationWindow {
                     }
 
                     Repeater {
-                        model: appBridge.sourceItems
+                        model: appBridge.sourceIds
                         delegate: CheckBox {
-                            text: modelData
-                            checked: true
+                            required property int modelData
+                            text: "Source " + modelData
+                            checked: appBridge.isSourceSelected(modelData)
+                            onToggled: appBridge.setSourceSelected(modelData, checked)
                             font.pixelSize: 28
                         }
                     }
@@ -378,8 +380,7 @@ ApplicationWindow {
                         color: "#4d5651"
                     }
                     Label {
-                        text: appBridge.potentialEnergyMin.toFixed(2) + " - "
-                            + appBridge.potentialEnergyMax.toFixed(2)
+                        text: appBridge.potentialEnergyMin.toFixed(2) + " - " + appBridge.potentialEnergyMax.toFixed(2)
                         font.pixelSize: 22
                         color: "#5f6863"
                     }
@@ -388,8 +389,8 @@ ApplicationWindow {
                         to: 1
                         first.value: appBridge.potentialEnergyMin
                         second.value: appBridge.potentialEnergyMax
-                        onFirstValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
-                        onSecondValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
+                        first.onValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
+                        second.onValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
                     }
 
                     Item {
