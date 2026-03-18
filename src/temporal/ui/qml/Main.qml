@@ -334,12 +334,19 @@ ApplicationWindow {
                     }
 
                     Repeater {
-                        model: ["Source", "Source 15", "Source", "Source"]
+                        model: appBridge.sourceItems
                         delegate: CheckBox {
                             text: modelData
                             checked: true
                             font.pixelSize: 28
                         }
+                    }
+
+                    Label {
+                        visible: appBridge.sourceCount === 0
+                        text: "No active source"
+                        font.pixelSize: 22
+                        color: "#6a746f"
                     }
 
                     Rectangle {
@@ -354,12 +361,12 @@ ApplicationWindow {
                         color: "#2e2e2e"
                     }
                     CheckBox {
-                        text: "Sources"
+                        text: "Sources (" + appBridge.sourceCount + ")"
                         checked: true
                         font.pixelSize: 28
                     }
                     CheckBox {
-                        text: "Potentials"
+                        text: "Potentials (" + appBridge.potentialCount + ")"
                         checked: false
                         font.pixelSize: 28
                     }
