@@ -78,6 +78,9 @@ class AutoRecorder:
     def is_recording(self, source_id: int, mode: str) -> bool:
         return (source_id, mode) in self._sessions
 
+    def active_sources(self) -> set[int]:
+        return set(self._last_seen.keys())
+
     def push(self, source_id: int, mode: str, pcm_chunk: bytes) -> None:
         key = (source_id, mode)
         writer = self._writers.get(key)

@@ -9,7 +9,12 @@ from PySide6.QtQml import QQmlApplicationEngine
 
 from temporal.core.config_loader import load_config
 from temporal.core.network.odas_client import OdasClient
-from temporal.core.network.odas_message_view import build_source_items, count_potentials, extract_source_ids
+from temporal.core.network.odas_message_view import (
+    build_source_items,
+    count_potentials,
+    extract_source_ids,
+)
+from temporal.core.recording.auto_recorder import AutoRecorder
 from temporal.core.ssh.remote_odas import RemoteOdasController
 
 
@@ -19,6 +24,7 @@ class AppBridge(QObject):
     sourceIdsChanged = Signal()
     sourceCountChanged = Signal()
     potentialCountChanged = Signal()
+    recordingSourceCountChanged = Signal()
     sourcesEnabledChanged = Signal()
     potentialsEnabledChanged = Signal()
     potentialRangeChanged = Signal()
@@ -36,10 +42,12 @@ class AppBridge(QObject):
         self._selected_source_ids: set[int] = set()
         self._source_items: list[str] = []
         self._potential_count = 0
+        self._recording_source_count = 0
         self._sources_enabled = True
         self._potentials_enabled = False
         self._potential_min = 0.0
         self._potential_max = 1.0
+        self._recorder = AutoRecorder(self._root / "recordings")
         self._client = OdasClient(
             config=self._cfg.streams,
             on_sst=self._on_sst,
@@ -67,6 +75,10 @@ class AppBridge(QObject):
     @Property(int, notify=potentialCountChanged)  # type: ignore[reportCallIssue]
     def potentialCount(self) -> int:
         return self._potential_count
+
+    @Property(int, notify=recordingSourceCountChanged)  # type: ignore[reportCallIssue]
+    def recordingSourceCount(self) -> int:
+        return self._recording_source_count
 
     @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
     def sourcesEnabled(self) -> bool:
@@ -123,6 +135,8 @@ class AppBridge(QObject):
     @Slot()
     def stopStreams(self) -> None:
         self._client.stop()
+        self._recorder.stop_all()
+        self._set_recording_source_count(0)
         self.setStatus("Streams stopped")
 
     @Slot(bool)
@@ -181,6 +195,9 @@ class AppBridge(QObject):
     def _on_sst(self, message: dict) -> None:
         self._last_sst = message
         self._refresh_sources()
+        self._recorder.update_active_sources(self._source_ids)
+        self._recorder.sweep_inactive()
+        self._set_recording_source_count(len(self._recorder.active_sources()))
         self._update_stream_status("SST update")
 
     def _on_ssl(self, message: dict) -> None:
@@ -195,13 +212,24 @@ class AppBridge(QObject):
         return
 
     def _update_stream_status(self, prefix: str) -> None:
-        self.setStatus(f"{prefix} | sources={self.sourceCount} potentials={self._potential_count}")
+        self.setStatus(
+            f"{prefix} | sources={self.sourceCount} potentials={self._potential_count} "
+            f"recording={self._recording_source_count}"
+        )
+
+    def _set_recording_source_count(self, value: int) -> None:
+        if self._recording_source_count == value:
+            return
+        self._recording_source_count = value
+        self.recordingSourceCountChanged.emit()
 
     def _refresh_sources(self) -> None:
         source_ids = extract_source_ids(self._last_sst)
         if source_ids != self._source_ids:
             current = set(source_ids)
-            self._selected_source_ids = {source_id for source_id in self._selected_source_ids if source_id in current}
+            self._selected_source_ids = {
+                source_id for source_id in self._selected_source_ids if source_id in current
+            }
             for source_id in source_ids:
                 if source_id not in self._selected_source_ids:
                     self._selected_source_ids.add(source_id)

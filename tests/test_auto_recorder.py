@@ -54,8 +54,19 @@ class TestAutoRecorder(unittest.TestCase):
             stopped = recorder.sweep_inactive()
 
             self.assertIn(2, stopped)
+            self.assertEqual(recorder.active_sources(), set())
             self.assertFalse(recorder.is_recording(2, "sp"))
             self.assertFalse(recorder.is_recording(2, "pf"))
+
+    def test_active_sources_tracks_seen_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            recorder = AutoRecorder(output_dir=temp_dir, now_fn=clock.now)
+
+            recorder.update_active_sources([3, 5])
+
+            self.assertEqual(recorder.active_sources(), {3, 5})
+            recorder.stop_all()
 
     def test_push_writes_pcm_frames(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
