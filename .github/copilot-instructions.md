@@ -42,3 +42,14 @@ Run these checks before merge:
 ## Additional Rules
 - Python source tree uses namespace packages; do not add __init__.py files.
 - Keep Pyright enabled and aligned with pyproject.toml settings.
+
+## Collaboration Rules
+- Ask via vscode_askQuestions whenever requirements are ambiguous.
+- Run markdownlint for markdown changes and fix syntax violations.
+- Write AI-facing docs and code comments in concise English imperative style.
+- Write human-facing docs and chat responses in concise Chinese technical style.
+- Deliver or update a PRD before implementing a feature.
+- Follow Explore -> Plan -> Approval -> Code before implementation.
+- After each bug fix, record a local lesson-learned rule.
+- Only use git add and git commit; never rewrite or delete git history.
+- Never modify or delete files outside the current workspace.

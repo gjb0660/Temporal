@@ -27,7 +27,15 @@
   - validation performed
   - unresolved risks
 
+## Collaboration Workflow
+- Clarify ambiguity with vscode_askQuestions before implementation.
+- Prepare or update a PRD before feature implementation.
+- Execute in order: Explore -> Plan -> Approval -> Code.
+- After bug fixes, append a local preventive rule.
+
 ## Forbidden
 - No cross-layer shortcut (QML direct socket access).
 - No destructive git cleanup (`git reset --hard`, `git clean -fd`).
 - No adding `__init__.py` in Python source tree.
+- No git history rewrite or deletion.
+- No modification outside workspace scope.
