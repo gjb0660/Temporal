@@ -1,12 +1,51 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "CenterPanePreviewData.js" as PreviewData
 
 Rectangle {
     id: root
 
     required property QtObject theme
-    required property var sourcePositions
+    property var sourcePositions: []
+    property bool previewMode: false
+    property string previewScenarioKey: "referenceSingle"
+
+    readonly property var previewCatalog: PreviewData.buildCatalog(theme)
+    readonly property var activePreview: previewCatalog[previewScenarioKey] || previewCatalog.referenceSingle
+    readonly property var runtimeElevationSeries: [
+        {
+            sourceId: 7,
+            color: theme.accentCyan,
+            values: [0.58, 0.57, 0.56, 0.54, 0.53, 0.52, 0.52, 0.52, 0.52]
+        },
+        {
+            sourceId: 15,
+            color: theme.accentPurple,
+            values: [0.42, 0.45, 0.50, 0.56, 0.61, 0.63, 0.62, 0.60, 0.59]
+        }
+    ]
+    readonly property var runtimeAzimuthSeries: [
+        {
+            sourceId: 7,
+            color: theme.accentCyan,
+            values: [0.10, 0.10, 0.11, 0.11, 0.12, 0.12, 0.12, 0.12, 0.12]
+        },
+        {
+            sourceId: 15,
+            color: theme.accentPurple,
+            values: [0.72, 0.72, 0.73, 0.71, 0.69, 0.66, 0.63, 0.64, 0.68]
+        }
+    ]
+    readonly property var displayedSourcePositions: {
+        if (previewMode) {
+            return activePreview.sourcePositions
+        }
+        return Array.isArray(sourcePositions) ? sourcePositions : []
+    }
+    readonly property var displayedElevationSeries: previewMode ? activePreview.elevationSeries : runtimeElevationSeries
+    readonly property var displayedAzimuthSeries: previewMode ? activePreview.azimuthSeries : runtimeAzimuthSeries
+    readonly property var displayedSourceColors: previewMode ? activePreview.sourceColors : ({})
 
     Layout.fillWidth: true
     Layout.fillHeight: true
@@ -40,8 +79,7 @@ Rectangle {
                 anchors.margins: 6
                 yTicks: ["90", "60", "30", "0", "-30", "-60", "-90"]
                 xTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
-                firstSeries: [0.58, 0.57, 0.56, 0.54, 0.53, 0.52, 0.52, 0.52, 0.52]
-                secondSeries: [0.42, 0.45, 0.50, 0.56, 0.61, 0.63, 0.62, 0.60, 0.59]
+                seriesList: root.displayedElevationSeries
             }
         }
 
@@ -63,20 +101,21 @@ Rectangle {
                 anchors.margins: 6
                 yTicks: ["180", "120", "60", "0", "-60", "-120", "-180"]
                 xTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
-                firstSeries: [0.10, 0.10, 0.11, 0.11, 0.12, 0.12, 0.12, 0.12, 0.12]
-                secondSeries: [0.72, 0.72, 0.73, 0.71, 0.69, 0.66, 0.63, 0.64, 0.68]
+                seriesList: root.displayedAzimuthSeries
             }
         }
 
         Label {
-            text: "活跃声源位置"
+            text: "活动声源位置"
             color: "#414952"
             font.pixelSize: theme.sideTitleFont
         }
 
         SourceSphereView {
             theme: root.theme
-            sourcePositions: sourcePositions
+            sourcePositions: root.displayedSourcePositions
+            sourceColors: root.displayedSourceColors
+            previewScenarioKey: root.previewMode ? root.activePreview.key : ""
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumHeight: theme.sphereHeight

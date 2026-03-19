@@ -1,40 +1,117 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick3D
 
 Rectangle {
     id: root
 
     required property QtObject theme
-    required property var sourcePositions
+    property var sourcePositions: []
+    property var sourceColors: ({})
+    property string previewScenarioKey: ""
 
     color: "#ffffff"
     border.color: "transparent"
 
-    property real sphereYaw: -20
-    property real spherePitch: 16
-    property real sphereRadius: 132
-    property var latitudeAngles: [-75, -60, -45, -30, -15, 0, 15, 30, 45, 60, 75]
-    property var longitudeAngles: [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345]
-    property int ringSegments: 36
-
-    function previewSources() {
-        if (sourcePositions.length > 0) {
-            return sourcePositions
+    property real sphereYaw: -34
+    property real spherePitch: 24
+    property real sphereRadius: 150
+    property var latitudeAngles: [-60, -36, -18, 18, 36, 60]
+    property var meridianAngles: [0, 30, 60, 90, 120, 150]
+    property var diagonalAngles: [0, 40, 80, 120, 160]
+    property int ringSegments: 44
+    property real diagonalTilt: 52
+    readonly property var fallbackPreviewSources: [
+        {
+            id: 15,
+            x: -0.42,
+            y: 0.18,
+            z: 0.64
         }
-        return [
-            {
-                id: 15,
-                x: -0.42,
-                y: 0.14,
-                z: 0.60
-            }
-        ]
+    ]
+    readonly property var visibleSources: normalizedSourceEntries()
+
+    function colorForSource(sourceId) {
+        if (sourceColors && sourceColors[sourceId] !== undefined) {
+            return sourceColors[sourceId]
+        }
+
+        const palette = [theme.accentPurple, theme.accentCyan, "#ff9c47", "#5ac97c", "#6a88ff", "#f16f7d"]
+        const base = Math.abs(Number(sourceId) || 0)
+        return palette[base % palette.length]
     }
+
+    function normalizedSourceEntries() {
+        const raw = Array.isArray(sourcePositions) && sourcePositions.length > 0 ? sourcePositions : fallbackPreviewSources
+        const entries = []
+        for (let index = 0; index < raw.length; index += 1) {
+            const item = raw[index]
+            if (!item) {
+                continue
+            }
+
+            const x = Number(item.x)
+            const y = Number(item.y)
+            const z = Number(item.z)
+            if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
+                continue
+            }
+
+            const sourceId = Number(item.id) || index + 1
+            const length = Math.sqrt(x * x + y * y + z * z)
+            const scale = length > 1 ? 1 / length : 1
+            entries.push({
+                id: sourceId,
+                color: item.color || colorForSource(sourceId),
+                x: x * scale,
+                y: y * scale,
+                z: z * scale
+            })
+        }
+
+        return entries.length > 0 ? entries : fallbackPreviewSources
+    }
+
+    function rotateVector(vector) {
+        const pitchRad = spherePitch * Math.PI / 180
+        const yawRad = sphereYaw * Math.PI / 180
+        const cosPitch = Math.cos(pitchRad)
+        const sinPitch = Math.sin(pitchRad)
+        const cosYaw = Math.cos(yawRad)
+        const sinYaw = Math.sin(yawRad)
+
+        const pitchedY = vector.y * cosPitch - vector.z * sinPitch
+        const pitchedZ = vector.y * sinPitch + vector.z * cosPitch
+        const yawedX = vector.x * cosYaw + pitchedZ * sinYaw
+        const yawedZ = -vector.x * sinYaw + pitchedZ * cosYaw
+
+        return {
+            x: yawedX,
+            y: pitchedY,
+            z: yawedZ
+        }
+    }
+
+    function axisEndpoint(vector, scale) {
+        const rotated = rotateVector(vector)
+        return Qt.point(axisOverlay.originX + rotated.x * scale, axisOverlay.originY - rotated.y * scale)
+    }
+
+    function labelAnchor(point) {
+        const rawX = point.x + (point.x >= axisOverlay.originX ? 6 : -12)
+        const rawY = point.y + (point.y <= axisOverlay.originY ? -6 : 16)
+        return Qt.point(Math.max(10, Math.min(axisOverlay.width - 10, rawX)), Math.max(10, Math.min(axisOverlay.height - 10, rawY)))
+    }
+
+    onSphereYawChanged: axisOverlay.requestPaint()
+    onSpherePitchChanged: axisOverlay.requestPaint()
+    onVisibleSourcesChanged: axisOverlay.requestPaint()
 
     View3D {
         anchors.fill: parent
-        anchors.margins: 2
+        anchors.leftMargin: 8
+        anchors.rightMargin: 8
+        anchors.topMargin: 4
+        anchors.bottomMargin: 6
         renderMode: View3D.Offscreen
         camera: sphereCamera
 
@@ -47,58 +124,56 @@ Rectangle {
 
         PerspectiveCamera {
             id: sphereCamera
-            position: Qt.vector3d(0, 0, 430)
-            clipFar: 2000
+            position: Qt.vector3d(0, 18, 520)
+            clipFar: 2400
+            fieldOfView: 32
         }
 
         DirectionalLight {
-            eulerRotation: Qt.vector3d(-34, 28, 0)
-            brightness: 0.95
+            eulerRotation: Qt.vector3d(-30, 32, 0)
+            brightness: 1.0
         }
 
         DirectionalLight {
-            eulerRotation: Qt.vector3d(40, -35, 0)
-            brightness: 0.35
+            eulerRotation: Qt.vector3d(44, -38, 0)
+            brightness: 0.30
         }
 
         Node {
             id: sceneRoot
-            y: -86
+            y: 4
             eulerRotation: Qt.vector3d(root.spherePitch, root.sphereYaw, 0)
 
             Model {
-                source: "#Sphere"
-                scale: Qt.vector3d(2.32, 0.10, 2.32)
-                position: Qt.vector3d(0, -24, 0)
+                source: "#Cylinder"
+                scale: Qt.vector3d(1.92, 0.048, 1.92)
                 materials: DefaultMaterial {
-                    diffuseColor: Qt.rgba(0.50, 0.69, 0.42, 0.52)
-                    lighting: DefaultMaterial.NoLighting
-                }
-            }
-
-            Model {
-                source: "#Sphere"
-                scale: Qt.vector3d(2.08, 0.06, 2.08)
-                position: Qt.vector3d(0, -66, 0)
-                materials: DefaultMaterial {
-                    diffuseColor: Qt.rgba(0.66, 0.44, 0.27, 0.42)
+                    diffuseColor: Qt.rgba(0.52, 0.69, 0.42, 0.56)
                     lighting: DefaultMaterial.NoLighting
                 }
             }
 
             Model {
                 source: "#Cylinder"
-                scale: Qt.vector3d(0.020, 2.82, 0.020)
+                scale: Qt.vector3d(0.34, 0.30, 0.34)
                 materials: DefaultMaterial {
-                    diffuseColor: root.theme.axisBlue
+                    diffuseColor: "#111111"
+                    lighting: DefaultMaterial.NoLighting
+                }
+            }
+
+            Model {
+                source: "#Cube"
+                scale: Qt.vector3d(0.56, 0.28, 0.38)
+                materials: DefaultMaterial {
+                    diffuseColor: "#111111"
                     lighting: DefaultMaterial.NoLighting
                 }
             }
 
             Model {
                 source: "#Cylinder"
-                scale: Qt.vector3d(0.020, 1.72, 0.020)
-                position: Qt.vector3d(86, 0, 0)
+                scale: Qt.vector3d(0.016, 3.40, 0.016)
                 eulerRotation: Qt.vector3d(0, 0, 90)
                 materials: DefaultMaterial {
                     diffuseColor: root.theme.axisOrange
@@ -108,8 +183,7 @@ Rectangle {
 
             Model {
                 source: "#Cylinder"
-                scale: Qt.vector3d(0.020, 1.72, 0.020)
-                position: Qt.vector3d(0, 0, 86)
+                scale: Qt.vector3d(0.016, 3.40, 0.016)
                 eulerRotation: Qt.vector3d(90, 0, 0)
                 materials: DefaultMaterial {
                     diffuseColor: root.theme.axisGreen
@@ -118,19 +192,10 @@ Rectangle {
             }
 
             Model {
-                source: "#Cube"
-                scale: Qt.vector3d(0.42, 0.24, 0.30)
+                source: "#Cylinder"
+                scale: Qt.vector3d(0.016, 3.40, 0.016)
                 materials: DefaultMaterial {
-                    diffuseColor: "#141414"
-                    lighting: DefaultMaterial.NoLighting
-                }
-            }
-
-            Model {
-                source: "#Cube"
-                scale: Qt.vector3d(0.20, 0.38, 0.20)
-                materials: DefaultMaterial {
-                    diffuseColor: "#141414"
+                    diffuseColor: root.theme.axisBlue
                     lighting: DefaultMaterial.NoLighting
                 }
             }
@@ -158,9 +223,9 @@ Rectangle {
                             source: "#Cylinder"
                             position: Qt.vector3d(parent.parent.ringRadiusValue * Math.cos(midRad), parent.parent.ringRadiusValue * Math.sin(midRad), 0)
                             eulerRotation: Qt.vector3d(0, 0, midDeg)
-                            scale: Qt.vector3d(0.012, Math.max(0.001, segmentLength / 100), 0.012)
+                            scale: Qt.vector3d(0.010, Math.max(0.001, segmentLength / 100), 0.010)
                             materials: DefaultMaterial {
-                                diffuseColor: "#5b6fff"
+                                diffuseColor: parent.parent.modelData > 0 ? "#5b72ff" : "#a46b3c"
                                 lighting: DefaultMaterial.NoLighting
                             }
                         }
@@ -169,7 +234,7 @@ Rectangle {
             }
 
             Repeater3D {
-                model: root.longitudeAngles
+                model: root.meridianAngles
 
                 delegate: Node {
                     required property real modelData
@@ -183,13 +248,14 @@ Rectangle {
                             property real midDeg: (index + 0.5) * 360 / root.ringSegments
                             property real midRad: midDeg * Math.PI / 180
                             property real segmentLength: 2 * Math.PI * root.sphereRadius / root.ringSegments
+                            property real localY: root.sphereRadius * Math.sin(midRad)
 
                             source: "#Cylinder"
                             position: Qt.vector3d(root.sphereRadius * Math.cos(midRad), root.sphereRadius * Math.sin(midRad), 0)
                             eulerRotation: Qt.vector3d(0, 0, midDeg)
-                            scale: Qt.vector3d(0.012, Math.max(0.001, segmentLength / 100), 0.012)
+                            scale: Qt.vector3d(0.010, Math.max(0.001, segmentLength / 100), 0.010)
                             materials: DefaultMaterial {
-                                diffuseColor: "#5b6fff"
+                                diffuseColor: localY >= 0 ? "#5b72ff" : "#a46b3c"
                                 lighting: DefaultMaterial.NoLighting
                             }
                         }
@@ -198,17 +264,64 @@ Rectangle {
             }
 
             Repeater3D {
-                model: root.previewSources()
+                model: root.diagonalAngles
 
-                delegate: Model {
+                delegate: Node {
+                    required property real modelData
+
+                    property real tiltRad: root.diagonalTilt * Math.PI / 180
+
+                    eulerRotation: Qt.vector3d(0, modelData, root.diagonalTilt)
+
+                    Repeater3D {
+                        model: root.ringSegments
+
+                        delegate: Model {
+                            property real midDeg: (index + 0.5) * 360 / root.ringSegments
+                            property real midRad: midDeg * Math.PI / 180
+                            property real segmentLength: 2 * Math.PI * root.sphereRadius / root.ringSegments
+                            property real localX: root.sphereRadius * Math.cos(midRad)
+                            property real localY: root.sphereRadius * Math.sin(midRad)
+                            property real worldY: localX * Math.sin(parent.parent.tiltRad) + localY * Math.cos(parent.parent.tiltRad)
+
+                            source: "#Cylinder"
+                            position: Qt.vector3d(localX, localY, 0)
+                            eulerRotation: Qt.vector3d(0, 0, midDeg)
+                            scale: Qt.vector3d(0.009, Math.max(0.001, segmentLength / 100), 0.009)
+                            materials: DefaultMaterial {
+                                diffuseColor: worldY >= 0 ? "#6d83ff" : "#9c6a42"
+                                lighting: DefaultMaterial.NoLighting
+                            }
+                        }
+                    }
+                }
+            }
+
+            Repeater3D {
+                model: root.visibleSources
+
+                delegate: Node {
                     required property var modelData
 
-                    source: "#Sphere"
-                    position: Qt.vector3d(modelData.x * root.sphereRadius, -modelData.z * root.sphereRadius, modelData.y * root.sphereRadius)
-                    scale: Qt.vector3d(0.080, 0.080, 0.080)
-                    materials: DefaultMaterial {
-                        diffuseColor: root.theme.accentPurple
-                        lighting: DefaultMaterial.NoLighting
+                    position: Qt.vector3d(modelData.x * root.sphereRadius, modelData.z * root.sphereRadius, modelData.y * root.sphereRadius)
+
+                    Model {
+                        source: "#Sphere"
+                        scale: Qt.vector3d(0.105, 0.105, 0.105)
+                        materials: DefaultMaterial {
+                            diffuseColor: modelData.color
+                            lighting: DefaultMaterial.NoLighting
+                        }
+                    }
+
+                    Model {
+                        source: "#Sphere"
+                        scale: Qt.vector3d(0.042, 0.042, 0.042)
+                        position: Qt.vector3d(0, 0, 0.3)
+                        materials: DefaultMaterial {
+                            diffuseColor: Qt.rgba(1, 1, 1, 0.72)
+                            lighting: DefaultMaterial.NoLighting
+                        }
                     }
                 }
             }
@@ -222,20 +335,22 @@ Rectangle {
         property real lastX: 0
         property real lastY: 0
 
-        onPressed: {
+        onPressed: function (mouse) {
             cursorShape = Qt.ClosedHandCursor
             lastX = mouse.x
             lastY = mouse.y
         }
 
-        onReleased: cursorShape = Qt.OpenHandCursor
+        onReleased: function () {
+            cursorShape = Qt.OpenHandCursor
+        }
 
-        onPositionChanged: {
+        onPositionChanged: function (mouse) {
             if (!(mouse.buttons & Qt.LeftButton)) {
                 return
             }
-            root.sphereYaw += (mouse.x - lastX) * 0.45
-            root.spherePitch = Math.max(-80, Math.min(80, root.spherePitch + (mouse.y - lastY) * 0.35))
+            root.sphereYaw += (mouse.x - lastX) * 0.42
+            root.spherePitch = Math.max(-70, Math.min(70, root.spherePitch + (mouse.y - lastY) * 0.30))
             lastX = mouse.x
             lastY = mouse.y
         }
@@ -245,67 +360,61 @@ Rectangle {
         id: axisOverlay
         anchors.left: parent.left
         anchors.bottom: parent.bottom
-        anchors.leftMargin: 20
-        anchors.bottomMargin: 18
-        width: 96
-        height: 74
+        anchors.leftMargin: 14
+        anchors.bottomMargin: 12
+        width: 120
+        height: 96
+
+        readonly property real originX: 30
+        readonly property real originY: 70
+        readonly property real axisScale: 26
 
         onPaint: {
             const ctx = getContext("2d")
+            const xPoint = root.axisEndpoint({
+                x: 1,
+                y: 0,
+                z: 0
+            }, axisScale)
+            const yPoint = root.axisEndpoint({
+                x: 0,
+                y: 0,
+                z: 1
+            }, axisScale)
+            const zPoint = root.axisEndpoint({
+                x: 0,
+                y: 1,
+                z: 0
+            }, axisScale)
+            const xLabel = root.labelAnchor(xPoint)
+            const yLabel = root.labelAnchor(yPoint)
+            const zLabel = root.labelAnchor(zPoint)
+
             ctx.reset()
             ctx.lineCap = "round"
             ctx.lineWidth = 2
+            ctx.font = "12px sans-serif"
+            ctx.textAlign = "center"
+            ctx.textBaseline = "middle"
 
-            const ox = 24
-            const oy = 56
+            function drawAxis(point, labelPoint, label, color) {
+                ctx.strokeStyle = color
+                ctx.beginPath()
+                ctx.moveTo(originX, originY)
+                ctx.lineTo(point.x, point.y)
+                ctx.stroke()
+                ctx.fillStyle = color
+                ctx.fillText(label, labelPoint.x, labelPoint.y)
+            }
 
-            ctx.strokeStyle = root.theme.axisOrange
+            drawAxis(xPoint, xLabel, "X", root.theme.axisOrange)
+            drawAxis(yPoint, yLabel, "Y", root.theme.axisGreen)
+            drawAxis(zPoint, zLabel, "Z", root.theme.axisBlue)
+
+            ctx.fillStyle = "#141414"
             ctx.beginPath()
-            ctx.moveTo(ox, oy)
-            ctx.lineTo(74, oy)
-            ctx.stroke()
-
-            ctx.strokeStyle = root.theme.axisBlue
-            ctx.beginPath()
-            ctx.moveTo(ox, oy)
-            ctx.lineTo(ox, 12)
-            ctx.stroke()
-
-            ctx.strokeStyle = root.theme.axisGreen
-            ctx.beginPath()
-            ctx.moveTo(ox, oy)
-            ctx.lineTo(8, 26)
-            ctx.stroke()
+            ctx.arc(originX, originY, 2.4, 0, Math.PI * 2)
+            ctx.fill()
         }
-    }
-
-    Label {
-        anchors.left: axisOverlay.left
-        anchors.top: axisOverlay.top
-        anchors.leftMargin: 0
-        anchors.topMargin: 4
-        text: "Y"
-        color: theme.axisGreen
-        font.pixelSize: theme.smallFont + 1
-    }
-
-    Label {
-        anchors.left: axisOverlay.left
-        anchors.top: axisOverlay.top
-        anchors.leftMargin: 22
-        anchors.topMargin: -4
-        text: "Z"
-        color: theme.axisBlue
-        font.pixelSize: theme.smallFont + 1
-    }
-
-    Label {
-        anchors.left: axisOverlay.left
-        anchors.top: axisOverlay.top
-        anchors.leftMargin: 74
-        anchors.topMargin: 42
-        text: "X"
-        color: theme.axisOrange
-        font.pixelSize: theme.smallFont + 1
     }
 }

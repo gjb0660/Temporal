@@ -13,6 +13,8 @@ ApplicationWindow {
     title: "Temporal 实时数据"
     color: "#eef2f6"
     font.family: "Segoe UI"
+    property bool previewMode: false
+    property string previewScenarioKey: "referenceSingle"
 
     readonly property QtObject theme: QtObject {
         readonly property color pageBackground: "#eef2f6"
@@ -109,6 +111,8 @@ ApplicationWindow {
             CenterPane {
                 theme: root.theme
                 sourcePositions: appBridge.sourcePositions
+                previewMode: root.previewMode
+                previewScenarioKey: root.previewScenarioKey
             }
 
             RightSidebar {

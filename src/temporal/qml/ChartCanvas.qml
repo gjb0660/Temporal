@@ -4,14 +4,31 @@ Canvas {
     required property QtObject theme
     property var yTicks: []
     property var xTicks: []
-    property var firstSeries: []
-    property var secondSeries: []
-    property color firstColor: theme.accentCyan
-    property color secondColor: theme.accentPurple
+    property var seriesList: []
     property string xAxisLabel: "样本"
 
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
+    onYTicksChanged: requestPaint()
+    onXTicksChanged: requestPaint()
+    onSeriesListChanged: requestPaint()
+    onXAxisLabelChanged: requestPaint()
+
+    function normalizedSeries() {
+        if (!Array.isArray(seriesList)) {
+            return []
+        }
+
+        const normalized = []
+        for (let index = 0; index < seriesList.length; index += 1) {
+            const item = seriesList[index]
+            if (!item || !Array.isArray(item.values) || item.values.length === 0) {
+                continue
+            }
+            normalized.push(item)
+        }
+        return normalized
+    }
 
     onPaint: {
         const ctx = getContext("2d")
@@ -23,6 +40,7 @@ Canvas {
         const bottomPad = 34
         const plotW = w - leftPad - rightPad
         const plotH = h - topPad - bottomPad
+        const visibleSeries = normalizedSeries()
 
         ctx.reset()
         ctx.fillStyle = "#ffffff"
@@ -62,9 +80,6 @@ Canvas {
         ctx.fillText(xAxisLabel, leftPad + plotW / 2, h - 4)
 
         function plot(points, color) {
-            if (points.length === 0) {
-                return
-            }
             ctx.strokeStyle = color
             ctx.lineWidth = 2
             ctx.beginPath()
@@ -80,7 +95,9 @@ Canvas {
             ctx.stroke()
         }
 
-        plot(firstSeries, firstColor)
-        plot(secondSeries, secondColor)
+        for (let index = 0; index < visibleSeries.length; index += 1) {
+            const item = visibleSeries[index]
+            plot(item.values, item.color || theme.accentPurple)
+        }
     }
 }
