@@ -133,6 +133,16 @@ class TestAppBridgeRecording(unittest.TestCase):
 
             self.assertEqual(bridge.recordingSessions, [])
 
+    def test_sst_over_capacity_limits_recording_to_mapped_sources(self) -> None:
+        with patch("temporal.app.AutoRecorder", _FakeRecorder):
+            bridge = AppBridge()
+
+            bridge._on_sst({"src": [{"id": 1}, {"id": 2}, {"id": 3}, {"id": 4}, {"id": 5}]})
+
+            self.assertEqual(len(bridge._source_channel_map), 4)
+            self.assertEqual(bridge.recordingSourceCount, 4)
+            self.assertFalse(any("Source 5" in item for item in bridge.recordingSessions))
+
 
 if __name__ == "__main__":
     unittest.main()

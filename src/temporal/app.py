@@ -239,7 +239,10 @@ class AppBridge(QObject):
         self._last_sst = message
         self._refresh_sources()
         self._update_source_channel_map(self._source_ids)
-        self._recorder.update_active_sources(self._source_ids)
+        mapped_source_ids = [
+            source_id for source_id in self._source_ids if source_id in self._source_channel_map
+        ]
+        self._recorder.update_active_sources(mapped_source_ids)
         self._recorder.sweep_inactive()
         self._set_recording_source_count(len(self._recorder.active_sources()))
         self._refresh_recording_sessions()
