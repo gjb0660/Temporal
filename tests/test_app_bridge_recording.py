@@ -61,7 +61,7 @@ class TestAppBridgeRecording(unittest.TestCase):
             bridge._on_sst({"src": [{"id": 2}, {"id": 0}, {"id": 5}]})
 
             self.assertEqual(bridge.recordingSourceCount, 2)
-            self.assertIn("录制中=2", bridge.status)
+            self.assertIn("录制中=2", bridge._status)
 
     def test_stop_streams_resets_recording_count(self) -> None:
         with patch("temporal.app.AutoRecorder", _FakeRecorder):
@@ -71,7 +71,7 @@ class TestAppBridgeRecording(unittest.TestCase):
             bridge.stopStreams()
 
             self.assertEqual(bridge.recordingSourceCount, 0)
-            self.assertEqual(bridge.status, "数据流已关闭")
+            self.assertEqual(bridge._status, "数据流已关闭")
 
     def test_source_channel_map_reuses_existing_channel(self) -> None:
         with patch("temporal.app.AutoRecorder", _FakeRecorder):
@@ -125,13 +125,13 @@ class TestAppBridgeRecording(unittest.TestCase):
 
             bridge._on_sst({"src": [{"id": 2}]})
 
-            self.assertEqual(len(bridge.recordingSessions), 2)
-            self.assertTrue(any("Source 2 [sp]" in item for item in bridge.recordingSessions))
-            self.assertTrue(any("Source 2 [pf]" in item for item in bridge.recordingSessions))
+            self.assertEqual(len(bridge._recording_sessions), 2)
+            self.assertTrue(any("Source 2 [sp]" in item for item in bridge._recording_sessions))
+            self.assertTrue(any("Source 2 [pf]" in item for item in bridge._recording_sessions))
 
             bridge.stopStreams()
 
-            self.assertEqual(bridge.recordingSessions, [])
+            self.assertEqual(bridge._recording_sessions, [])
 
     def test_sst_over_capacity_limits_recording_to_mapped_sources(self) -> None:
         with patch("temporal.app.AutoRecorder", _FakeRecorder):
@@ -141,7 +141,7 @@ class TestAppBridgeRecording(unittest.TestCase):
 
             self.assertEqual(len(bridge._source_channel_map), 4)
             self.assertEqual(bridge.recordingSourceCount, 4)
-            self.assertFalse(any("Source 5" in item for item in bridge.recordingSessions))
+            self.assertFalse(any("Source 5" in item for item in bridge._recording_sessions))
 
 
 if __name__ == "__main__":

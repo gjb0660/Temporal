@@ -368,12 +368,7 @@ class AppBridge(QObject):
         self.recordingSessionsChanged.emit()
 
     def _refresh_recording_sessions(self) -> None:
-        snapshot_fn = getattr(self._recorder, "sessions_snapshot", None)
-        if snapshot_fn is None or not callable(snapshot_fn):
-            self._set_recording_sessions([])
-            return
-
-        sessions = snapshot_fn()
+        sessions = self._recorder.sessions_snapshot()
         items = [f"Source {item.source_id} [{item.mode}] {item.filepath.name}" for item in sessions]
         self._set_recording_sessions(items)
 

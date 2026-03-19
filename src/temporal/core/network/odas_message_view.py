@@ -49,7 +49,11 @@ def extract_source_positions(
             continue
         if selected_ids is not None and source_id not in selected_ids:
             continue
-        if not all(isinstance(value, (int, float)) for value in (x, y, z)):
+        if not isinstance(x, (int, float)):
+            continue
+        if not isinstance(y, (int, float)):
+            continue
+        if not isinstance(z, (int, float)):
             continue
 
         seen.add(source_id)
