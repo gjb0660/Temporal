@@ -24,6 +24,10 @@ Always check these workflow contracts:
 2. QML changes require lint -> fix -> format.
 3. TDD must complete Red -> Green -> Refactor.
 4. Rule documents must stay terse and avoid repeated guidance.
+5. Agents must use `vscode_askQuestions` only at true blocking
+  decisions.
+6. Agents must not require a pre-code approval step
+  for implementable tasks.
 
 Return findings in this order:
 

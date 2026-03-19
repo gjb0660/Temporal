@@ -69,6 +69,11 @@ Run these checks before merge:
 
 - Run markdownlint for markdown changes and fix syntax violations.
 - Keep rule docs short; prefer imperative bullets and remove repeated guidance.
+- Use `vscode_askQuestions` at true decision blockers;
+  do not pause the session when the next implementation step is clear.
+- Default to direct execution for implementation requests;
+  do not ask for pre-code confirmation unless the user explicitly
+  requested a checkpoint.
 - For touched Python files, run lint first, fix findings, then format.
 - For touched QML files, run lint first, fix findings, then format.
 - Use TDD as Red -> Green -> Refactor; do not stop after Green.
