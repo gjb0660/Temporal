@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import threading
 from dataclasses import dataclass
 
@@ -55,7 +56,17 @@ class RemoteOdasController:
         return CommandResult(code=code, stdout=out, stderr=err)
 
     def start_odaslive(self) -> CommandResult:
-        cmd = f"nohup {self._cfg.odas_command} >/tmp/odaslive.log 2>&1 & echo $!"
+        escaped_command = shlex.quote(self._cfg.odas_command)
+        escaped_args = " ".join(shlex.quote(arg) for arg in self._cfg.odas_args)
+        command = escaped_command
+        if escaped_args:
+            command = f"{command} {escaped_args}"
+        if self._cfg.odas_cwd is not None:
+            escaped_cwd = shlex.quote(self._cfg.odas_cwd)
+            command = f"cd {escaped_cwd} && {command}"
+        escaped_log = shlex.quote(self._cfg.odas_log)
+        shell_script = f"{command} >{escaped_log} 2>&1 < /dev/null & echo $!"
+        cmd = f"sh -lc {shlex.quote(shell_script)}"
         return self._exec(cmd)
 
     def stop_odaslive(self) -> CommandResult:
@@ -66,7 +77,7 @@ class RemoteOdasController:
 
     def read_log_tail(self, lines: int = 80) -> CommandResult:
         safe_lines = max(1, min(lines, 200))
-        cmd = (
-            f"sh -lc 'if [ -f /tmp/odaslive.log ]; then tail -n {safe_lines} /tmp/odaslive.log; fi'"
-        )
+        escaped_log = shlex.quote(self._cfg.odas_log)
+        shell_script = f"if [ -f {escaped_log} ]; then tail -n {safe_lines} {escaped_log}; fi"
+        cmd = f"sh -lc {shlex.quote(shell_script)}"
         return self._exec(cmd)

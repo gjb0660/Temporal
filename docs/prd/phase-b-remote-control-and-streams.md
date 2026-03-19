@@ -23,6 +23,23 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 2. Keep stream handlers resilient to malformed chunks and lines.
 3. Keep protocol ports aligned with ODAS defaults.
 4. Keep socket operations inside backend layer only.
+5. Keep SSH config contract explicit and minimal:
+   `odas.command`, `odas.args`, `odas.cwd`, `odas.log`.
+
+## SSH Contract
+
+- `remote.username` and `remote.private_key` are optional; empty string means missing.
+- `odas.command` is executable name, `odas.args` is argument array,
+  `odas.cwd` is optional working directory.
+- `odas.log` is log target path; default is `odaslive.log`.
+- Remove legacy key compatibility; do not read deprecated fields.
+
+## SSH Semantics
+
+- Call `paramiko.SSHClient.connect` once and pass optional credentials as `None`.
+- Start odaslive in background without `nohup`.
+- Apply `odas.cwd` before command when configured.
+- Read log tail from `odas.log` path.
 
 ## Quality Requirements
 
@@ -34,3 +51,6 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 1. SSH connection test reports clear success or failure state.
 2. Remote odaslive commands can be triggered from UI actions.
 3. SST and SSL clients can receive and parse test lines without crash.
+4. Config loader maps `odas.command`, `odas.args`, `odas.cwd`,
+   and `odas.log` to backend model.
+5. SSH start command supports optional working directory and does not use `nohup`.

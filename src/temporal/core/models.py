@@ -32,6 +32,9 @@ class OdasStreamConfig:
 class RemoteOdasConfig:
     host: str
     port: int
-    username: str
-    private_key: str
-    odas_command: str
+    username: str | None = None
+    private_key: str | None = None
+    odas_command: str = "odaslive"
+    odas_args: list[str] = field(default_factory=list)
+    odas_cwd: str | None = None
+    odas_log: str = "odaslive.log"

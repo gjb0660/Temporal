@@ -1,12 +1,14 @@
 [remote]
-host = "172.21.16.139"
+host = "127.0.0.1"
 port = 22
-username = "odas"
-private_key = "~/.ssh/id_rsa"
+username = ""
+private_key = ""
 
 [odas]
-config_path = "/opt/odas/config/odas.cfg"
-command = "odaslive -c /opt/odas/config/odas.cfg -v"
+command = "odaslive"
+args = ["-c", "odas.cfg", "-v"]
+cwd = ""
+log = "odaslive.log"
 
 [streams]
 sst_port = 9000

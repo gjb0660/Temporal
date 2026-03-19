@@ -46,7 +46,8 @@ def _fake_config() -> TemporalConfig:
         port=22,
         username="odas",
         private_key="~/.ssh/id_rsa",
-        odas_command="odaslive -c /opt/odas/config/odas.cfg -v",
+        odas_args=["-c", "/opt/odas/config/odas.cfg", "-v"],
+        odas_log="/tmp/odaslive.log",
     )
     streams = OdasStreamConfig(
         sst=OdasEndpoint(host="127.0.0.1", port=9000),
