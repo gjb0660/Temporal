@@ -68,7 +68,7 @@ ApplicationWindow {
                     label: "声源",
                     checked: true,
                     enabled: false,
-                    badge: index === 1 ? "15" : ""
+                    badge: ""
                 })
             }
             return rows

@@ -12,8 +12,8 @@ Rectangle {
     color: "#ffffff"
     border.color: "transparent"
 
-    property real sphereYaw: -34
-    property real spherePitch: 24
+    property real sphereYaw: 0
+    property real spherePitch: 0
     property real sphereRadius: 150
     property var latitudeAngles: [-60, -36, -18, 18, 36, 60]
     property var meridianAngles: [0, 30, 60, 90, 120, 150]
@@ -41,7 +41,8 @@ Rectangle {
     }
 
     function normalizedSourceEntries() {
-        const raw = Array.isArray(sourcePositions) && sourcePositions.length > 0 ? sourcePositions : fallbackPreviewSources
+        const hasRuntimePoints = Array.isArray(sourcePositions) && sourcePositions.length > 0
+        const raw = hasRuntimePoints ? sourcePositions : previewScenarioKey !== "" ? fallbackPreviewSources : []
         const entries = []
         for (let index = 0; index < raw.length; index += 1) {
             const item = raw[index]
@@ -68,7 +69,10 @@ Rectangle {
             })
         }
 
-        return entries.length > 0 ? entries : fallbackPreviewSources
+        if (entries.length > 0) {
+            return entries
+        }
+        return previewScenarioKey !== "" ? fallbackPreviewSources : []
     }
 
     function rotateVector(vector) {

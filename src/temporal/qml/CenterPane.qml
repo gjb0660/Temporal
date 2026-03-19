@@ -13,39 +13,18 @@ Rectangle {
 
     readonly property var previewCatalog: PreviewData.buildCatalog(theme)
     readonly property var activePreview: previewCatalog[previewScenarioKey] || previewCatalog.referenceSingle
-    readonly property var runtimeElevationSeries: [
-        {
-            sourceId: 7,
-            color: theme.accentCyan,
-            values: [0.58, 0.57, 0.56, 0.54, 0.53, 0.52, 0.52, 0.52, 0.52]
-        },
-        {
-            sourceId: 15,
-            color: theme.accentPurple,
-            values: [0.42, 0.45, 0.50, 0.56, 0.61, 0.63, 0.62, 0.60, 0.59]
-        }
-    ]
-    readonly property var runtimeAzimuthSeries: [
-        {
-            sourceId: 7,
-            color: theme.accentCyan,
-            values: [0.10, 0.10, 0.11, 0.11, 0.12, 0.12, 0.12, 0.12, 0.12]
-        },
-        {
-            sourceId: 15,
-            color: theme.accentPurple,
-            values: [0.72, 0.72, 0.73, 0.71, 0.69, 0.66, 0.63, 0.64, 0.68]
-        }
-    ]
+    readonly property var previewXTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
+    readonly property var runtimeXTicks: ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600"]
     readonly property var displayedSourcePositions: {
         if (previewMode) {
             return activePreview.sourcePositions
         }
         return Array.isArray(sourcePositions) ? sourcePositions : []
     }
-    readonly property var displayedElevationSeries: previewMode ? activePreview.elevationSeries : runtimeElevationSeries
-    readonly property var displayedAzimuthSeries: previewMode ? activePreview.azimuthSeries : runtimeAzimuthSeries
+    readonly property var displayedElevationSeries: previewMode ? activePreview.elevationSeries : []
+    readonly property var displayedAzimuthSeries: previewMode ? activePreview.azimuthSeries : []
     readonly property var displayedSourceColors: previewMode ? activePreview.sourceColors : ({})
+    readonly property var displayedXTicks: previewMode ? previewXTicks : runtimeXTicks
 
     Layout.fillWidth: true
     Layout.fillHeight: true
@@ -78,7 +57,7 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
                 yTicks: ["90", "60", "30", "0", "-30", "-60", "-90"]
-                xTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
+                xTicks: root.displayedXTicks
                 seriesList: root.displayedElevationSeries
             }
         }
@@ -100,7 +79,7 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
                 yTicks: ["180", "120", "60", "0", "-60", "-120", "-180"]
-                xTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
+                xTicks: root.displayedXTicks
                 seriesList: root.displayedAzimuthSeries
             }
         }
