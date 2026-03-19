@@ -76,6 +76,7 @@ Run these checks before merge:
 - Write human-facing docs and chat responses in concise Chinese technical style.
 - Deliver or update a PRD before implementing a feature.
 - Store all PRDs under docs/prd; do not place PRDs in docs root.
+- Update docs/phase-progress.md only during session handoff.
 - Commit implementation and corresponding tests together in one atomic commit.
 - Only use git add and git commit; never rewrite or delete git history.
 - Never modify or delete files outside the current workspace.

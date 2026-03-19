@@ -43,6 +43,7 @@
 - Follow technical boundaries and quality gates in .github/copilot-instructions.md.
 - Keep rule and handoff docs terse; remove duplicated guidance.
 - Place PRD files only under docs/prd.
+- Update docs/phase-progress.md only in handoff stage.
 - Execute in order: Explore -> Plan -> Approval -> Code.
 - For behavior changes with tests, complete Red -> Green -> Refactor before handoff.
 - Commit implementation and corresponding tests together in one atomic commit.
