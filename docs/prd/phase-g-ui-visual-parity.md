@@ -1,52 +1,101 @@
-# PRD: Phase G UI Visual Parity
+# PRD: Phase G UI Visual Parity Round 2
 
 ## Goal
 
-Deliver a QML live-data page that visually matches the original odas_web page,
-switches human-facing UI copy to Chinese, and upgrades the source-location area
-from a placeholder into a real rotatable QtQuick3D scene.
+Deliver a second visual-parity pass for the QML live-data page so that it more
+closely matches the ODAS Studio reference in layout rhythm, control simplicity,
+3D source-location readability, and Windows-native visual tone.
 
 ## Scope
 
-- Rebuild the main page layout with responsive QML layouts.
-- Match the reference page structure, spacing, typography, colors, and panel rhythm.
-- Replace the local monitor card with remote odaslive log output.
-- Replace the placeholder source-location sphere with a rotatable QtQuick3D scene.
-- Unify ODAS control button styling and align the energy-range labels with the slider.
-- Keep existing appBridge actions and bindings working.
-- Validate with local screenshots and iterative visual adjustment.
+- Keep the existing three-column page structure and Chinese human-facing copy.
+- Refine the left column so the ODAS log area and ODAS control area use an
+  overall height split close to 6:4.
+- Simplify the ODAS control area to two operator-facing toggle buttons:
+  start/stop and listen/stop-listening.
+- Expose bridge state needed for button text, enabled state, and safe toggles.
+- Enlarge the 3D source-location sphere and add a clear XYZ axis indicator.
+- Reduce the header brand text size and shift the page theme closer to a
+  Windows-native light application style.
+- Validate by taking local screenshots after implementation and iterating until
+  the page visually meets the reference checkpoints.
 
 ## Non-Goals
 
 - Full production chart rendering from live SST history.
-- Backend protocol changes beyond minimal read-only UI support if required.
+- New protocol features or backend transport changes outside bridge state and
+  toggle behavior needed by the UI.
+- Pixel-perfect cloning of every reference detail.
 
 ## Functional Requirements
 
 1. The page keeps a stable three-column structure when the window is resized.
 2. Header, content panels, and footer remain aligned without absolute page positioning.
-3. Source and filter panels continue to bind to appBridge state.
-4. The ODAS control area keeps all current actions callable from the UI and uses
-   a consistent custom button style.
-5. The central 3D visualization supports drag rotation and displays active SST
-   source positions when available.
-6. The left log panel displays remote `/tmp/odaslive.log` tail output through the bridge.
+3. Source and filter panels continue to bind to `appBridge` state.
+4. The ODAS control area shows only two buttons in QML:
+   `启动/停止` and `监听/停止监听`.
+5. The start toggle connects SSH first when needed, starts remote odaslive,
+   and stops both odaslive and active streams when toggled off.
+6. The listen toggle starts or stops streams and remains disabled when remote
+   odaslive is not running.
+7. The left log panel continues to display remote `/tmp/odaslive.log` tail output.
+8. The source-location area remains rotatable and displays active SST source
+   positions when available.
+9. The source-location area includes a clearly visible XYZ axis indicator in the
+   lower-left overlay.
+
+## Interface Additions
+
+- `AppBridge.remoteConnected: bool`
+- `AppBridge.odasRunning: bool`
+- `AppBridge.streamsActive: bool`
+- `AppBridge.toggleRemoteOdas()`
+- `AppBridge.toggleStreams()`
+
+Existing low-level bridge slots remain available for compatibility, but QML
+uses the new toggle entry points.
 
 ## Quality Requirements
 
 - Use QML relative layouts, anchors, and size constraints instead of fixed page coordinates.
-- Keep touched QML valid under qmllint.
-- Preserve readability at the current default size and at narrower widths.
+- Keep touched QML valid under qmllint and format it with `pyside6-qmlformat`.
+- Keep touched Python files clean under `ruff check` and `ruff format`.
+- Preserve readability at the default application size and at narrower widths.
+- Keep dynamic status or log text inside bounded containers; do not let it
+  resize the control-button row.
 
 ## Acceptance Criteria
 
-1. At the default application size, the page visually matches the reference page
-   in overall composition and spacing.
-2. At smaller and larger window sizes, columns and sections remain readable and aligned.
-3. Source list, filters, and control buttons still reflect live appBridge state.
-4. Local static checks pass for touched files.
+1. At the default application size, the page visually matches the reference in
+   overall composition, spacing, and hierarchy.
+2. The left ODAS log area and left ODAS control area maintain an overall height
+   split close to 6:4.
+3. The left control area shows only the two toggle buttons and their state is
+   consistent with bridge status.
+4. The 3D source-location sphere is visually larger than the current version
+   and occupies the main emphasis of its section.
+5. The lower-left XYZ indicator is clearly visible without zooming.
+6. The `Temporal Studio` title is visibly smaller than the current version.
+7. The page theme reads as a Windows-native light UI with product branding,
+   rather than a heavily custom green-tinted interface.
+8. Local static checks and unit tests pass for touched files.
+
+## Validation Workflow
+
+1. Update this PRD first.
+2. Implement bridge, QML, and tests.
+3. Run lint and format for touched Python and QML files.
+4. Launch the app and capture screenshots at:
+   - default size `1188x794`
+   - a narrower width around `1024`
+5. Compare screenshots against the reference and iterate until all acceptance
+   criteria above are satisfied.
 
 ## Preventive Rules
 
-- Keep dynamic status or log text inside bounded containers; do not let it resize action-button rows.
-- Keep the source-location area as a recognizable interactive 3D view; do not regress it to a placeholder or unreadable point cloud.
+- Keep the source-location area as a recognizable interactive 3D view; do not
+  regress it to a placeholder or unreadable point cloud.
+- Keep listen control blocked when odaslive is not running; do not let QML
+  bypass backend safety checks.
+- Keep left-column card proportions explicit in layout constraints so future
+  text changes do not collapse the control area again.

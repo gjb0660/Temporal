@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from temporal.app import AppBridge
+from temporal.core.ssh.remote_odas import CommandResult
 
 
 @dataclass
@@ -51,6 +52,51 @@ class _FakeRecorder:
         sessions = list(self._sessions.values())
         sessions.sort(key=lambda item: (item.source_id, item.mode))
         return sessions
+
+
+class _FakeClient:
+    def __init__(self, **_kwargs) -> None:
+        self.start_calls = 0
+        self.stop_calls = 0
+
+    def start(self) -> None:
+        self.start_calls += 1
+
+    def stop(self) -> None:
+        self.stop_calls += 1
+
+
+class _FakeRemote:
+    def __init__(self, _config) -> None:
+        self.connected = False
+        self.running = False
+        self.connect_calls = 0
+        self.start_calls = 0
+        self.stop_calls = 0
+
+    def connect(self) -> None:
+        self.connected = True
+        self.connect_calls += 1
+
+    def start_odaslive(self) -> CommandResult:
+        self.running = True
+        self.start_calls += 1
+        return CommandResult(code=0, stdout="123\n", stderr="")
+
+    def stop_odaslive(self) -> CommandResult:
+        self.running = False
+        self.stop_calls += 1
+        return CommandResult(code=0, stdout="", stderr="")
+
+    def status(self) -> CommandResult:
+        stdout = "odaslive -c /tmp/odas.cfg\n" if self.running else ""
+        return CommandResult(code=0, stdout=stdout, stderr="")
+
+    def read_log_tail(self, _lines: int = 80) -> CommandResult:
+        if not self.connected:
+            raise RuntimeError("SSH is not connected")
+        stdout = "odaslive ready\n" if self.running else "connected\n"
+        return CommandResult(code=0, stdout=stdout, stderr="")
 
 
 class TestAppBridgeRecording(unittest.TestCase):
@@ -132,6 +178,69 @@ class TestAppBridgeRecording(unittest.TestCase):
             bridge.stopStreams()
 
             self.assertEqual(bridge._recording_sessions, [])
+
+    def test_toggle_remote_odas_connects_then_starts(self) -> None:
+        with (
+            patch("temporal.app.AutoRecorder", _FakeRecorder),
+            patch("temporal.app.OdasClient", _FakeClient),
+            patch("temporal.app.RemoteOdasController", _FakeRemote),
+        ):
+            bridge = AppBridge()
+
+            bridge.toggleRemoteOdas()
+
+            self.assertTrue(bridge.remoteConnected)
+            self.assertTrue(bridge.odasRunning)
+            self.assertEqual(bridge._remote.connect_calls, 1)
+            self.assertEqual(bridge._remote.start_calls, 1)
+
+    def test_toggle_remote_odas_stops_streams_and_remote(self) -> None:
+        with (
+            patch("temporal.app.AutoRecorder", _FakeRecorder),
+            patch("temporal.app.OdasClient", _FakeClient),
+            patch("temporal.app.RemoteOdasController", _FakeRemote),
+        ):
+            bridge = AppBridge()
+            bridge.toggleRemoteOdas()
+            bridge.toggleStreams()
+
+            bridge.toggleRemoteOdas()
+
+            self.assertFalse(bridge.odasRunning)
+            self.assertFalse(bridge.streamsActive)
+            self.assertEqual(bridge._remote.stop_calls, 1)
+            self.assertEqual(bridge._client.stop_calls, 1)
+
+    def test_toggle_streams_starts_and_stops_client(self) -> None:
+        with (
+            patch("temporal.app.AutoRecorder", _FakeRecorder),
+            patch("temporal.app.OdasClient", _FakeClient),
+            patch("temporal.app.RemoteOdasController", _FakeRemote),
+        ):
+            bridge = AppBridge()
+            bridge.toggleRemoteOdas()
+
+            bridge.toggleStreams()
+            self.assertTrue(bridge.streamsActive)
+            self.assertEqual(bridge._client.start_calls, 1)
+
+            bridge.toggleStreams()
+            self.assertFalse(bridge.streamsActive)
+            self.assertEqual(bridge._client.stop_calls, 1)
+
+    def test_start_streams_requires_running_remote(self) -> None:
+        with (
+            patch("temporal.app.AutoRecorder", _FakeRecorder),
+            patch("temporal.app.OdasClient", _FakeClient),
+            patch("temporal.app.RemoteOdasController", _FakeRemote),
+        ):
+            bridge = AppBridge()
+
+            bridge.toggleStreams()
+
+            self.assertFalse(bridge.streamsActive)
+            self.assertEqual(bridge._client.start_calls, 0)
+            self.assertEqual(bridge._status, "请先启动远程 odaslive")
 
     def test_sst_over_capacity_limits_recording_to_mapped_sources(self) -> None:
         with patch("temporal.app.AutoRecorder", _FakeRecorder):

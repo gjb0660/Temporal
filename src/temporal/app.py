@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# pyright: reportMissingImports=false, reportUntypedFunctionDecorator=false
+
 import sys
 from pathlib import Path
 
@@ -24,6 +26,9 @@ class AppBridge(QObject):
     _AUDIO_SAMPLE_WIDTH = 2
 
     statusChanged = Signal()
+    remoteConnectedChanged = Signal()
+    odasRunningChanged = Signal()
+    streamsActiveChanged = Signal()
     sourceItemsChanged = Signal()
     sourceIdsChanged = Signal()
     sourceCountChanged = Signal()
@@ -59,6 +64,9 @@ class AppBridge(QObject):
         self._potentials_enabled = False
         self._potential_min = 0.0
         self._potential_max = 1.0
+        self._remote_connected = False
+        self._odas_running = False
+        self._streams_active = False
         self._recorder = AutoRecorder(self._root / "recordings")
         self._log_timer = QTimer(self)
         self._log_timer.setInterval(1500)
@@ -74,6 +82,18 @@ class AppBridge(QObject):
     @Property(str, notify=statusChanged)  # type: ignore[reportCallIssue]
     def status(self) -> str:
         return self._status
+
+    @Property(bool, notify=remoteConnectedChanged)  # type: ignore[reportCallIssue]
+    def remoteConnected(self) -> bool:
+        return self._remote_connected
+
+    @Property(bool, notify=odasRunningChanged)  # type: ignore[reportCallIssue]
+    def odasRunning(self) -> bool:
+        return self._odas_running
+
+    @Property(bool, notify=streamsActiveChanged)  # type: ignore[reportCallIssue]
+    def streamsActive(self) -> bool:
+        return self._streams_active
 
     @Property(list, notify=sourceItemsChanged)  # type: ignore[reportCallIssue]
     def sourceItems(self) -> list[str]:
@@ -134,42 +154,88 @@ class AppBridge(QObject):
     def connectRemote(self) -> None:
         try:
             self._remote.connect()
-            self.setStatus("SSH 已连接")
-            self._set_remote_log_lines(["已连接远程主机，正在读取 odaslive 日志..."])
-            if not self._log_timer.isActive():
-                self._log_timer.start()
-            self._poll_remote_log()
         except Exception as exc:
+            self._set_remote_connected(False)
+            self._set_odas_running(False)
             self.setStatus(f"SSH 连接失败: {exc}")
             self._set_remote_log_lines([f"远程连接失败: {exc}"])
+            return
+
+        self._set_remote_connected(True)
+        if not self._log_timer.isActive():
+            self._log_timer.start()
+        self._poll_remote_log()
+        self._sync_remote_odas_state()
+        if self._odas_running:
+            self.setStatus("SSH 已连接，远程 odaslive 运行中")
+        else:
+            self.setStatus("SSH 已连接")
 
     @Slot()
     def startRemoteOdas(self) -> None:
+        if not self._remote_connected:
+            self.setStatus("请先连接远程 SSH")
+            return
+
         try:
             result = self._remote.start_odaslive()
-            if result.code == 0:
-                self.setStatus("远程 odaslive 已启动")
-            else:
-                self.setStatus(result.stderr.strip() or "远程 odaslive 启动失败")
-            self._poll_remote_log()
         except Exception as exc:
             self.setStatus(f"启动失败: {exc}")
+            return
+
+        if result.code == 0:
+            self._set_odas_running(True)
+            self.setStatus("远程 odaslive 已启动")
+        else:
+            self._sync_remote_odas_state()
+            self.setStatus(result.stderr.strip() or "远程 odaslive 启动失败")
+        self._poll_remote_log()
 
     @Slot()
     def stopRemoteOdas(self) -> None:
+        if not self._remote_connected:
+            self.setStatus("SSH 未连接")
+            return
+
         try:
             result = self._remote.stop_odaslive()
-            if result.code == 0:
-                self.setStatus("远程 odaslive 已停止")
-            else:
-                self.setStatus(result.stderr.strip() or "远程 odaslive 停止失败")
-            self._poll_remote_log()
         except Exception as exc:
             self.setStatus(f"停止失败: {exc}")
+            return
+
+        if result.code == 0:
+            self._set_odas_running(False)
+            self.setStatus("远程 odaslive 已停止")
+        else:
+            self._sync_remote_odas_state()
+            self.setStatus(result.stderr.strip() or "远程 odaslive 停止失败")
+        self._poll_remote_log()
+
+    @Slot()
+    def toggleRemoteOdas(self) -> None:
+        if self._odas_running:
+            if self._streams_active:
+                self.stopStreams()
+            self.stopRemoteOdas()
+            return
+
+        if not self._remote_connected:
+            self.connectRemote()
+            if not self._remote_connected:
+                return
+        self.startRemoteOdas()
 
     @Slot()
     def startStreams(self) -> None:
+        if not self._odas_running:
+            self.setStatus("请先启动远程 odaslive")
+            return
+        if self._streams_active:
+            self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
+            return
+
         self._client.start()
+        self._set_streams_active(True)
         self._update_stream_status("开始监听 SST/SSL/SSS 数据流")
 
     @Slot()
@@ -178,9 +244,17 @@ class AppBridge(QObject):
         self._recorder.stop_all()
         self._source_channel_map.clear()
         self._channel_source_map.clear()
+        self._set_streams_active(False)
         self._set_recording_source_count(0)
         self._set_recording_sessions([])
         self.setStatus("数据流已关闭")
+
+    @Slot()
+    def toggleStreams(self) -> None:
+        if self._streams_active:
+            self.stopStreams()
+            return
+        self.startStreams()
 
     @Slot(bool)
     def setSourcesEnabled(self, enabled: bool) -> None:
@@ -327,6 +401,24 @@ class AppBridge(QObject):
             f"录制中={self._recording_source_count}"
         )
 
+    def _set_remote_connected(self, connected: bool) -> None:
+        if self._remote_connected == connected:
+            return
+        self._remote_connected = connected
+        self.remoteConnectedChanged.emit()
+
+    def _set_odas_running(self, running: bool) -> None:
+        if self._odas_running == running:
+            return
+        self._odas_running = running
+        self.odasRunningChanged.emit()
+
+    def _set_streams_active(self, active: bool) -> None:
+        if self._streams_active == active:
+            return
+        self._streams_active = active
+        self.streamsActiveChanged.emit()
+
     def _set_recording_source_count(self, value: int) -> None:
         if self._recording_source_count == value:
             return
@@ -340,12 +432,29 @@ class AppBridge(QObject):
         self._remote_log_lines = clean_lines
         self.remoteLogLinesChanged.emit()
 
+    def _sync_remote_odas_state(self) -> None:
+        if not self._remote_connected:
+            self._set_odas_running(False)
+            return
+
+        try:
+            result = self._remote.status()
+        except Exception:
+            self._set_odas_running(False)
+            return
+
+        self._set_odas_running(bool(result.stdout.strip()))
+
     def _poll_remote_log(self) -> None:
         try:
             result = self._remote.read_log_tail(80)
         except Exception as exc:
             message = str(exc)
             if "SSH is not connected" in message:
+                self._set_remote_connected(False)
+                self._set_odas_running(False)
+                if self._log_timer.isActive():
+                    self._log_timer.stop()
                 self._set_remote_log_lines(["等待连接远程 odaslive..."])
                 return
             self._set_remote_log_lines([f"日志读取失败: {message}"])
@@ -368,7 +477,15 @@ class AppBridge(QObject):
         self.recordingSessionsChanged.emit()
 
     def _refresh_recording_sessions(self) -> None:
-        sessions = self._recorder.sessions_snapshot()
+        snapshot_fn = getattr(self._recorder, "sessions_snapshot", None)
+        if snapshot_fn is None or not callable(snapshot_fn):
+            self._set_recording_sessions([])
+            return
+
+        sessions = snapshot_fn()
+        if not isinstance(sessions, list):
+            self._set_recording_sessions([])
+            return
         items = [f"Source {item.source_id} [{item.mode}] {item.filepath.name}" for item in sessions]
         self._set_recording_sessions(items)
 

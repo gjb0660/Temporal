@@ -4,24 +4,27 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+
     required property QtObject theme
     required property var sourcePositions
 
     Layout.fillWidth: true
     Layout.fillHeight: true
+    radius: theme.cardRadius
     color: "#ffffff"
+    border.color: theme.borderColor
 
     ColumnLayout {
         anchors.fill: parent
         anchors.leftMargin: Math.max(12, theme.panelInset)
         anchors.rightMargin: Math.max(10, theme.panelInset - 2)
-        anchors.topMargin: Math.max(6, theme.smallFont)
-        anchors.bottomMargin: Math.max(8, theme.smallFont)
-        spacing: Math.max(8, theme.smallFont)
+        anchors.topMargin: Math.max(8, theme.smallFont)
+        anchors.bottomMargin: Math.max(10, theme.smallFont)
+        spacing: Math.max(10, theme.smallFont)
 
         Label {
             text: "声源俯仰角"
-            color: "#4a4a4a"
+            color: "#414952"
             font.pixelSize: theme.sideTitleFont
         }
 
@@ -29,7 +32,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: theme.chartHeight
             color: "#ffffff"
-            border.color: "#d9e1dd"
+            border.color: theme.innerBorderColor
 
             ChartCanvas {
                 theme: root.theme
@@ -44,7 +47,7 @@ Rectangle {
 
         Label {
             text: "声源方位角"
-            color: "#4a4a4a"
+            color: "#414952"
             font.pixelSize: theme.sideTitleFont
         }
 
@@ -52,7 +55,7 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: theme.chartHeight
             color: "#ffffff"
-            border.color: "#d9e1dd"
+            border.color: theme.innerBorderColor
 
             ChartCanvas {
                 theme: root.theme
@@ -67,7 +70,7 @@ Rectangle {
 
         Label {
             text: "活跃声源位置"
-            color: "#4a4a4a"
+            color: "#414952"
             font.pixelSize: theme.sideTitleFont
         }
 

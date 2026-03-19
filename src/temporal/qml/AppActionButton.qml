@@ -6,22 +6,25 @@ Basic.Button {
 
     required property QtObject theme
 
-    implicitHeight: 32
-    implicitWidth: 84
+    implicitHeight: 34
+    implicitWidth: 96
     font.pixelSize: theme.bodyFont
     padding: 0
 
     contentItem: Text {
         text: control.text
-        color: control.enabled ? "#2f3a36" : "#89948f"
+        color: control.enabled ? control.theme.buttonText : control.theme.buttonDisabledText
         font.pixelSize: control.theme.bodyFont
+        font.family: "Segoe UI"
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
+        elide: Text.ElideRight
     }
 
     background: Rectangle {
-        radius: 3
-        color: control.pressed ? "#d8e4de" : "#f7faf8"
-        border.color: control.enabled ? "#b9cbc2" : "#d7dfdb"
+        radius: 2
+        color: !control.enabled ? "#f6f8fa" : control.pressed ? control.theme.buttonPressed : control.hovered ? control.theme.buttonHover : control.theme.buttonFill
+        border.color: control.theme.buttonBorder
+        border.width: 1
     }
 }

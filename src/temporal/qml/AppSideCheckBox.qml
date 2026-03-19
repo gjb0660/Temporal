@@ -18,7 +18,7 @@ Basic.CheckBox {
         implicitHeight: 13
         y: control.topPadding + (control.availableHeight - height) / 2
         radius: 2
-        border.color: "#7f8a85"
+        border.color: "#7e8a96"
         color: "#ffffff"
         opacity: control.enabled ? 1.0 : 0.55
 
@@ -27,14 +27,14 @@ Basic.CheckBox {
             width: 7
             height: 7
             radius: 1
-            color: "#6e7773"
+            color: "#5d6a77"
             visible: control.checked
         }
     }
 
     contentItem: Label {
         text: control.text
-        color: control.enabled ? "#4f5854" : "#7a8480"
+        color: control.enabled ? "#4a5560" : "#7d8792"
         font.pixelSize: control.theme.bodyFont
         verticalAlignment: Text.AlignVCenter
         leftPadding: control.indicator.width + control.spacing
