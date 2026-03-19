@@ -1,4 +1,4 @@
-# PRD: Phase F Validation and Delivery
+# Spec: Phase F Validation and Delivery
 
 ## Goal
 

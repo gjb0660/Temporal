@@ -54,7 +54,7 @@ Run these checks before merge:
 
 - `uv run pyright`
 - `uv run pyside6-qmllint src/temporal/qml/Main.qml`
-- `npx markdownlint-cli AGENTS.md docs/**/*.md .github/**/*.md`
+- `npx markdownlint AGENTS.md docs/**/*.md .github/**/*.md specs/**/*.md`
 - `uv run ruff check src tests`
 - `uv run python -m unittest discover -s tests -p "test_*.py" -v`
 
@@ -67,21 +67,10 @@ Run these checks before merge:
 
 ## Collaboration Rules
 
-- Run markdownlint for markdown changes and fix syntax violations.
-- Keep rule docs short; prefer imperative bullets and remove repeated guidance.
-- Use `vscode_askQuestions` at true decision blockers;
-  do not pause the session when the next implementation step is clear.
-- Default to direct execution for implementation requests;
-  do not ask for pre-code confirmation unless the user explicitly
-  requested a checkpoint.
-- For touched Python files, run lint first, fix findings, then format.
-- For touched QML files, run lint first, fix findings, then format.
-- Use TDD as Red -> Green -> Refactor; do not stop after Green.
+- Keep agent workflow rules in `AGENTS.md`; do not duplicate them here.
+- Run markdownlint for touched Markdown files and fix all violations
+  before merge.
 - Write AI-facing docs and code comments in concise English imperative style.
 - Write human-facing docs and chat responses in concise Chinese technical style.
-- Deliver or update a PRD before implementing a feature.
-- Store all PRDs under docs/prd; do not place PRDs in docs root.
-- Update docs/phase-progress.md only during session handoff.
-- Commit implementation and corresponding tests together in one atomic commit.
 - Only use git add and git commit; never rewrite or delete git history.
 - Never modify or delete files outside the current workspace.

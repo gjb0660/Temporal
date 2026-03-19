@@ -1,4 +1,4 @@
-# PRD: Phase H Preview Data Linkage
+# Spec: Phase H Preview Data Linkage
 
 ## Goal
 

@@ -1,4 +1,4 @@
-# PRD: Phase F Channel-Cap Recording Alignment
+# Spec: Phase F Channel-Cap Recording Alignment
 
 ## Goal
 

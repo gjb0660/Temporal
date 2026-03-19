@@ -1,4 +1,4 @@
-# PRD: Phase F Integration Runbook and Risks
+# Spec: Phase F Integration Runbook and Risks
 
 ## Goal
 

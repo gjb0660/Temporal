@@ -1,4 +1,4 @@
-# PRD: Source Sphere View
+# Spec: Source Sphere View
 
 ## Goal
 

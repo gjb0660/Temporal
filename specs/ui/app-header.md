@@ -1,4 +1,4 @@
-# PRD: App Header View
+# Spec: App Header View
 
 ## Goal
 

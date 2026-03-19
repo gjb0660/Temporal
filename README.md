@@ -22,9 +22,10 @@ uv run temporal
 
 ## 文档入口
 
-- 阶段进度：docs/phase-progress.md
-- 阶段 PRD：docs/prd/
-- 会话交接：docs/session-handoff-2026-03-18.md
+- 实现规格：specs/
+- 阶段进度：specs/phase-progress.md
+- 会话交接：specs/handoffs/
+- 使用文档：docs/
 
 ## 说明
 

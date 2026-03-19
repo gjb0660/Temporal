@@ -1,4 +1,4 @@
-# PRD: App Action Button View
+# Spec: App Action Button View
 
 ## Goal
 

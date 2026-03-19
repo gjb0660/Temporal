@@ -1,4 +1,4 @@
-# PRD: Phase D SSS Routing and Session Visibility
+# Spec: Phase D SSS Routing and Session Visibility
 
 ## Goal
 

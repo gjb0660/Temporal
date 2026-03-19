@@ -1,4 +1,4 @@
-# PRD: Phase B Remote Control and Stream Scaffolding
+# Spec: Phase B Remote Control and Stream Scaffolding
 
 ## Goal
 

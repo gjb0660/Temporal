@@ -1,4 +1,4 @@
-# PRD: Main Window
+# Spec: Main Window
 
 ## Goal
 

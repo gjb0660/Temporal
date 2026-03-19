@@ -1,4 +1,4 @@
-# PRD: Chart Canvas View
+# Spec: Chart Canvas View
 
 ## Goal
 

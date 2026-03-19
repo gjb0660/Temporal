@@ -14,51 +14,28 @@
 - Phase G extension: source sphere rebuild, empty-state cleanup,
   and default Z-up orientation
 - Phase H preview planning baseline: entry, linkage,
-  and validation PRDs defined
+  and validation specs defined
 - Rule update: Pyright config aligned with Facade and namespace package rule
 - Phase E: Agent governance files
   (`.github/copilot-instructions.md`, `AGENTS.md`, `.github/instructions/*`)
-- Rule update: `docs/phase-progress.md` only updated during handoff stage
+- Rule update: `specs/phase-progress.md` only updated during handoff stage
 
-## PRD Index
+## Spec Index
 
-- docs/prd/phase-a-project-skeleton.md
-- docs/prd/phase-b-remote-control-and-streams.md
-- docs/prd/phase-c-sources-filters.md
-- docs/prd/phase-d-auto-recording.md
-- docs/prd/phase-d-sss-routing-and-session-visibility.md
-- docs/prd/phase-e-agent-governance.md
-- docs/prd/phase-f-channel-cap-alignment.md
-- docs/prd/phase-f-validation-and-delivery.md
-- docs/prd/phase-f-integration-runbook-risks.md
-- docs/prd/phase-g-ui-visual-parity.md
-- docs/prd/phase-h-preview-entry-and-bridge.md
-- docs/prd/phase-h-preview-data-linkage.md
-- docs/prd/phase-h-preview-filtering-and-validation.md
-- docs/prd/copilot-to-codex-skill.md
-
-## Git Commits
-
-- `7111e7e` phase-a: bootstrap temporal skeleton and runnable qml shell
-- `541f7e6` chore: align pyright config and use namespace packages
-- `28d5325` phase-b: add ssh control and odas stream client scaffolding
-- `5ec3043` phase-c: wire source and potential counters into app bridge and qml
-- `39a5eb6` phase-c: add source/potential filter controls and energy range handling
-- `9a80603` phase-c: complete source selection linkage and finalize filters
-- `083811f` phase-d: add source-driven recorder lifecycle and filename contract
-- `8eb279e` phase-d: link recorder lifecycle with source updates and recording status
-- `21e19b7` ui: refine relative layout and enforce uv lint-format workflow rule
-- `4235d96` phase-e: add agent governance instructions and skill pack
-- `daf2281` phase-d: route sss audio and expose recording sessions
-- `37b3679` phase-f: align recorder activation with channel mapping
-- `e40a929` docs: update phase progress guidelines for session handoff
-- `86717e1` phase-f: finalize integration validation and ops docs
-- `3a67f18` docs: add copilot-to-codex skill prd file
-- `22786f5` ui: refine phase g ui parity and odas controls
-- `816f7c0` docs: add ui prd for main windows
-- `295d921` ui: rebuild center pane preview and source sphere view
-- `1a2c689` ui: clear empty-state center pane placeholders
-- `8863e3f` docs: add phase h-j preview planning prds
+- specs/plans/phase-a-project-skeleton.md
+- specs/plans/phase-b-remote-control-and-streams.md
+- specs/plans/phase-c-sources-filters.md
+- specs/plans/phase-d-auto-recording.md
+- specs/plans/phase-d-sss-routing-and-session-visibility.md
+- specs/plans/phase-e-agent-governance.md
+- specs/plans/phase-f-channel-cap-alignment.md
+- specs/plans/phase-f-validation-and-delivery.md
+- specs/plans/phase-f-integration-runbook-risks.md
+- specs/plans/phase-g-ui-visual-parity.md
+- specs/plans/phase-h-preview-entry-and-bridge.md
+- specs/plans/phase-h-preview-data-linkage.md
+- specs/plans/phase-h-preview-filtering-and-validation.md
+- specs/copilot-to-codex-skill.md
 
 ## Session Lessons
 
@@ -105,5 +82,5 @@
 3. `uv run pyside6-qmllint src/temporal/qml/Main.qml`
 4. `uv run python -m unittest discover -s tests -p "test_*.py" -v`
 5. Execute runbook smoke test and collect artifacts under `recordings/`.
-6. Read the Phase H preview PRDs and begin implementation from
+6. Read the Phase H preview specs and begin implementation from
    `temporal-preview` entry.

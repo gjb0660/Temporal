@@ -1,4 +1,4 @@
-# PRD: Phase C Sources and Filters MVP
+# Spec: Phase C Sources and Filters MVP
 
 ## Goal
 

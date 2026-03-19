@@ -1,4 +1,4 @@
-# PRD: Phase H Preview Filtering and Validation
+# Spec: Phase H Preview Filtering and Validation
 
 ## Goal
 

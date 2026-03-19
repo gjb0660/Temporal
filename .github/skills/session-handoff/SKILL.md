@@ -1,6 +1,6 @@
 ---
 name: session-handoff
-description: "Use when: preparing end-of-session handoff, updating progress docs, summarizing commits/tests, and drafting a practical next-session checklist. Keywords: handoff, session summary, 会话交接, 阶段进度, next steps."
+description: "Use when: preparing end-of-session handoff, updating progress docs, recording validation status, and drafting a practical next-session checklist. Keywords: handoff, session summary, 会话交接, 阶段进度, next steps."
 argument-hint: "handoff date and scope"
 ---
 
@@ -21,7 +21,7 @@ Typical triggers:
 
 - Handoff date (for filename)
 - Current objective and phase
-- Workspace status and recent commits
+- Workspace status and validation evidence
 
 ## Procedure
 
@@ -35,9 +35,8 @@ Typical triggers:
 
 ### 1) Collect Status Context
 
-- Inspect workspace status and recent history. Example commands:
+- Inspect workspace status and current delivery scope. Example commands:
   - `git status --short --untracked-files=all`
-  - `git log --oneline -n 20`
 - Identify completed scope, in-progress scope, and pending items.
 
 ### 2) Capture Validation Evidence
@@ -53,18 +52,19 @@ Typical triggers:
 
 ### 3) Update Progress Documentation
 
-- Update the project progress document (for Temporal: `docs/phase-progress.md`) with:
+- Update the project progress document
+  (for Temporal: `specs/phase-progress.md`) with:
   - Completed phases and deltas
-  - Key commits for this session
   - Next actionable items
   - Session lessons confirmed with user
 
 ### 4) Create/Update Handoff Document
 
 - Use repository convention for handoff path and date naming.
-- Temporal default: `docs/handoffs/session-YYYY-MM-DD.md`.
+- Temporal default: `specs/handoffs/session-YYYY-MM-DD.md`.
 - Use [handoff template](./references/handoff-template.md).
-- Include handoff contract fields when available (for example from AGENTS workflow):
+- Include handoff contract fields when available
+  (for example from AGENTS workflow):
   - changed files list
   - assumptions
   - validation performed
@@ -89,7 +89,7 @@ Typical triggers:
 
 - Documentation is concise and audience-appropriate
   (Temporal commonly uses concise Chinese for human-facing docs).
-- Commit and validation facts are consistent with actual git/test outputs.
+- Validation facts are consistent with actual git/test outputs.
 - Content does not conflict with active repository rules
   (for Temporal: `.github/copilot-instructions.md` and `AGENTS.md`).
 - If code changes are included in the same session,

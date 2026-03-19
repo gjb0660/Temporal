@@ -1,4 +1,4 @@
-# PRD: Phase A Project Skeleton
+# Spec: Phase A Project Skeleton
 
 ## Goal
 

@@ -1,4 +1,4 @@
-# PRD: Phase E Agent Governance and Collaboration
+# Spec: Phase E Agent Governance and Collaboration
 
 ## Goal
 

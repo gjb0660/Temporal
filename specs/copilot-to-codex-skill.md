@@ -1,4 +1,4 @@
-# PRD: copilot-to-codex Skill
+# Spec: copilot-to-codex Skill
 
 ## 目标
 
@@ -30,12 +30,15 @@
 3. 将 `.github/instructions/*.instructions.md` 的 frontmatter 元数据提取到总技能 `SKILL.md`。
 4. 将 `.github/instructions/*.instructions.md` 的正文拆分到总技能 `references/` 下对应文件。
 5. 将 `.github/skills/<name>/` 逐个迁移到 `.codex/skills/<name>/`，保持独立技能目录。
-6. 对源技能 `SKILL.md` 在迁移时仅保留 Codex 兼容 frontmatter 字段 `name` 与 `description`，正文与资源目录保持不变。
+6. 对源技能 `SKILL.md` 在迁移时仅保留 Codex 兼容 frontmatter 字段
+   `name` 与 `description`，正文与资源目录保持不变。
 7. 在 `.codex/.gitignore` 中写入忽略规则：
+
    ```gitignore
    *
    !.gitignore
    ```
+
 8. 生成 `.codex/copilot-sync-manifest.json`，记录受管文件、哈希、模式与文本基线。
 9. 对旧版 `.codex/AGENTS.md` 和 `.codex/instructions/*`：
    - 若由旧 manifest 管理且未被人工修改，则自动删除。
@@ -56,7 +59,9 @@
    - `references/workspace-agents.md`
    - `references/workspace-copilot-instructions.md`
    - 每个 `.github/instructions/*` 对应的 reference 文件
-2. `.github/instructions/*` 的 `description`、`applyTo` 等元数据出现在 `github-instructions/SKILL.md` 中。
-3. `.github/skills/odas-workflow` 与 `.github/skills/session-handoff` 被迁移到 `.codex/skills/` 下独立目录。
+2. `.github/instructions/*` 的 `description`、`applyTo` 等元数据出现在
+   `github-instructions/SKILL.md` 中。
+3. `.github/skills/odas-workflow` 与 `.github/skills/session-handoff`
+   被迁移到 `.codex/skills/` 下独立目录。
 4. 新版本同步后，不再新增 `.codex/AGENTS.md` 或 `.codex/instructions/*`。
 5. 旧版受管 `.codex/AGENTS.md` 和 `.codex/instructions/*` 被清理或显式标记为 stale。

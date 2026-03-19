@@ -1,4 +1,4 @@
-# PRD: App Side Checkbox View
+# Spec: App Side Checkbox View
 
 ## Goal
 

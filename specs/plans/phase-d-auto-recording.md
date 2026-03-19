@@ -1,4 +1,4 @@
-# PRD: Phase D Source-Driven Auto Recording
+# Spec: Phase D Source-Driven Auto Recording
 
 ## Goal
 

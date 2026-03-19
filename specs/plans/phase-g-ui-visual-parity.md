@@ -1,4 +1,4 @@
-# PRD: Phase G UI Visual Parity Round 2
+# Spec: Phase G UI Visual Parity Round 2
 
 ## Goal
 
@@ -103,7 +103,7 @@ uses the new toggle entry points.
 
 ## Validation Workflow
 
-1. Update this PRD first.
+1. Update this spec first.
 2. Implement bridge, QML, and tests.
 3. Run lint and format for touched Python and QML files.
 4. Launch the app and capture screenshots at:

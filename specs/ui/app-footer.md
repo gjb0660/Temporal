@@ -1,4 +1,4 @@
-# PRD: App Footer View
+# Spec: App Footer View
 
 ## Goal
 

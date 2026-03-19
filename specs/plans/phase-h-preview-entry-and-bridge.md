@@ -1,4 +1,4 @@
-# PRD: Phase H Preview Entry and Bridge
+# Spec: Phase H Preview Entry and Bridge
 
 ## Goal
 

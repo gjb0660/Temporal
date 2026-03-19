@@ -1,4 +1,4 @@
-# PRD: Center Pane View
+# Spec: Center Pane View
 
 ## Goal
 

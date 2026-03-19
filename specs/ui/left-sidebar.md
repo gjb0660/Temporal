@@ -1,4 +1,4 @@
-# PRD: Left Sidebar View
+# Spec: Left Sidebar View
 
 ## Goal
 
