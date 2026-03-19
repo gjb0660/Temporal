@@ -52,11 +52,11 @@ and reconnect scenarios.
 
 Run these checks before merge:
 
-- pyright
-- qmllint src/temporal/qml/Main.qml
-- `markdownlint AGENTS.md docs/**/*.md .github/instructions/*.md`
-- ruff check src tests
-- `python -m unittest discover -s tests -p "test_*.py" -v`
+- `uv run pyright`
+- `uv run pyside6-qmllint src/temporal/qml/Main.qml`
+- `npx markdownlint-cli AGENTS.md docs/**/*.md .github/**/*.md`
+- `uv run ruff check src tests`
+- `uv run python -m unittest discover -s tests -p "test_*.py" -v`
 
 ## Additional Rules
 
@@ -68,8 +68,10 @@ Run these checks before merge:
 ## Collaboration Rules
 
 - Run markdownlint for markdown changes and fix syntax violations.
-- For Python and QML changes, run lint first, fix findings,
-  then run format before final checks.
+- Keep rule docs short; prefer imperative bullets and remove repeated guidance.
+- For touched Python files, run lint first, fix findings, then format.
+- For touched QML files, run lint first, fix findings, then format.
+- Use TDD as Red -> Green -> Refactor; do not stop after Green.
 - Write AI-facing docs and code comments in concise English imperative style.
 - Write human-facing docs and chat responses in concise Chinese technical style.
 - Deliver or update a PRD before implementing a feature.

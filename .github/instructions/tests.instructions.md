@@ -6,7 +6,8 @@ applyTo: "tests/**"
 # Test Instructions
 
 - Use unittest for unit and integration tests.
-- Follow TDD with Red -> Green -> Refactor.
+- Use TDD as Red -> Green -> Refactor.
+- Refactor after Green; remove duplication and keep test helpers intent-revealing.
 - Unit tests first for protocol parsing and recorder transitions.
 - Avoid real network in unit tests; use fake sockets and deterministic fixtures.
 - Include reconnect and malformed message cases.
