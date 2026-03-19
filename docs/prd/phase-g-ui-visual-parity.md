@@ -26,6 +26,9 @@ closely matches the ODAS Studio reference in layout rhythm, control simplicity,
 - New protocol features or backend transport changes outside bridge state and
   toggle behavior needed by the UI.
 - Pixel-perfect cloning of every reference detail.
+- A dedicated `uv run temporal-preview` entrypoint.
+- In-UI preview scenario switching controls.
+- Full-page preview energy filtering across source list, charts, and 3D view.
 
 ## Functional Requirements
 
@@ -54,6 +57,24 @@ closely matches the ODAS Studio reference in layout rhythm, control simplicity,
 
 Existing low-level bridge slots remain available for compatibility, but QML
 uses the new toggle entry points.
+
+## Current Preview Limitations
+
+- Preview usage still depends on local QML properties rather than a standard
+  application entrypoint.
+- The right sidebar source list is not yet driven by the same preview scenario
+  model as the center charts and 3D source view.
+- The lower-right potential energy control is not yet defined as a full-page
+  preview filtering mechanism.
+
+## Forward Constraints
+
+- Future preview work must inject state through `appBridge` rather than ad hoc
+  QML-only flags.
+- Future UI testing must use a dedicated preview entrypoint instead of editing
+  `Main.qml` to enable preview mode.
+- Future preview datasets must drive both the center pane and the right sidebar
+  from one shared scenario model.
 
 ## Quality Requirements
 
