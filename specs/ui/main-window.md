@@ -17,18 +17,12 @@
 
 ### Inputs
 
-- `appBridge.sourcePositions`
-- `appBridge.sourceRows`
-- `appBridge.recordingSessions`
-- `appBridge.previewMode`
-- `appBridge.previewScenarioKey`
+- `appBridge`
 
 ### Rules
 
 - 主窗口不再在本地 QML 中组装 `sourceRows()`。
-- 右栏数据直接来自 `appBridge.sourceRows`。
-- 中栏预览状态直接来自 `appBridge.previewMode` 和
-  `appBridge.previewScenarioKey`。
+- 右栏和中栏只接收 `appBridge`，由子组件直接消费 bridge 最终输出。
 - 页面本身不直接实现后端业务逻辑。
 
 ## Visual Requirements
@@ -45,6 +39,7 @@
 - 窗口缩放时，三栏布局保持可读且不重叠。
 - 中栏优先获得剩余宽度。
 - 右栏在预览模式和正式模式下都保持稳定结构。
+- 主窗口不再向子组件转发 preview 专用属性。
 
 ## Technical Constraints
 
@@ -63,6 +58,7 @@
 1. 主窗口不再包含本地 `sourceRows()` 逻辑。
 2. 预览模式下右栏和中栏都从 `appBridge` 获取统一场景数据。
 3. 正式模式下页面仍保持稳定空态和占位结构。
+4. `Main.qml` 不再向中栏转发 `previewMode` 或 `previewScenarioKey`。
 
 ## Validation
 

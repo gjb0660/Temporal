@@ -7,15 +7,6 @@ Rectangle {
 
     required property QtObject theme
     required property QtObject appBridge
-    property var sourcePositions: []
-    property bool previewMode: false
-    property string previewScenarioKey: ""
-    readonly property var previewXTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
-    readonly property var runtimeXTicks: ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600"]
-    readonly property var displayedSourcePositions: Array.isArray(sourcePositions) ? sourcePositions : []
-    readonly property var displayedElevationSeries: previewMode ? root.appBridge.elevationSeries : []
-    readonly property var displayedAzimuthSeries: previewMode ? root.appBridge.azimuthSeries : []
-    readonly property var displayedXTicks: previewMode ? previewXTicks : runtimeXTicks
 
     Layout.fillWidth: true
     Layout.fillHeight: true
@@ -48,8 +39,8 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
                 yTicks: ["90", "60", "30", "0", "-30", "-60", "-90"]
-                xTicks: root.displayedXTicks
-                seriesList: root.displayedElevationSeries
+                xTicks: root.appBridge.chartXTicks
+                seriesList: root.appBridge.elevationSeries
             }
         }
 
@@ -70,8 +61,8 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
                 yTicks: ["180", "120", "60", "0", "-60", "-120", "-180"]
-                xTicks: root.displayedXTicks
-                seriesList: root.displayedAzimuthSeries
+                xTicks: root.appBridge.chartXTicks
+                seriesList: root.appBridge.azimuthSeries
             }
         }
 
@@ -83,9 +74,7 @@ Rectangle {
 
         SourceSphereView {
             theme: root.theme
-            sourcePositions: root.displayedSourcePositions
-            sourceColors: ({})
-            previewScenarioKey: root.previewMode ? root.previewScenarioKey : ""
+            sourcePositions: root.appBridge.sourcePositions
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumHeight: theme.sphereHeight

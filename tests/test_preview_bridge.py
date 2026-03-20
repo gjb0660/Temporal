@@ -78,11 +78,20 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(bridge.previewScenarioKeys, list(PREVIEW_SCENARIO_KEYS))
         self.assertEqual(len(source_rows), 1)
         self.assertEqual(source_rows[0]["sourceId"], 15)
+        self.assertEqual(source_rows[0]["label"], "声源")
         self.assertTrue(source_rows[0]["checked"])
         self.assertEqual(bridge.sourceIds, [15])
         self.assertEqual(len(source_positions), 1)
         self.assertEqual(source_positions[0]["id"], 15)
         self.assertEqual(bridge.recordingSessions, [])
+        self.assertEqual(bridge.status, "Temporal 就绪")
+        self.assertEqual(bridge.remoteLogLines, ["等待连接远程 odaslive...", "当前场景：参考单点"])
+        self.assertTrue(bridge.showPreviewScenarioSelector)
+        self.assertEqual(bridge.headerNavLabels, [])
+        self.assertEqual(
+            bridge.chartXTicks,
+            ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"],
+        )
 
     def test_scenarios_keep_rows_positions_and_series_in_sync(self) -> None:
         expectations = {
@@ -107,13 +116,14 @@ class TestPreviewBridge(unittest.TestCase):
             self.assertEqual(len(elevation_series), expected_count)
             self.assertEqual(len(azimuth_series), expected_count)
 
-    def test_preview_scenario_options_are_exposed(self) -> None:
+    def test_preview_scenario_options_are_exposed_in_chinese(self) -> None:
         bridge = PreviewBridge()
 
         options = cast(list[dict[str, str]], bridge.previewScenarioOptions)
 
         self.assertEqual([item["key"] for item in options], list(PREVIEW_SCENARIO_KEYS))
-        self.assertEqual(options[0]["label"], "Reference Single")
+        self.assertEqual(options[0]["label"], "参考单点")
+        self.assertEqual(options[-1]["label"], "空状态")
 
     def test_scenario_switch_resets_all_sources_to_selected(self) -> None:
         bridge = PreviewBridge()
@@ -125,6 +135,7 @@ class TestPreviewBridge(unittest.TestCase):
 
         self.assertEqual(sorted(bridge.sourceIds), [12, 15, 27, 31])
         self.assertTrue(all(row["checked"] for row in bridge.sourceRows))
+        self.assertEqual(bridge.remoteLogLines, ["等待连接远程 odaslive...", "当前场景：赤道边界"])
 
     def test_unknown_preview_scenario_is_ignored(self) -> None:
         bridge = PreviewBridge()
@@ -160,6 +171,7 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(bridge.sourcePositions, [])
         self.assertEqual(bridge.elevationSeries, [])
         self.assertEqual(bridge.azimuthSeries, [])
+        self.assertEqual(bridge.remoteLogLines, ["等待连接远程 odaslive...", "当前场景：空状态"])
 
     def test_toggle_remote_and_streams_only_changes_local_state(self) -> None:
         bridge = PreviewBridge()
@@ -167,13 +179,16 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.toggleRemoteOdas()
         self.assertTrue(bridge.remoteConnected)
         self.assertTrue(bridge.odasRunning)
+        self.assertEqual(bridge.status, "远程 odaslive 已启动")
 
         bridge.toggleStreams()
         self.assertTrue(bridge.streamsActive)
+        self.assertEqual(bridge.status, "正在监听 SST/SSL/SSS 数据流")
 
         bridge.toggleRemoteOdas()
         self.assertFalse(bridge.odasRunning)
         self.assertFalse(bridge.streamsActive)
+        self.assertEqual(bridge.status, "远程 odaslive 已停止")
 
     def test_filter_state_updates_without_changing_preview_data(self) -> None:
         bridge = PreviewBridge()
@@ -210,6 +225,12 @@ class TestAppBridgePreviewDefaults(unittest.TestCase):
         self.assertEqual(bridge.previewScenarioKey, "")
         self.assertEqual(bridge.previewScenarioKeys, [])
         self.assertEqual(bridge.previewScenarioOptions, [])
+        self.assertFalse(bridge.showPreviewScenarioSelector)
+        self.assertEqual(bridge.headerNavLabels, ["配置", "录制", "相机"])
+        self.assertEqual(
+            bridge.chartXTicks,
+            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600"],
+        )
         self.assertEqual(bridge.sourceRows, [])
         self.assertEqual(bridge.elevationSeries, [])
         self.assertEqual(bridge.azimuthSeries, [])

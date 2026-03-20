@@ -84,16 +84,11 @@ ApplicationWindow {
             CenterPane {
                 theme: root.theme
                 appBridge: root.appBridge
-                sourcePositions: root.appBridge.sourcePositions
-                previewMode: root.appBridge.previewMode
-                previewScenarioKey: root.appBridge.previewScenarioKey
             }
 
             RightSidebar {
                 theme: root.theme
                 appBridge: root.appBridge
-                sourceRows: root.appBridge.sourceRows
-                recordingSessions: root.appBridge.recordingSessions
             }
         }
     }

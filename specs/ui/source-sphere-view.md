@@ -17,14 +17,13 @@
 ### Inputs
 
 - `sourcePositions`
-- `sourceColors`
 - `theme.axisBlue`
 - `theme.axisOrange`
 - `theme.axisGreen`
 
 ### Rules
 
-- `sourcePositions` 允许为空或未定义，组件必须回退到稳定预览点位，且不能产生运行时警告。
+- `sourcePositions` 允许为空或未定义，组件必须安全渲染空球体，且不能产生运行时警告。
 - 主场景轴语义固定为：
   - X 轴为橙色
   - Z 轴为蓝色
@@ -51,6 +50,7 @@
 - 使用 `QtQuick3D` 实现，不退化为静态 2D 图。
 - 鼠标事件处理使用显式函数参数形式，避免 QML 废弃警告。
 - 以轻量近似方式实现球壳，不引入自定义 3D Geometry。
+- 组件不在本地合成预览 fallback 点位，所有点位均来自 bridge 输入。
 
 ## Non-Goals
 
@@ -64,6 +64,7 @@
 2. 左下角存在完整的 `X / Y / Z` 缩略坐标框，且方向与主场景一致。
 3. 组件启动时没有 `undefined` 属性访问错误和废弃信号参数警告。
 4. 同一 source id 在重复刷新时颜色保持稳定。
+5. 空输入时不显示伪造点位。
 
 ## Validation
 

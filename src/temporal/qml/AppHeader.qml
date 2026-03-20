@@ -97,7 +97,7 @@ Column {
             }
 
             RowLayout {
-                visible: root.appBridge.previewMode
+                visible: root.appBridge.showPreviewScenarioSelector
                 spacing: 8
 
                 Label {
@@ -131,7 +131,7 @@ Column {
             }
 
             Repeater {
-                model: root.appBridge.previewMode ? [] : ["配置", "录制", "相机"]
+                model: root.appBridge.headerNavLabels
 
                 delegate: Label {
                     text: modelData

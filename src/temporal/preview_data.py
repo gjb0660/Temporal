@@ -15,9 +15,9 @@ PREVIEW_SCENARIO_KEYS = (
 _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
     "referenceSingle": {
         "key": "referenceSingle",
-        "displayName": "Reference Single",
-        "status": "Preview scenario: referenceSingle",
-        "remoteLogLines": ["Preview mode active", "Scenario set to referenceSingle"],
+        "displayName": "参考单点",
+        "status": "Temporal 就绪",
+        "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：参考单点"],
         "sources": [
             {"id": 15, "color": "#cf54ea", "x": -0.42, "y": 0.18, "z": 0.64, "energy": 0.88},
         ],
@@ -38,9 +38,9 @@ _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
     },
     "hemisphereSpread": {
         "key": "hemisphereSpread",
-        "displayName": "Hemisphere Spread",
-        "status": "Preview scenario: hemisphereSpread",
-        "remoteLogLines": ["Preview mode active", "Scenario set to hemisphereSpread"],
+        "displayName": "半球分布",
+        "status": "Temporal 就绪",
+        "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：半球分布"],
         "sources": [
             {"id": 7, "color": "#4dc6d8", "x": -0.56, "y": 0.28, "z": 0.58, "energy": 0.76},
             {"id": 15, "color": "#cf54ea", "x": 0.46, "y": 0.18, "z": 0.62, "energy": 0.88},
@@ -94,9 +94,9 @@ _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
     },
     "equatorBoundary": {
         "key": "equatorBoundary",
-        "displayName": "Equator Boundary",
-        "status": "Preview scenario: equatorBoundary",
-        "remoteLogLines": ["Preview mode active", "Scenario set to equatorBoundary"],
+        "displayName": "赤道边界",
+        "status": "Temporal 就绪",
+        "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：赤道边界"],
         "sources": [
             {"id": 12, "color": "#ff9c47", "x": 0.98, "y": 0.00, "z": 0.02, "energy": 0.74},
             {"id": 15, "color": "#cf54ea", "x": -0.96, "y": 0.02, "z": -0.01, "energy": 0.82},
@@ -150,9 +150,9 @@ _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
     },
     "emptyState": {
         "key": "emptyState",
-        "displayName": "Empty State",
-        "status": "Preview scenario: emptyState",
-        "remoteLogLines": ["Preview mode active", "Scenario set to emptyState"],
+        "displayName": "空状态",
+        "status": "Temporal 就绪",
+        "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：空状态"],
         "sources": [],
         "elevationSeries": [],
         "azimuthSeries": [],

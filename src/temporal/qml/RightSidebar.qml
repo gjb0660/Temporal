@@ -8,31 +8,6 @@ Rectangle {
 
     required property QtObject theme
     required property QtObject appBridge
-    required property var sourceRows
-    required property var recordingSessions
-
-    readonly property bool previewMode: root.appBridge.previewMode
-    readonly property var displayedSourceRows: {
-        if (Array.isArray(sourceRows) && sourceRows.length > 0) {
-            return sourceRows
-        }
-        if (previewMode) {
-            return []
-        }
-
-        const rows = []
-        for (let index = 0; index < 4; index += 1) {
-            rows.push({
-                sourceId: -1,
-                label: "声源",
-                checked: true,
-                enabled: false,
-                badge: "",
-                badgeColor: theme.accentPurple
-            })
-        }
-        return rows
-    }
 
     Layout.preferredWidth: theme.rightPanelWidth
     Layout.fillHeight: true
@@ -54,7 +29,7 @@ Rectangle {
         }
 
         Repeater {
-            model: root.displayedSourceRows
+            model: root.appBridge.sourceRows
 
             delegate: ColumnLayout {
                 required property var modelData
@@ -107,6 +82,21 @@ Rectangle {
                     color: "#c9d9d2"
                 }
             }
+        }
+
+        Label {
+            visible: root.appBridge.sourceRows.length === 0
+            text: "暂无活动声源"
+            color: theme.mutedText
+            font.pixelSize: theme.bodyFont
+            Layout.fillWidth: true
+        }
+
+        Rectangle {
+            visible: root.appBridge.sourceRows.length === 0
+            Layout.fillWidth: true
+            Layout.preferredHeight: 1
+            color: "#c9d9d2"
         }
 
         Item {
@@ -238,7 +228,7 @@ Rectangle {
         }
 
         Repeater {
-            model: root.recordingSessions
+            model: root.appBridge.recordingSessions
 
             delegate: Label {
                 required property string modelData
@@ -251,7 +241,7 @@ Rectangle {
         }
 
         Label {
-            visible: root.recordingSessions.length === 0
+            visible: root.appBridge.recordingSessions.length === 0
             text: "暂无活跃录音会话"
             color: theme.mutedText
             font.pixelSize: theme.bodyFont

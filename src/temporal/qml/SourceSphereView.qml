@@ -6,8 +6,6 @@ Rectangle {
 
     required property QtObject theme
     property var sourcePositions: []
-    property var sourceColors: ({})
-    property string previewScenarioKey: ""
 
     color: "#ffffff"
     border.color: "transparent"
@@ -20,29 +18,16 @@ Rectangle {
     property var diagonalAngles: [0, 40, 80, 120, 160]
     property int ringSegments: 44
     property real diagonalTilt: 52
-    readonly property var fallbackPreviewSources: [
-        {
-            id: 15,
-            x: -0.42,
-            y: 0.18,
-            z: 0.64
-        }
-    ]
     readonly property var visibleSources: normalizedSourceEntries()
 
     function colorForSource(sourceId) {
-        if (sourceColors && sourceColors[sourceId] !== undefined) {
-            return sourceColors[sourceId]
-        }
-
         const palette = [theme.accentPurple, theme.accentCyan, "#ff9c47", "#5ac97c", "#6a88ff", "#f16f7d"]
         const base = Math.abs(Number(sourceId) || 0)
         return palette[base % palette.length]
     }
 
     function normalizedSourceEntries() {
-        const hasRuntimePoints = Array.isArray(sourcePositions) && sourcePositions.length > 0
-        const raw = hasRuntimePoints ? sourcePositions : previewScenarioKey !== "" ? fallbackPreviewSources : []
+        const raw = Array.isArray(sourcePositions) ? sourcePositions : []
         const entries = []
         for (let index = 0; index < raw.length; index += 1) {
             const item = raw[index]
@@ -69,10 +54,7 @@ Rectangle {
             })
         }
 
-        if (entries.length > 0) {
-            return entries
-        }
-        return previewScenarioKey !== "" ? fallbackPreviewSources : []
+        return entries
     }
 
     function rotateVector(vector) {

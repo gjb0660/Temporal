@@ -26,6 +26,8 @@ class AppBridge(QObject):
     _AUDIO_SAMPLE_WIDTH = 2
     _STARTUP_VERIFY_INTERVAL_MS = 200
     _STARTUP_VERIFY_ATTEMPTS = 11
+    _RUNTIME_CHART_X_TICKS = ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600"]
+    _HEADER_NAV_LABELS = ["配置", "录制", "相机"]
 
     statusChanged = Signal()
     remoteConnectedChanged = Signal()
@@ -195,6 +197,18 @@ class AppBridge(QObject):
     @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
     def azimuthSeries(self) -> list[dict]:
         return []
+
+    @Property(bool, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def showPreviewScenarioSelector(self) -> bool:
+        return False
+
+    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def headerNavLabels(self) -> list[str]:
+        return list(self._HEADER_NAV_LABELS)
+
+    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def chartXTicks(self) -> list[str]:
+        return list(self._RUNTIME_CHART_X_TICKS)
 
     @Slot(str)
     def setStatus(self, status: str) -> None:

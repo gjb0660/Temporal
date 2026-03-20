@@ -15,6 +15,8 @@ from temporal.preview_data import (
 
 
 class PreviewBridge(QObject):
+    _PREVIEW_CHART_X_TICKS = ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
+
     statusChanged = Signal()
     remoteConnectedChanged = Signal()
     odasRunningChanged = Signal()
@@ -36,11 +38,11 @@ class PreviewBridge(QObject):
 
     def __init__(self) -> None:
         super().__init__()
-        self._status = "预览模式已就绪"
+        self._status = "Temporal 就绪"
         self._remote_connected = False
         self._odas_running = False
         self._streams_active = False
-        self._remote_log_lines = ["预览模式已启用", "当前未连接实时后端"]
+        self._remote_log_lines = ["等待连接远程 odaslive...", "当前处于预览模式"]
         self._recording_sessions: list[str] = []
         self._sources_enabled = True
         self._potentials_enabled = False
@@ -158,6 +160,18 @@ class PreviewBridge(QObject):
             if int(series["sourceId"]) in selected_ids
         ]
 
+    @Property(bool, notify=previewModeChanged)  # type: ignore[reportCallIssue]
+    def showPreviewScenarioSelector(self) -> bool:
+        return True
+
+    @Property(list, notify=previewModeChanged)  # type: ignore[reportCallIssue]
+    def headerNavLabels(self) -> list[str]:
+        return []
+
+    @Property(list, notify=previewModeChanged)  # type: ignore[reportCallIssue]
+    def chartXTicks(self) -> list[str]:
+        return list(self._PREVIEW_CHART_X_TICKS)
+
     @Slot()
     def toggleRemoteOdas(self) -> None:
         if self._odas_running:
@@ -166,8 +180,8 @@ class PreviewBridge(QObject):
                 self.streamsActiveChanged.emit()
             self._odas_running = False
             self.odasRunningChanged.emit()
-            self._set_status("预览模式中的远程 odaslive 已停止")
-            self._set_remote_log_lines(["预览模式已启用", "远程 odaslive 已停止"])
+            self._set_status("远程 odaslive 已停止")
+            self._set_remote_log_lines(["等待连接远程 odaslive...", "远程 odaslive 已停止"])
             return
 
         if not self._remote_connected:
@@ -175,26 +189,26 @@ class PreviewBridge(QObject):
             self.remoteConnectedChanged.emit()
         self._odas_running = True
         self.odasRunningChanged.emit()
-        self._set_status("预览模式中的远程 odaslive 运行中")
-        self._set_remote_log_lines(["预览模式已启用", "远程 odaslive 运行中"])
+        self._set_status("远程 odaslive 已启动")
+        self._set_remote_log_lines(["远程 odaslive 已启动", "当前处于预览模式"])
 
     @Slot()
     def toggleStreams(self) -> None:
         if self._streams_active:
             self._streams_active = False
             self.streamsActiveChanged.emit()
-            self._set_status("预览模式中的监听已停止")
-            self._set_remote_log_lines(["预览模式已启用", "监听已停止"])
+            self._set_status("数据流已关闭")
+            self._set_remote_log_lines(["远程 odaslive 已启动", "已停止监听 SST/SSL/SSS 数据流"])
             return
 
         if not self._odas_running:
-            self._set_status("预览模式需要先启动远程 odaslive")
+            self._set_status("请先启动远程 odaslive")
             return
 
         self._streams_active = True
         self.streamsActiveChanged.emit()
-        self._set_status("预览模式中的监听运行中")
-        self._set_remote_log_lines(["预览模式已启用", "监听运行中"])
+        self._set_status("正在监听 SST/SSL/SSS 数据流")
+        self._set_remote_log_lines(["远程 odaslive 已启动", "正在监听 SST/SSL/SSS 数据流"])
 
     @Slot(int, bool)
     def setSourceSelected(self, source_id: int, selected: bool) -> None:
@@ -223,7 +237,7 @@ class PreviewBridge(QObject):
             return
         self._sources_enabled = enabled
         self.sourcesEnabledChanged.emit()
-        self._set_status("预览声源显示状态已更新")
+        self._set_status("声源筛选已更新")
 
     @Slot(bool)
     def setPotentialsEnabled(self, enabled: bool) -> None:
@@ -231,7 +245,7 @@ class PreviewBridge(QObject):
             return
         self._potentials_enabled = enabled
         self.potentialsEnabledChanged.emit()
-        self._set_status("预览候选点筛选状态已更新")
+        self._set_status("候选点筛选已更新")
 
     @Slot(float, float)
     def setPotentialEnergyRange(self, minimum: float, maximum: float) -> None:
@@ -242,7 +256,7 @@ class PreviewBridge(QObject):
         self._potential_min = low
         self._potential_max = high
         self.potentialRangeChanged.emit()
-        self._set_status("预览能量范围已更新")
+        self._set_status("候选声源能量范围已更新")
 
     @Slot(str)
     def setPreviewScenario(self, key: str) -> None:
@@ -273,12 +287,8 @@ class PreviewBridge(QObject):
 
     def _apply_scenario_metadata(self) -> None:
         scenario = self._active_scenario()
-        self._set_status(str(scenario.get("status", f"Preview scenario: {self._preview_scenario_key}")))
-        log_lines = scenario.get(
-            "remoteLogLines",
-            ["Preview mode active", f"Scenario set to {self._preview_scenario_key}"],
-        )
-        self._set_remote_log_lines(list(log_lines))
+        self._set_status(str(scenario.get("status", "Temporal 就绪")))
+        self._set_remote_log_lines(list(scenario.get("remoteLogLines", ["等待连接远程 odaslive..."])))
 
     def _emit_preview_data_changed(self) -> None:
         self.sourceIdsChanged.emit()
