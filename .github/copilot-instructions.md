@@ -50,7 +50,7 @@ and reconnect scenarios.
 
 ## Quality Gates
 
-Run these checks before merge:
+Run these checks before commit:
 
 - `uv run pyright`
 - `uv run pyside6-qmllint src/temporal/qml/Main.qml`
@@ -69,7 +69,7 @@ Run these checks before merge:
 
 - Keep agent workflow rules in `AGENTS.md`; do not duplicate them here.
 - Run markdownlint for touched Markdown files and fix all violations
-  before merge.
+  before commit.
 - Keep AI execution content under `specs/` and export human-facing
   manuals under `docs/`.
 - Write AI-facing docs and code comments in concise English imperative style.

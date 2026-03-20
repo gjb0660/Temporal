@@ -38,6 +38,7 @@
   `Exception: small-change`.
 - `small-change` relaxes full Plan requirements only;
   it does not waive Refactor.
+- Code is not complete until the commit is recorded in git.
 
 ## Handoff Contract
 

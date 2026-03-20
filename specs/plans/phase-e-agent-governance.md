@@ -33,6 +33,8 @@ Codify stable Copilot collaboration rules for Temporal delivery.
    after Spec and Plan entry conditions are satisfied.
 11. Use the existing Review Agent to evaluate Refactor quality
    for high-risk or test-driven behavior changes.
+12. Treat code work as incomplete until the commit is recorded in git.
+13. Treat unclear risk classification as high-risk by default.
 
 ## Quality Requirements
 

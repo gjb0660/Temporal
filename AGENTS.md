@@ -54,10 +54,12 @@
 - Before commit: touched-scope tests are green,
   touched-scope lint and format gates pass,
   and behavior changes sync required Spec updates.
+- Code is not complete until the commit is recorded in git.
 - Commit implementation, related tests, and required Spec updates
   together in one atomic commit.
 - Run the existing Review Agent before considering Code complete
   for high-risk or test-driven behavior changes.
+- If risk is unclear, treat the change as high-risk.
 
 - Keep rule and handoff docs terse; remove duplicated guidance.
 - After a bug fix, add one preventive rule to the nearest applicable

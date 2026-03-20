@@ -41,6 +41,9 @@ Always check these workflow contracts:
    the existing Review Agent before Code is considered complete.
 14. `docs/` is exported human-facing output,
    not the AI execution source.
+15. Code is not complete until the commit is recorded in git.
+16. If risk classification is unclear, audit must treat the change
+  as high-risk by default.
 
 Return findings in this order:
 
