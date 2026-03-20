@@ -35,6 +35,7 @@ Typical triggers:
 
 ### 1) Collect Status Context
 
+- Read `specs/index.md` first for repository routing and export rules.
 - Inspect workspace status and current delivery scope. Example commands:
   - `git status --short --untracked-files=all`
 - Identify completed scope, in-progress scope, and pending items.
@@ -53,7 +54,7 @@ Typical triggers:
 ### 3) Update Progress Documentation
 
 - Update the project progress document
-  (for Temporal: `specs/phase-progress.md`) with:
+  (for Temporal: `specs/in-progress.md`) with:
   - Completed phases and deltas
   - Next actionable items
   - Session lessons confirmed with user

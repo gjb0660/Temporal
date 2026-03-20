@@ -21,11 +21,15 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 
 1. Keep instruction files discoverable under .github hierarchy.
 2. Keep rule wording actionable and concise.
-3. Enforce Explore -> Plan -> Code workflow.
+3. Enforce Explore -> Spec -> Plan -> Code workflow.
 4. Require `vscode_askQuestions` only for true blocking decisions
    or missing required inputs.
 5. Include constraints for non-destructive git operations.
 6. Do not require a pre-code approval step for implementable tasks.
+7. Keep `specs/index.md` as the static contract entry.
+8. Keep `specs/in-progress.md` as the dynamic routing and state source.
+9. Require explicit `Exception: small-change` evidence
+   for small-change exceptions.
 
 ## Quality Requirements
 

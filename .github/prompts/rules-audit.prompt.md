@@ -8,8 +8,8 @@ description: >-
 
 # Rules Audit
 
-Audit repository governance files under `.github/**`, `AGENTS.md`, and
-`docs/**` only when they define or repeat agent workflow rules.
+Audit repository governance files under `.github/**`, `AGENTS.md`,
+and `specs/**` only when they define or repeat agent workflow rules.
 
 Goal:
 
@@ -28,6 +28,17 @@ Always check these workflow contracts:
   decisions.
 6. Agents must not require a pre-code approval step
   for implementable tasks.
+7. Workflow must be Explore -> Spec -> Plan -> Code.
+8. `specs/index.md` is the static entry; `specs/in-progress.md`
+  is the dynamic routing and state board.
+9. New feature startup must check `specs/in-progress.md`
+  for duplicate demand.
+10. Code requires Definition and Execution unless the target feature
+   declares `Exception: small-change`.
+11. High-risk small-change claims require explicit evidence;
+   heuristic audit alone is insufficient.
+12. `docs/` is exported human-facing output,
+   not the AI execution source.
 
 Return findings in this order:
 

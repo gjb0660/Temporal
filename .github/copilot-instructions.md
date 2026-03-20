@@ -70,6 +70,8 @@ Run these checks before merge:
 - Keep agent workflow rules in `AGENTS.md`; do not duplicate them here.
 - Run markdownlint for touched Markdown files and fix all violations
   before merge.
+- Keep AI execution content under `specs/` and export human-facing
+  manuals under `docs/`.
 - Write AI-facing docs and code comments in concise English imperative style.
 - Write human-facing docs and chat responses in concise Chinese technical style.
 - Only use git add and git commit; never rewrite or delete git history.

@@ -23,9 +23,10 @@ uv run temporal
 ## 文档入口
 
 - 实现规格：specs/
-- 阶段进度：specs/phase-progress.md
+- 规格入口：specs/index.md
+- 动态状态：specs/in-progress.md
 - 会话交接：specs/handoffs/
-- 使用文档：docs/
+- 使用文档：docs/（由 specs 手动导出）
 
 ## 说明
 
