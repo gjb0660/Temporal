@@ -28,8 +28,11 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 6. Do not require a pre-code approval step for implementable tasks.
 7. Keep `specs/index.md` as the static contract entry.
 8. Keep `specs/in-progress.md` as the dynamic routing and state source.
-9. Require explicit `Exception: small-change` evidence
-   for small-change exceptions.
+9. Keep handoff contract only in `specs/index.md`.
+10. Define Code as `Red -> Green -> Refactor -> Commit`
+   after Spec and Plan entry conditions are satisfied.
+11. Use the existing Review Agent to evaluate Refactor quality
+   for high-risk or test-driven behavior changes.
 
 ## Quality Requirements
 

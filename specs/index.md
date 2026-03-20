@@ -4,7 +4,8 @@
 
 - `specs/` is the AI execution source for Temporal.
 - `docs/` is manual export output for human readers.
-- This file defines static directory contract and reading principles.
+- This file defines static directory contract, collaboration contract,
+  and reading principles.
 - Active routing and mutable state live in `specs/in-progress.md`.
 
 ## Directory Contract
@@ -32,12 +33,19 @@
 ## Feature Contract
 
 - A feature must state its target clearly.
-- Code requires Definition.
-- Code requires Execution unless the target feature declares
+- Code entry requires Definition.
+- Code entry requires Execution unless the target feature declares
   `Exception: small-change`.
-- Small-change exceptions are valid only when Spec and external behavior
-  remain unchanged.
-- High-risk changes cannot rely on heuristic audit alone.
+- `small-change` relaxes full Plan requirements only;
+  it does not waive Refactor.
+
+## Handoff Contract
+
+- Every handoff must include:
+  - changed files list
+  - assumptions
+  - validation performed
+  - unresolved risks
 
 ## Decision Boundaries
 

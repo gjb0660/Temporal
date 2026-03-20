@@ -35,9 +35,11 @@ Always check these workflow contracts:
   for duplicate demand.
 10. Code requires Definition and Execution unless the target feature
    declares `Exception: small-change`.
-11. High-risk small-change claims require explicit evidence;
-   heuristic audit alone is insufficient.
-12. `docs/` is exported human-facing output,
+11. `small-change` relaxes Plan only; it does not waive Refactor.
+12. Code completion requires Red -> Green -> Refactor -> Commit.
+13. High-risk or test-driven behavior changes must run
+   the existing Review Agent before Code is considered complete.
+14. `docs/` is exported human-facing output,
    not the AI execution source.
 
 Return findings in this order:
