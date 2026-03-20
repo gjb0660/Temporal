@@ -12,6 +12,8 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 - Define ODAS workflow skill for repeatable implementation quality.
 - Define governance repair and governance audit skills
    for repeatable rule maintenance.
+- Define a push prompt for advancing work with
+   spec update, test-first execution, and final commit discipline.
 
 ## Non-Goals
 
@@ -41,6 +43,8 @@ Codify stable Copilot collaboration rules for Temporal delivery.
       `.github/skills/rules-governance/`.
 15. Keep governance audit workflow under
       `.github/skills/rules-audit/` instead of prompt form.
+16. Keep next-step progression prompt under
+   `.github/prompts/push.prompt.md`.
 
 ## Quality Requirements
 
@@ -48,6 +52,7 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 - Keep frontmatter valid when required by instruction system.
 - Keep skill names, folder names, and descriptions aligned
    for discovery.
+- Keep prompt descriptions specific enough for discovery.
 
 ## Acceptance Criteria
 
@@ -55,3 +60,4 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 2. Rule files reflect current repository conventions.
 3. Review agent priorities cover regression and data-loss risks.
 4. Governance audit and repair workflows are discoverable as skills.
+5. Next-step progression workflow is discoverable as a prompt.
