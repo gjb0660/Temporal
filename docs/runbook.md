@@ -13,6 +13,7 @@
 1. 确认 Python 环境和依赖已安装。
 2. 检查配置文件 [config/odas.example.toml](../config/odas.example.toml)。
 3. 确认 `[streams].listen_host` 是远端 ODAS 可访问到的 Temporal 本机地址。
+   未显式配置时，Temporal 默认监听 `0.0.0.0`。
 4. 确认 `sst_port`、`ssl_port`、`sss_sep_port`、`sss_pf_port` 未被本机占用。
 5. 确认远端 SSH 可达，且 `odas.cwd`、`odas.command`、ODAS cfg 路径配置正确。
 
@@ -32,6 +33,8 @@
 - `odas.args` 中必须能定位到 ODAS cfg 文件，或 wrapper 脚本中能解析出 cfg 路径。
 - ODAS cfg 中 `tracks`、`hops`、音频 sink 的目标地址必须指向 Temporal 的
   `streams.listen_host` 和对应端口。
+- 若 `streams.listen_host = 0.0.0.0`，它只表示本地监听所有接口；
+  远端 cfg 仍应填写一个真实可达的 Temporal IP，preflight 仅校验端口。
 
 ## 启动语义
 

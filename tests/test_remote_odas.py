@@ -48,6 +48,22 @@ def _make_config(**overrides: object) -> RemoteOdasConfig:
 
 
 class TestRemoteOdasController(unittest.TestCase):
+    def test_should_validate_sink_host_is_false_for_wildcard(self) -> None:
+        controller = RecordingRemoteOdasController(
+            _make_config(),
+            _make_streams(listen_host="0.0.0.0"),
+        )
+
+        self.assertFalse(controller._should_validate_sink_host())
+
+    def test_should_validate_sink_host_is_true_for_specific_host(self) -> None:
+        controller = RecordingRemoteOdasController(
+            _make_config(),
+            _make_streams(listen_host="192.168.1.50"),
+        )
+
+        self.assertTrue(controller._should_validate_sink_host())
+
     def test_connect_passes_none_for_username_and_key_when_empty(self) -> None:
         cfg = _make_config(username=None, private_key=None)
         controller = RemoteOdasController(cfg, _make_streams())
@@ -87,6 +103,7 @@ class TestRemoteOdasController(unittest.TestCase):
         command = controller.commands[-1]
         self.assertIn("preflight_or_exit || exit 1", command)
         self.assertIn("listen_host=10.10.0.8", command)
+        self.assertIn("validate_sink_host=1", command)
         self.assertIn("expected_sst_port=9000", command)
         self.assertIn("expected_ssl_port=9001", command)
         self.assertIn("expected_sep_port=10000", command)
@@ -94,6 +111,19 @@ class TestRemoteOdasController(unittest.TestCase):
         self.assertIn("preflight: sink host mismatch", command)
         self.assertIn("preflight: %s sink port mismatch", command)
         self.assertIn("cfg_arg_path=odas.cfg", command)
+
+    def test_start_odaslive_skips_sink_host_match_when_listen_host_is_wildcard(self) -> None:
+        controller = RecordingRemoteOdasController(
+            _make_config(odas_command="odaslive", odas_args=["-c", "odas.cfg"]),
+            _make_streams(listen_host="0.0.0.0"),
+        )
+
+        controller.start_odaslive()
+
+        command = controller.commands[-1]
+        self.assertIn("validate_sink_host=0", command)
+        self.assertIn("expected_sst_port=9000", command)
+        self.assertIn("expected_ssl_port=9001", command)
 
     def test_start_odaslive_extracts_cfg_path_from_wrapper_when_args_are_empty(self) -> None:
         controller = RecordingRemoteOdasController(_make_config(), _make_streams())

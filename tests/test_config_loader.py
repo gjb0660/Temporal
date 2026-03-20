@@ -46,7 +46,7 @@ class TestConfigLoader(unittest.TestCase):
             self.assertEqual(config.remote.odas_log, "odaslive.log")
             self.assertEqual(config.streams.sst.host, "192.168.1.50")
 
-    def test_default_args_and_log_are_used_when_omitted(self) -> None:
+    def test_default_args_log_and_listen_host_are_used_when_omitted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             cfg_path = Path(temp_dir) / "odas.toml"
             cfg_path.write_text(
@@ -60,7 +60,6 @@ class TestConfigLoader(unittest.TestCase):
                         'command = "odaslive"',
                         "",
                         "[streams]",
-                        'listen_host = "127.0.0.1"',
                         "sst_port = 9000",
                         "ssl_port = 9001",
                         "sss_sep_port = 10000",
@@ -74,7 +73,7 @@ class TestConfigLoader(unittest.TestCase):
             self.assertEqual(config.remote.odas_args, [])
             self.assertIsNone(config.remote.odas_cwd)
             self.assertEqual(config.remote.odas_log, "odaslive.log")
-            self.assertEqual(config.streams.sst.host, "127.0.0.1")
+            self.assertEqual(config.streams.sst.host, "0.0.0.0")
 
     def test_command_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -188,7 +187,7 @@ class TestConfigLoader(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "odas.log must not be blank"):
                 load_config(cfg_path)
 
-    def test_streams_listen_host_defaults_without_reusing_remote_host(self) -> None:
+    def test_streams_listen_host_defaults_to_wildcard_without_reusing_remote_host(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             cfg_path = Path(temp_dir) / "odas.toml"
             cfg_path.write_text(
@@ -213,7 +212,7 @@ class TestConfigLoader(unittest.TestCase):
 
             config = load_config(cfg_path)
 
-            self.assertEqual(config.streams.sst.host, "127.0.0.1")
+            self.assertEqual(config.streams.sst.host, "0.0.0.0")
             self.assertNotEqual(config.streams.sst.host, config.remote.host)
 
 

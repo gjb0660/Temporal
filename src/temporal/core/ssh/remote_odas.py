@@ -82,12 +82,16 @@ class RemoteOdasController:
                     return arg[len(prefix) :]
         return None
 
+    def _should_validate_sink_host(self) -> bool:
+        return self._streams.sst.host not in {"", "0.0.0.0", "::"}
+
     def _common_shell_prelude(self) -> str:
         cfg_cwd = shlex.quote(self._cfg.odas_cwd or "")
         cfg_log = shlex.quote(self._cfg.odas_log)
         cfg_command = shlex.quote(self._cfg.odas_command)
         cfg_arg_path = shlex.quote(self._cfg_arg_path() or "")
         listen_host = shlex.quote(self._streams.sst.host)
+        validate_sink_host = "1" if self._should_validate_sink_host() else "0"
         ports = [
             self._streams.sst.port,
             self._streams.ssl.port,
@@ -112,6 +116,7 @@ class RemoteOdasController:
                 f"cfg_command={cfg_command}",
                 f"cfg_arg_path={cfg_arg_path}",
                 f"listen_host={listen_host}",
+                f"validate_sink_host={validate_sink_host}",
                 f"expected_sst_port={ports[0]}",
                 f"expected_ssl_port={ports[1]}",
                 f"expected_sep_port={ports[2]}",
@@ -244,9 +249,11 @@ ensure_cfg_contains_port() {
 }
 
 validate_cfg_sinks() {
-    if ! grep -Fq "$listen_host" "$cfg_path"; then
-        printf 'preflight: sink host mismatch\n' >&2
-        return 1
+    if [ "$validate_sink_host" = "1" ]; then
+        if ! grep -Fq "$listen_host" "$cfg_path"; then
+            printf 'preflight: sink host mismatch\n' >&2
+            return 1
+        fi
     fi
     ensure_cfg_contains_port "$expected_sst_port" "tracks" || return 1
     ensure_cfg_contains_port "$expected_ssl_port" "hops" || return 1
@@ -322,56 +329,54 @@ __ARG_CHECKS__
             ]
         )
 
+    def _runtime_script(self, *lines: str, needs_command_path: bool = False) -> str:
+        script_lines = [
+            self._common_shell_prelude(),
+            "resolve_runtime_paths >/dev/null 2>&1 || exit 0",
+        ]
+        if needs_command_path:
+            script_lines.append("resolve_command_path >/dev/null 2>&1 || exit 0")
+        script_lines.extend(lines)
+        return "\n".join(script_lines)
+
     def _status_script(self) -> str:
-        return "\n".join(
-            [
-                self._common_shell_prelude(),
-                "resolve_runtime_paths >/dev/null 2>&1 || exit 0",
-                "resolve_command_path >/dev/null 2>&1 || exit 0",
-                "if ! load_valid_pid; then",
-                "    exit 0",
-                "fi",
-                'printf "%s\\n" "$pid"',
-            ]
+        return self._runtime_script(
+            "if ! load_valid_pid; then",
+            "    exit 0",
+            "fi",
+            'printf "%s\\n" "$pid"',
+            needs_command_path=True,
         )
 
     def _stop_script(self) -> str:
-        return "\n".join(
-            [
-                self._common_shell_prelude(),
-                "resolve_runtime_paths >/dev/null 2>&1 || exit 0",
-                "resolve_command_path >/dev/null 2>&1 || exit 0",
-                "if ! load_valid_pid; then",
-                "    exit 0",
-                "fi",
-                'if ! kill "$pid" 2>/dev/null; then',
-                '    if ! kill -0 "$pid" 2>/dev/null; then',
-                "        cleanup_pid",
-                "        exit 0",
-                "    fi",
-                '    printf "failed to stop pid %s\\n" "$pid" >&2',
-                "    exit 1",
-                "fi",
-                "attempt=0",
-                'while kill -0 "$pid" 2>/dev/null; do',
-                "    attempt=$((attempt + 1))",
-                f'    if [ "$attempt" -ge {self._STOP_WAIT_ATTEMPTS} ]; then',
-                '        printf "failed to stop pid %s\\n" "$pid" >&2',
-                "        exit 1",
-                "    fi",
-                f"    sleep {self._STOP_WAIT_SEC}",
-                "done",
-                "cleanup_pid",
-            ]
+        return self._runtime_script(
+            "if ! load_valid_pid; then",
+            "    exit 0",
+            "fi",
+            'if ! kill "$pid" 2>/dev/null; then',
+            '    if ! kill -0 "$pid" 2>/dev/null; then',
+            "        cleanup_pid",
+            "        exit 0",
+            "    fi",
+            '    printf "failed to stop pid %s\\n" "$pid" >&2',
+            "    exit 1",
+            "fi",
+            "attempt=0",
+            'while kill -0 "$pid" 2>/dev/null; do',
+            "    attempt=$((attempt + 1))",
+            f'    if [ "$attempt" -ge {self._STOP_WAIT_ATTEMPTS} ]; then',
+            '        printf "failed to stop pid %s\\n" "$pid" >&2',
+            "        exit 1",
+            "    fi",
+            f"    sleep {self._STOP_WAIT_SEC}",
+            "done",
+            "cleanup_pid",
+            needs_command_path=True,
         )
 
     def _log_script(self, lines: int) -> str:
-        return "\n".join(
-            [
-                self._common_shell_prelude(),
-                "resolve_runtime_paths >/dev/null 2>&1 || exit 0",
-                f'if [ -f "$resolved_log" ]; then tail -n {lines} "$resolved_log"; fi',
-            ]
+        return self._runtime_script(
+            f'if [ -f "$resolved_log" ]; then tail -n {lines} "$resolved_log"; fi'
         )
 
     def start_odaslive(self) -> CommandResult:

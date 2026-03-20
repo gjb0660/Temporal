@@ -16,6 +16,24 @@ def _wait_for(predicate, timeout: float = 2.0) -> bool:
 
 
 class TestOdasStreamClient(unittest.TestCase):
+    def test_listener_bound_to_wildcard_accepts_loopback_client(self) -> None:
+        received: list[dict] = []
+        listener = TcpJsonListener(
+            OdasEndpoint(host="0.0.0.0", port=0),
+            received.append,
+            "sst",
+        )
+        listener.start()
+        self.assertTrue(_wait_for(lambda: listener.bound_port != 0))
+
+        with socket.create_connection(("127.0.0.1", listener.bound_port), timeout=1.0) as client:
+            client.sendall(b'{"src":[{"id":9}]}\n')
+
+        self.assertTrue(_wait_for(lambda: len(received) == 1))
+        listener.stop()
+
+        self.assertEqual(received[0]["src"][0]["id"], 9)
+
     def test_json_listener_accepts_reconnect_and_parses_chunked_messages(self) -> None:
         received: list[dict] = []
         listener = TcpJsonListener(

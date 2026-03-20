@@ -53,6 +53,28 @@ def _parse_odas_args(value: object) -> list[str]:
     return args
 
 
+def _required_int(value: object, field_name: str, default: int) -> int:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be an integer")
+    if not isinstance(value, (int, str)):
+        raise ValueError(f"{field_name} must be an integer")
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field_name} must be an integer") from exc
+
+
+def _stream_endpoint(
+    streams_raw: dict[str, object], key: str, default_port: int, host: str
+) -> OdasEndpoint:
+    return OdasEndpoint(
+        host=host,
+        port=_required_int(streams_raw.get(key), key, default_port),
+    )
+
+
 def load_config(path: str | Path) -> TemporalConfig:
     cfg_path = Path(path)
     if not cfg_path.exists():
@@ -67,7 +89,7 @@ def load_config(path: str | Path) -> TemporalConfig:
 
     remote = RemoteOdasConfig(
         host=str(remote_raw.get("host", "127.0.0.1")),
-        port=int(remote_raw.get("port", 22)),
+        port=_required_int(remote_raw.get("port"), "remote.port", 22),
         username=_optional_string(remote_raw.get("username")),
         private_key=_optional_string(remote_raw.get("private_key")),
         odas_command=_required_string(odas_raw.get("command"), "odas.command", "odaslive"),
@@ -79,13 +101,13 @@ def load_config(path: str | Path) -> TemporalConfig:
     listen_host = _required_string(
         streams_raw.get("listen_host"),
         "streams.listen_host",
-        "127.0.0.1",
+        "0.0.0.0",
     )
     streams = OdasStreamConfig(
-        sst=OdasEndpoint(host=listen_host, port=int(streams_raw.get("sst_port", 9000))),
-        ssl=OdasEndpoint(host=listen_host, port=int(streams_raw.get("ssl_port", 9001))),
-        sss_sep=OdasEndpoint(host=listen_host, port=int(streams_raw.get("sss_sep_port", 10000))),
-        sss_pf=OdasEndpoint(host=listen_host, port=int(streams_raw.get("sss_pf_port", 10010))),
+        sst=_stream_endpoint(streams_raw, "sst_port", 9000, listen_host),
+        ssl=_stream_endpoint(streams_raw, "ssl_port", 9001, listen_host),
+        sss_sep=_stream_endpoint(streams_raw, "sss_sep_port", 10000, listen_host),
+        sss_pf=_stream_endpoint(streams_raw, "sss_pf_port", 10010, listen_host),
     )
 
     return TemporalConfig(remote=remote, streams=streams)

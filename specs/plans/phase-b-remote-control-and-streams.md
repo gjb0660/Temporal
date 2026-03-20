@@ -43,6 +43,10 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 ## Stream Contract
 
 - `streams.listen_host` is the Temporal local bind address for SST/SSL/SSS listeners.
+- If `streams.listen_host` is omitted, default to `0.0.0.0`
+  so remote ODAS can connect through any reachable local interface.
+- When `streams.listen_host` is `0.0.0.0` or `::`,
+  treat it as a bind-only wildcard and skip strict cfg host equality validation.
 - `sst_port`, `ssl_port`, `sss_sep_port`, and `sss_pf_port`
   are Temporal local listening ports.
 - Do not infer stream host from `remote.host`.
