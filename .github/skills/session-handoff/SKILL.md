@@ -38,6 +38,7 @@ Typical triggers:
 - Read `specs/index.md` first for repository routing and export rules.
 - Inspect workspace status and current delivery scope. Example commands:
   - `git status --short --untracked-files=all`
+  - `git log --oneline -n 20`
 - Identify completed scope, in-progress scope, and pending items.
 
 ### 2) Capture Validation Evidence
@@ -56,6 +57,7 @@ Typical triggers:
 - Update the project progress document
   (for Temporal: `specs/in-progress.md`) with:
   - Completed phases and deltas
+  - Key commits for this session
   - Next actionable items
   - Session lessons confirmed with user
 

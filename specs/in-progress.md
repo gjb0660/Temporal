@@ -36,6 +36,10 @@
 
 ## Recently Completed (Last 7 Days)
 
+- Remote stream listener direction corrected to `ODAS -> Temporal`,
+  with wildcard bind default and preflight coverage tightened
+  Spec: [phase-b-remote-control-and-streams.md](./plans/phase-b-remote-control-and-streams.md)
+
 - Phase A: project skeleton + runnable PySide6/QML shell
   Spec: [phase-a-project-skeleton.md](./plans/phase-a-project-skeleton.md)
 
@@ -98,3 +102,5 @@
 - Keep specs and handoff docs on English headings with concise Chinese body.
 - For root-cause repair prompts, clarify first and do not proceed on
   unstated assumptions.
+- For remote ODAS ingestion, wildcard bind (`0.0.0.0`) is a bind-only default;
+  do not treat it as the remote sink host literal in preflight checks.
