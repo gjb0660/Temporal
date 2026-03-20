@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from temporal.core.models import OdasStreamConfig
-from temporal.core.network.odas_stream_client import TcpAudioSubscriber, TcpJsonSubscriber
+from temporal.core.network.odas_stream_client import TcpAudioListener, TcpJsonListener
 
 
 class OdasClient:
@@ -15,10 +15,10 @@ class OdasClient:
         on_sep_audio: Callable[[bytes], None],
         on_pf_audio: Callable[[bytes], None],
     ) -> None:
-        self._sst = TcpJsonSubscriber(config.sst, on_sst, "sst")
-        self._ssl = TcpJsonSubscriber(config.ssl, on_ssl, "ssl")
-        self._sep = TcpAudioSubscriber(config.sss_sep, on_sep_audio, "sep")
-        self._pf = TcpAudioSubscriber(config.sss_pf, on_pf_audio, "pf")
+        self._sst = TcpJsonListener(config.sst, on_sst, "sst")
+        self._ssl = TcpJsonListener(config.ssl, on_ssl, "ssl")
+        self._sep = TcpAudioListener(config.sss_sep, on_sep_audio, "sep")
+        self._pf = TcpAudioListener(config.sss_pf, on_pf_audio, "pf")
 
     def start(self) -> None:
         self._sst.start()

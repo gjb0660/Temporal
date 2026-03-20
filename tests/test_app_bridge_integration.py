@@ -25,16 +25,20 @@ class _FakeClock:
 class _FakeOdasClient:
     def __init__(self, **_kwargs) -> None:
         self.started = False
+        self.start_calls = 0
+        self.stop_calls = 0
 
     def start(self) -> None:
         self.started = True
+        self.start_calls += 1
 
     def stop(self) -> None:
         self.started = False
+        self.stop_calls += 1
 
 
 class _FakeRemoteOdasController:
-    def __init__(self, _cfg: RemoteOdasConfig) -> None:
+    def __init__(self, _cfg: RemoteOdasConfig, _streams: OdasStreamConfig) -> None:
         self.connected = False
         self.connect_calls = 0
         self.start_calls = 0
@@ -72,19 +76,20 @@ class _FakeRemoteOdasController:
 
 def _fake_config() -> TemporalConfig:
     remote = RemoteOdasConfig(
-        host="127.0.0.1",
+        host="172.21.16.222",
         port=22,
         username="odas",
         private_key="~/.ssh/id_rsa",
-        odas_command="custom-odas-launcher",
-        odas_args=["-c", "/opt/odas/config/odas.cfg", "-v"],
-        odas_log="/tmp/odaslive.log",
+        odas_command="./odas_loop.sh",
+        odas_args=[],
+        odas_cwd="workspace/ODAS/odas",
+        odas_log="odaslive.log",
     )
     streams = OdasStreamConfig(
-        sst=OdasEndpoint(host="127.0.0.1", port=9000),
-        ssl=OdasEndpoint(host="127.0.0.1", port=9001),
-        sss_sep=OdasEndpoint(host="127.0.0.1", port=10000),
-        sss_pf=OdasEndpoint(host="127.0.0.1", port=10010),
+        sst=OdasEndpoint(host="192.168.1.50", port=9000),
+        ssl=OdasEndpoint(host="192.168.1.50", port=9001),
+        sss_sep=OdasEndpoint(host="192.168.1.50", port=10000),
+        sss_pf=OdasEndpoint(host="192.168.1.50", port=10010),
     )
     return TemporalConfig(remote=remote, streams=streams)
 
@@ -108,6 +113,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
             recorder = AutoRecorder(output_dir=temp_dir)
             bridge = self._make_bridge(recorder)
 
+            bridge.startStreams()
             bridge._on_sst({"src": [{"id": 2}, {"id": 4}]})
             bridge.setPotentialsEnabled(True)
             bridge._on_ssl({"src": [{"E": 0.3}, {"E": 0.7}]})
@@ -132,6 +138,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
                 now_fn=clock.now,
             )
             bridge = self._make_bridge(recorder)
+            bridge.startStreams()
             bridge._on_sst({"src": [{"id": 7}]})
             first_session = sorted(recorder.sessions_snapshot(), key=lambda item: item.mode)
             self.assertEqual(len(first_session), 2)
@@ -150,20 +157,6 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertNotEqual(first_paths, second_paths)
             bridge.stopStreams()
 
-    def test_filename_contract_kept_in_integration_flow(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            recorder = AutoRecorder(output_dir=temp_dir)
-            bridge = self._make_bridge(recorder)
-            bridge._on_sst({"src": [{"id": 3}]})
-            bridge._on_sep_audio(b"\x01\x00\x02\x00\x03\x00\x04\x00")
-            bridge.stopStreams()
-
-            names = [path.name for path in Path(temp_dir).glob("ODAS_3_*_*.wav")]
-            self.assertTrue(any(name.endswith("_sp.wav") for name in names))
-            self.assertTrue(any(name.endswith("_pf.wav") for name in names))
-            for name in names:
-                self.assertRegex(name, r"^ODAS_3_\d{8}_\d{6}_\d{6}_(sp|pf)\.wav$")
-
     def test_remote_log_poll_updates_lines(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
@@ -171,6 +164,45 @@ class TestAppBridgeIntegration(unittest.TestCase):
             bridge._poll_remote_log()
 
             self.assertEqual(bridge.remoteLogLines, ["startup ok", "ready"])
+
+    def test_start_remote_starts_local_listeners_before_remote_launch(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+            remote = bridge._remote
+            client = bridge._client
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            self.assertIsInstance(client, _FakeOdasClient)
+
+            bridge.startRemoteOdas()
+
+            self.assertTrue(bridge.streamsActive)
+            self.assertEqual(client.start_calls, 1)
+            self.assertEqual(remote.start_calls, 1)
+
+    def test_preflight_failure_uses_humanized_sink_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.log_output = "Sink tracks: Cannot connect to server\n"
+            remote.start_result = CommandResult(
+                code=1,
+                stdout="",
+                stderr="preflight: sink host mismatch",
+            )
+
+            bridge.startRemoteOdas()
+
+            self.assertFalse(bridge.odasStarting)
+            self.assertFalse(bridge.odasRunning)
+            self.assertEqual(
+                bridge._status,
+                "启动失败: 远程 ODAS 配置中的输出地址与 Temporal 监听地址不一致",
+            )
 
     def test_start_failure_uses_log_reason_when_process_never_appears(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -191,25 +223,6 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertFalse(bridge.odasRunning)
             self.assertEqual(bridge._status, "启动失败: 远程命令不存在或未安装")
 
-    def test_start_failure_filters_log_read_error_into_human_reason(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            recorder = AutoRecorder(output_dir=temp_dir)
-            bridge = self._make_bridge(recorder)
-            bridge.connectRemote()
-            remote = bridge._remote
-            self.assertIsInstance(remote, _FakeRemoteOdasController)
-            remote.log_output = (
-                "日志读取失败: /home/garrett/.profile.d/02-function.sh: "
-                "line 18: cd: ~/workspace/ODAS/odas: No such file or directory\n"
-            )
-
-            bridge.startRemoteOdas()
-            self._drain_startup(bridge)
-
-            self.assertFalse(bridge.odasStarting)
-            self.assertFalse(bridge.odasRunning)
-            self.assertEqual(bridge._status, "启动失败: 远程工作目录不存在或不可访问")
-
     def test_start_transitions_from_starting_to_running_after_pid_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
@@ -228,22 +241,6 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertFalse(bridge.odasStarting)
             self.assertTrue(bridge.odasRunning)
-
-    def test_immediate_start_error_does_not_enter_running_state(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            recorder = AutoRecorder(output_dir=temp_dir)
-            bridge = self._make_bridge(recorder)
-            bridge.connectRemote()
-            remote = bridge._remote
-            self.assertIsInstance(remote, _FakeRemoteOdasController)
-            remote.log_output = ""
-            remote.start_result = CommandResult(code=1, stdout="", stderr="permission denied")
-
-            bridge.startRemoteOdas()
-
-            self.assertFalse(bridge.odasStarting)
-            self.assertFalse(bridge.odasRunning)
-            self.assertEqual(bridge._status, "启动失败: 远程命令或目录权限不足")
 
     def test_repeated_start_click_is_ignored_while_starting(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

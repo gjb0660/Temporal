@@ -76,12 +76,16 @@ def load_config(path: str | Path) -> TemporalConfig:
         odas_log=_required_string(odas_raw.get("log"), "odas.log", "odaslive.log"),
     )
 
-    host = remote.host
+    listen_host = _required_string(
+        streams_raw.get("listen_host"),
+        "streams.listen_host",
+        "127.0.0.1",
+    )
     streams = OdasStreamConfig(
-        sst=OdasEndpoint(host=host, port=int(streams_raw.get("sst_port", 9000))),
-        ssl=OdasEndpoint(host=host, port=int(streams_raw.get("ssl_port", 9001))),
-        sss_sep=OdasEndpoint(host=host, port=int(streams_raw.get("sss_sep_port", 10000))),
-        sss_pf=OdasEndpoint(host=host, port=int(streams_raw.get("sss_pf_port", 10010))),
+        sst=OdasEndpoint(host=listen_host, port=int(streams_raw.get("sst_port", 9000))),
+        ssl=OdasEndpoint(host=listen_host, port=int(streams_raw.get("ssl_port", 9001))),
+        sss_sep=OdasEndpoint(host=listen_host, port=int(streams_raw.get("sss_sep_port", 10000))),
+        sss_pf=OdasEndpoint(host=listen_host, port=int(streams_raw.get("sss_pf_port", 10010))),
     )
 
     return TemporalConfig(remote=remote, streams=streams)

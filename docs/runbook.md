@@ -2,68 +2,68 @@
 
 ## 目标
 
-本文档面向运维和开发联调人员，提供可复现的运行步骤、
-检查点和常见故障排查方法。
+本文档面向运维和联调人员，说明 Temporal 与远端 ODAS 的正确协作方式。
 
-## 1. 启动前检查
+- 数据流方向固定为 `ODAS -> Temporal`
+- Temporal 通过 SSH 远程启动 `odaslive`
+- `odaslive` 主动连接 Temporal 本地监听端口推送 SST、SSL、SSS 数据
+
+## 启动前检查
 
 1. 确认 Python 环境和依赖已安装。
-2. 确认配置文件 [config/odas.example.toml](config/odas.example.toml)
-   已填写远端主机、SSH 密钥路径和端口。
-3. 确认远端 ODAS 主机可达，端口 22/9000/9001/10000/10010 可访问。
+2. 检查配置文件 [config/odas.example.toml](../config/odas.example.toml)。
+3. 确认 `[streams].listen_host` 是远端 ODAS 可访问到的 Temporal 本机地址。
+4. 确认 `sst_port`、`ssl_port`、`sss_sep_port`、`sss_pf_port` 未被本机占用。
+5. 确认远端 SSH 可达，且 `odas.cwd`、`odas.command`、ODAS cfg 路径配置正确。
 
-## 2. 启动应用
+## 推荐操作顺序
 
-1. 在仓库根目录执行：`uv run temporal`
-2. 界面出现后检查状态文本为“Temporal 就绪”。
+1. 启动 Temporal：`uv run temporal`
+2. 在界面中连接 SSH。
+3. 启动监听。
+4. 启动远端 `odaslive`。
+5. 观察日志、声源和录音状态。
+6. 结束时先停监听，再停远端 `odaslive`。
 
-## 3. 远端控制流程
+## 远端配置要求
 
-1. 点击“连接 SSH”，状态应变为“SSH 已连接”。
-2. 点击“启动 odaslive”，状态应变为“远程 odaslive 已启动”。
-3. 观察日志面板是否持续刷新。
-4. 结束时点击“停止 odaslive”。
+- `odas.cwd` 为相对路径时，按远端 `$HOME/<cwd>` 解析。
+- `odas.command` 必须是可执行命令或脚本。
+- `odas.args` 中必须能定位到 ODAS cfg 文件，或 wrapper 脚本中能解析出 cfg 路径。
+- ODAS cfg 中 `tracks`、`hops`、音频 sink 的目标地址必须指向 Temporal 的
+  `streams.listen_host` 和对应端口。
 
-## 4. 数据流与录制流程
+## 启动语义
 
-1. 点击“开始监听”启动 SST/SSL/SSS。
-2. 检查 Sources 列表是否出现有效 source id（非 0）。
-3. 检查 recordingSourceCount 是否与可映射 source 数一致。
-4. 检查 recordingSessions 是否出现 `Source {id} [sp|pf] ...wav`。
-5. 点击“停止监听”后，录制计数和会话列表应清空。
+- Temporal 不再主动连接 `remote.host:9000/9001/10000/10010`。
+- 启动远端 `odaslive` 前，Temporal 会先启动本地监听端并执行远端 preflight。
+- preflight 失败时，界面状态显示摘要原因，原始错误保留在日志区。
+- 只有远端实例通过 PID 校验后，状态才会变为“运行中”。
 
-## 5. 录制文件检查
+## 常见问题
 
-1. 打开 [recordings](recordings) 目录。
-2. 检查文件名格式：`ODAS_{source_id}_{timestamp}_{sp|pf}.wav`。
-3. 使用播放器或脚本确认文件可打开且非空。
+### `Sink tracks/hops: Cannot connect to server`
 
-## 6. 常见问题排查
+这通常不是 Temporal 本地解析故障，而是远端 ODAS 无法连接到 Temporal 监听端。
 
-### 6.1 SSH 连接失败
+排查顺序：
 
-1. 检查用户名和私钥路径。
-2. 在终端手动验证 SSH：
-   `ssh -i <key> <user>@<host>`。
-3. 检查远端防火墙和安全组。
+1. 检查 `[streams].listen_host` 是否填写为远端 ODAS 可访问的 Temporal 地址。
+2. 检查远端 ODAS cfg 中 sink 的 host/port 是否与 Temporal 配置完全一致。
+3. 检查 Temporal 是否已经启动监听。
+4. 检查本机防火墙是否放通 `9000/9001/10000/10010`。
 
-### 6.2 有源但不录制
+### 远端工作目录不存在
 
-1. 确认 source 在前 4 个映射通道内。
-2. 确认 source 未被取消勾选。
-3. 确认 SSS 端口无阻塞。
+若状态显示“远程工作目录不存在或不可访问”：
 
-### 6.3 录制中断频繁
+1. 检查 `odas.cwd` 是否写错。
+2. 若为相对路径，确认其相对的是远端 `$HOME`，不是登录 shell 的当前目录。
 
-1. 检查网络抖动和 SST 更新间隔。
-2. 检查 inactive timeout 是否过短。
-3. 必要时先停止监听并重新开始。
+### 远端命令不存在或不可执行
 
-## 7. 建议操作顺序
+若状态显示“远程命令不存在或未安装”或“远程命令或目录权限不足”：
 
-1. 连接 SSH。
-2. 启动 odaslive。
-3. 开始监听。
-4. 观察录制状态。
-5. 停止监听。
-6. 停止 odaslive。
+1. 检查 `odas.command` 是否存在。
+2. 检查 wrapper 脚本是否有执行权限。
+3. 检查 wrapper 内部引用的 cfg 和二进制路径是否仍有效。

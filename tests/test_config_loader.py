@@ -26,6 +26,7 @@ class TestConfigLoader(unittest.TestCase):
                         'cwd = "/opt/odas"',
                         "",
                         "[streams]",
+                        'listen_host = "192.168.1.50"',
                         "sst_port = 9000",
                         "ssl_port = 9001",
                         "sss_sep_port = 10000",
@@ -43,6 +44,7 @@ class TestConfigLoader(unittest.TestCase):
             self.assertEqual(config.remote.odas_args, ["-c", "/opt/odas/config/odas.cfg", "-v"])
             self.assertEqual(config.remote.odas_cwd, "/opt/odas")
             self.assertEqual(config.remote.odas_log, "odaslive.log")
+            self.assertEqual(config.streams.sst.host, "192.168.1.50")
 
     def test_default_args_and_log_are_used_when_omitted(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -58,6 +60,7 @@ class TestConfigLoader(unittest.TestCase):
                         'command = "odaslive"',
                         "",
                         "[streams]",
+                        'listen_host = "127.0.0.1"',
                         "sst_port = 9000",
                         "ssl_port = 9001",
                         "sss_sep_port = 10000",
@@ -71,6 +74,7 @@ class TestConfigLoader(unittest.TestCase):
             self.assertEqual(config.remote.odas_args, [])
             self.assertIsNone(config.remote.odas_cwd)
             self.assertEqual(config.remote.odas_log, "odaslive.log")
+            self.assertEqual(config.streams.sst.host, "127.0.0.1")
 
     def test_command_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -87,6 +91,7 @@ class TestConfigLoader(unittest.TestCase):
                         'args = ["-c", "/opt/odas/config/odas.cfg", "-v"]',
                         "",
                         "[streams]",
+                        'listen_host = "10.0.0.2"',
                         "sst_port = 9000",
                         "ssl_port = 9001",
                         "sss_sep_port = 10000",
@@ -98,6 +103,7 @@ class TestConfigLoader(unittest.TestCase):
 
             config = load_config(cfg_path)
             self.assertEqual(config.remote.odas_command, "/opt/odas/bin/odaslive")
+            self.assertEqual(config.streams.sst.host, "10.0.0.2")
 
     def test_blank_command_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -113,6 +119,7 @@ class TestConfigLoader(unittest.TestCase):
                         'command = "  "',
                         "",
                         "[streams]",
+                        'listen_host = "127.0.0.1"',
                         "sst_port = 9000",
                         "ssl_port = 9001",
                         "sss_sep_port = 10000",
@@ -140,6 +147,7 @@ class TestConfigLoader(unittest.TestCase):
                         "args = [false, 1]",
                         "",
                         "[streams]",
+                        'listen_host = "127.0.0.1"',
                         "sst_port = 9000",
                         "ssl_port = 9001",
                         "sss_sep_port = 10000",
@@ -167,6 +175,7 @@ class TestConfigLoader(unittest.TestCase):
                         'log = "  "',
                         "",
                         "[streams]",
+                        'listen_host = "127.0.0.1"',
                         "sst_port = 9000",
                         "ssl_port = 9001",
                         "sss_sep_port = 10000",
@@ -178,6 +187,34 @@ class TestConfigLoader(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "odas.log must not be blank"):
                 load_config(cfg_path)
+
+    def test_streams_listen_host_defaults_without_reusing_remote_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            cfg_path = Path(temp_dir) / "odas.toml"
+            cfg_path.write_text(
+                "\n".join(
+                    [
+                        "[remote]",
+                        'host = "172.21.16.222"',
+                        "port = 22",
+                        "",
+                        "[odas]",
+                        'command = "odaslive"',
+                        "",
+                        "[streams]",
+                        "sst_port = 9000",
+                        "ssl_port = 9001",
+                        "sss_sep_port = 10000",
+                        "sss_pf_port = 10010",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            config = load_config(cfg_path)
+
+            self.assertEqual(config.streams.sst.host, "127.0.0.1")
+            self.assertNotEqual(config.streams.sst.host, config.remote.host)
 
 
 if __name__ == "__main__":

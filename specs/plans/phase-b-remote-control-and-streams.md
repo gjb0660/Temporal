@@ -25,6 +25,8 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 4. Keep socket operations inside backend layer only.
 5. Keep SSH config contract explicit and minimal:
    `odas.command`, `odas.args`, `odas.cwd`, `odas.log`.
+6. Keep ODAS stream direction explicit:
+   remote odaslive pushes to Temporal listeners.
 
 ## SSH Contract
 
@@ -37,6 +39,13 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 - Derive the control pid path from `odas.log`:
   replace the last extension with `.pid`, or append `.pid` when no extension exists.
 - Remove legacy key compatibility; do not read deprecated fields.
+
+## Stream Contract
+
+- `streams.listen_host` is the Temporal local bind address for SST/SSL/SSS listeners.
+- `sst_port`, `ssl_port`, `sss_sep_port`, and `sss_pf_port`
+  are Temporal local listening ports.
+- Do not infer stream host from `remote.host`.
 
 ## SSH Semantics
 
@@ -67,6 +76,23 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
   before showing them in the status panel.
 - Keep the raw log text in the log panel for diagnosis; only the status panel
   uses the filtered reason.
+- Resolve relative `odas.cwd` against remote `$HOME`,
+  not the login shell working directory.
+- Before launching odaslive, validate that:
+  the resolved working directory exists,
+  the configured command is executable,
+  the referenced ODAS cfg file exists,
+  and the cfg sink targets point at `streams.listen_host` and the configured ports.
+- Treat preflight failure as a startup failure.
+- If local listeners are not active when remote odaslive starts,
+  Temporal must start them before launching odaslive.
+
+## Stream Semantics
+
+- Temporal listens locally for SST/SSL JSON streams and SSS PCM streams.
+- Remote odaslive actively connects to those listeners.
+- Listener sockets must accept a connection, read until disconnect,
+  and then continue accepting later reconnects.
 
 ## Quality Requirements
 
@@ -79,7 +105,7 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 2. Remote odaslive commands can be triggered from UI actions.
 3. SST and SSL clients can receive and parse test lines without crash.
 4. Config loader maps `odas.command`, `odas.args`, `odas.cwd`,
-    and `odas.log` to backend model.
+    `odas.log`, and `streams.listen_host` to backend model.
 5. SSH start command supports optional working directory and does not use `nohup`.
 6. SSH status and stop use the derived pid file and process identity validation.
 7. Left-panel status says "starting" until process existence is verified.
@@ -88,3 +114,4 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 10. Remote log text wraps in the left log panel.
 11. The left status panel shows a filtered human-readable failure reason
     instead of raw shell paths and traces.
+12. Temporal local listeners are started before remote odaslive launches.

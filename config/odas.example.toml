@@ -11,6 +11,7 @@ cwd = ""
 log = "odaslive.log"
 
 [streams]
+listen_host = "127.0.0.1"
 sst_port = 9000
 ssl_port = 9001
 sss_sep_port = 10000

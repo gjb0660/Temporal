@@ -50,7 +50,7 @@ class AppBridge(QObject):
         self._root = Path(__file__).resolve().parents[2]
         self._cfg_path = self._root / "config" / "odas.example.toml"
         self._cfg = load_config(self._cfg_path)
-        self._remote = RemoteOdasController(self._cfg.remote)
+        self._remote = RemoteOdasController(self._cfg.remote, self._cfg.streams)
         self._last_sst: dict = {}
         self._last_ssl: dict = {}
         self._source_ids: list[int] = []
@@ -195,6 +195,11 @@ class AppBridge(QObject):
             self.setStatus("远程 odaslive 启动中")
             return
 
+        if not self._streams_active:
+            self.startStreams()
+            if not self._streams_active:
+                return
+
         try:
             result = self._remote.start_odaslive()
         except Exception as exc:
@@ -257,16 +262,17 @@ class AppBridge(QObject):
 
     @Slot()
     def startStreams(self) -> None:
-        if not self._odas_running:
-            self.setStatus("请先启动远程 odaslive")
-            return
         if self._streams_active:
             self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
             return
 
-        self._client.start()
+        try:
+            self._client.start()
+        except Exception as exc:
+            self.setStatus(f"本地监听启动失败: {exc}")
+            return
         self._set_streams_active(True)
-        self._update_stream_status("开始监听 SST/SSL/SSS 数据流")
+        self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
 
     @Slot()
     def stopStreams(self) -> None:
@@ -512,6 +518,12 @@ class AppBridge(QObject):
         return ""
 
     def _pick_startup_failure_reason(self, result: object | None = None) -> str:
+        if result is not None:
+            stderr = getattr(result, "stderr", "")
+            stdout = getattr(result, "stdout", "")
+            explicit = stderr.strip() or stdout.strip()
+            if explicit.lower().startswith("preflight:"):
+                return explicit
         log_reason = self._latest_remote_log_reason()
         if log_reason:
             return log_reason
@@ -535,6 +547,26 @@ class AppBridge(QObject):
             if "permission denied" in lower:
                 return "远程日志路径不可读或不可写"
             return "远程日志读取失败"
+        if "preflight: remote working directory" in lower:
+            return "远程工作目录不存在或不可访问"
+        if "preflight: remote command missing" in lower:
+            return "远程命令不存在或未安装"
+        if "preflight: remote command not executable" in lower:
+            return "远程命令或目录权限不足"
+        if "preflight: odas config path missing" in lower:
+            return "远程 ODAS 配置文件未声明或无法解析"
+        if "preflight: odas config file missing" in lower:
+            return "远程 ODAS 配置文件不存在"
+        if "preflight: sink host mismatch" in lower:
+            return "远程 ODAS 配置中的输出地址与 Temporal 监听地址不一致"
+        if "preflight: tracks sink port mismatch" in lower:
+            return "远程 ODAS 配置中的 tracks 输出端口与 Temporal 不一致"
+        if "preflight: hops sink port mismatch" in lower:
+            return "远程 ODAS 配置中的 hops 输出端口与 Temporal 不一致"
+        if "preflight: audio sep sink port mismatch" in lower:
+            return "远程 ODAS 配置中的分离音频输出端口与 Temporal 不一致"
+        if "preflight: audio pf sink port mismatch" in lower:
+            return "远程 ODAS 配置中的后滤音频输出端口与 Temporal 不一致"
         if "command not found" in lower:
             return "远程命令不存在或未安装"
         if "permission denied" in lower:
