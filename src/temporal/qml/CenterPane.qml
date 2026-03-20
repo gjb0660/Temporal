@@ -6,14 +6,15 @@ Rectangle {
     id: root
 
     required property QtObject theme
+    required property QtObject appBridge
     property var sourcePositions: []
     property bool previewMode: false
     property string previewScenarioKey: ""
     readonly property var previewXTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
     readonly property var runtimeXTicks: ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600"]
     readonly property var displayedSourcePositions: Array.isArray(sourcePositions) ? sourcePositions : []
-    readonly property var displayedElevationSeries: previewMode ? appBridge.elevationSeries : []
-    readonly property var displayedAzimuthSeries: previewMode ? appBridge.azimuthSeries : []
+    readonly property var displayedElevationSeries: previewMode ? root.appBridge.elevationSeries : []
+    readonly property var displayedAzimuthSeries: previewMode ? root.appBridge.azimuthSeries : []
     readonly property var displayedXTicks: previewMode ? previewXTicks : runtimeXTicks
 
     Layout.fillWidth: true

@@ -40,6 +40,7 @@ class AppBridge(QObject):
     potentialCountChanged = Signal()
     recordingSourceCountChanged = Signal()
     recordingSessionsChanged = Signal()
+    sourceRowsChanged = Signal()
     sourcesEnabledChanged = Signal()
     potentialsEnabledChanged = Signal()
     potentialRangeChanged = Signal()
@@ -141,6 +142,20 @@ class AppBridge(QObject):
     def recordingSessions(self) -> list[str]:
         return self._recording_sessions
 
+    @Property(list, notify=sourceRowsChanged)  # type: ignore[reportCallIssue]
+    def sourceRows(self) -> list[dict[str, str | int | bool]]:
+        return [
+            {
+                "sourceId": source_id,
+                "label": "声源",
+                "checked": source_id in self._selected_source_ids,
+                "enabled": True,
+                "badge": str(source_id),
+                "badgeColor": "#cf54ea",
+            }
+            for source_id in self._source_ids
+        ]
+
     @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
     def sourcesEnabled(self) -> bool:
         return self._sources_enabled
@@ -167,6 +182,10 @@ class AppBridge(QObject):
 
     @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
     def previewScenarioKeys(self) -> list[str]:
+        return []
+
+    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def previewScenarioOptions(self) -> list[dict]:
         return []
 
     @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
@@ -716,6 +735,7 @@ class AppBridge(QObject):
                     self._selected_source_ids.add(source_id)
             self._source_ids = source_ids
             self.sourceIdsChanged.emit()
+            self.sourceRowsChanged.emit()
 
         items = build_source_items(
             self._last_sst,
@@ -735,6 +755,7 @@ class AppBridge(QObject):
         if positions != self._source_positions:
             self._source_positions = positions
             self.sourcePositionsChanged.emit()
+        self.sourceRowsChanged.emit()
 
     def _refresh_potentials(self) -> None:
         count = count_potentials(
@@ -758,7 +779,8 @@ def run_with_bridge(bridge: QObject) -> int:
     if app is None:
         app = QGuiApplication(sys.argv)
     engine = QQmlApplicationEngine()
-    engine.rootContext().setContextProperty("appBridge", bridge)
+    bridge.setParent(engine)
+    engine.setInitialProperties({"appBridge": bridge})
 
     qml_path = Path(__file__).resolve().parent / "qml" / "Main.qml"
     engine.load(str(qml_path))

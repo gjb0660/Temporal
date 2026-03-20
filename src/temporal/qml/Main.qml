@@ -5,6 +5,8 @@ import QtQuick.Layouts
 ApplicationWindow {
     id: root
 
+    required property QtObject appBridge
+
     width: 1188
     height: 794
     minimumWidth: 940
@@ -13,6 +15,7 @@ ApplicationWindow {
     title: "Temporal 实时数据"
     color: "#eef2f6"
     font.family: "Segoe UI"
+
     readonly property QtObject theme: QtObject {
         readonly property color pageBackground: "#eef2f6"
         readonly property color panelBackground: "#edf4ef"
@@ -55,37 +58,9 @@ ApplicationWindow {
         readonly property int cardRadius: 3
     }
 
-    function sourceRows() {
-        const ids = Array.isArray(appBridge.sourceIds) ? appBridge.sourceIds : []
-        const rows = []
-        if (ids.length === 0) {
-            for (let index = 0; index < 4; index += 1) {
-                rows.push({
-                    sourceId: -1,
-                    label: "声源",
-                    checked: true,
-                    enabled: false,
-                    badge: ""
-                })
-            }
-            return rows
-        }
-
-        for (let index = 0; index < ids.length; index += 1) {
-            const sourceId = ids[index]
-            rows.push({
-                sourceId: sourceId,
-                label: "声源",
-                checked: appBridge.isSourceSelected(sourceId),
-                enabled: true,
-                badge: String(sourceId)
-            })
-        }
-        return rows
-    }
-
     header: AppHeader {
         theme: root.theme
+        appBridge: root.appBridge
     }
 
     footer: AppFooter {
@@ -103,19 +78,22 @@ ApplicationWindow {
 
             LeftSidebar {
                 theme: root.theme
+                appBridge: root.appBridge
             }
 
             CenterPane {
                 theme: root.theme
-                sourcePositions: appBridge.sourcePositions
-                previewMode: appBridge.previewMode
-                previewScenarioKey: appBridge.previewScenarioKey
+                appBridge: root.appBridge
+                sourcePositions: root.appBridge.sourcePositions
+                previewMode: root.appBridge.previewMode
+                previewScenarioKey: root.appBridge.previewScenarioKey
             }
 
             RightSidebar {
                 theme: root.theme
-                sourceRows: root.sourceRows()
-                recordingSessions: appBridge.recordingSessions
+                appBridge: root.appBridge
+                sourceRows: root.appBridge.sourceRows
+                recordingSessions: root.appBridge.recordingSessions
             }
         }
     }

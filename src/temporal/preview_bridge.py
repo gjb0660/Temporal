@@ -10,6 +10,7 @@ from temporal.preview_data import (
     DEFAULT_PREVIEW_SCENARIO_KEY,
     get_preview_scenario,
     preview_scenario_keys,
+    preview_scenario_options,
 )
 
 
@@ -20,6 +21,7 @@ class PreviewBridge(QObject):
     streamsActiveChanged = Signal()
     sourceIdsChanged = Signal()
     sourcePositionsChanged = Signal()
+    sourceRowsChanged = Signal()
     remoteLogLinesChanged = Signal()
     recordingSessionsChanged = Signal()
     sourcesEnabledChanged = Signal()
@@ -28,25 +30,28 @@ class PreviewBridge(QObject):
     previewModeChanged = Signal()
     previewScenarioKeyChanged = Signal()
     previewScenarioKeysChanged = Signal()
+    previewScenarioOptionsChanged = Signal()
     elevationSeriesChanged = Signal()
     azimuthSeriesChanged = Signal()
 
     def __init__(self) -> None:
         super().__init__()
-        self._status = "Preview ready"
+        self._status = "预览模式已就绪"
         self._remote_connected = False
         self._odas_running = False
         self._streams_active = False
-        self._remote_log_lines = ["Preview mode active", "No live backend connections"]
-        self._source_ids: list[int] = []
-        self._selected_source_ids: set[int] = set()
+        self._remote_log_lines = ["预览模式已启用", "当前未连接实时后端"]
         self._recording_sessions: list[str] = []
         self._sources_enabled = True
         self._potentials_enabled = False
         self._potential_min = 0.0
         self._potential_max = 1.0
         self._preview_scenario_keys = preview_scenario_keys()
+        self._preview_scenario_options = preview_scenario_options()
         self._preview_scenario_key = DEFAULT_PREVIEW_SCENARIO_KEY
+        self._selected_source_ids: set[int] = set()
+        self._reset_selected_sources()
+        self._apply_scenario_metadata()
 
     @Property(str, notify=statusChanged)  # type: ignore[reportCallIssue]
     def status(self) -> str:
@@ -66,11 +71,34 @@ class PreviewBridge(QObject):
 
     @Property(list, notify=sourceIdsChanged)  # type: ignore[reportCallIssue]
     def sourceIds(self) -> list[int]:
-        return self._source_ids
+        return [int(source["id"]) for source in self._selected_sources()]
 
     @Property(list, notify=sourcePositionsChanged)  # type: ignore[reportCallIssue]
     def sourcePositions(self) -> list[dict[str, Any]]:
-        return self._active_scenario()["sourcePositions"]
+        return [
+            {
+                "id": int(source["id"]),
+                "color": source["color"],
+                "x": source["x"],
+                "y": source["y"],
+                "z": source["z"],
+            }
+            for source in self._selected_sources()
+        ]
+
+    @Property(list, notify=sourceRowsChanged)  # type: ignore[reportCallIssue]
+    def sourceRows(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "sourceId": int(source["id"]),
+                "label": "声源",
+                "checked": int(source["id"]) in self._selected_source_ids,
+                "enabled": True,
+                "badge": str(int(source["id"])),
+                "badgeColor": source["color"],
+            }
+            for source in self._scenario_sources()
+        ]
 
     @Property(list, notify=remoteLogLinesChanged)  # type: ignore[reportCallIssue]
     def remoteLogLines(self) -> list[str]:
@@ -108,13 +136,27 @@ class PreviewBridge(QObject):
     def previewScenarioKeys(self) -> list[str]:
         return list(self._preview_scenario_keys)
 
+    @Property(list, notify=previewScenarioOptionsChanged)  # type: ignore[reportCallIssue]
+    def previewScenarioOptions(self) -> list[dict[str, str]]:
+        return list(self._preview_scenario_options)
+
     @Property(list, notify=elevationSeriesChanged)  # type: ignore[reportCallIssue]
     def elevationSeries(self) -> list[dict[str, Any]]:
-        return self._active_scenario()["elevationSeries"]
+        selected_ids = set(self.sourceIds)
+        return [
+            series
+            for series in self._active_scenario()["elevationSeries"]
+            if int(series["sourceId"]) in selected_ids
+        ]
 
     @Property(list, notify=azimuthSeriesChanged)  # type: ignore[reportCallIssue]
     def azimuthSeries(self) -> list[dict[str, Any]]:
-        return self._active_scenario()["azimuthSeries"]
+        selected_ids = set(self.sourceIds)
+        return [
+            series
+            for series in self._active_scenario()["azimuthSeries"]
+            if int(series["sourceId"]) in selected_ids
+        ]
 
     @Slot()
     def toggleRemoteOdas(self) -> None:
@@ -124,8 +166,8 @@ class PreviewBridge(QObject):
                 self.streamsActiveChanged.emit()
             self._odas_running = False
             self.odasRunningChanged.emit()
-            self._set_status("Preview remote odaslive stopped")
-            self._set_remote_log_lines(["Preview mode active", "Remote odaslive stopped"])
+            self._set_status("预览模式中的远程 odaslive 已停止")
+            self._set_remote_log_lines(["预览模式已启用", "远程 odaslive 已停止"])
             return
 
         if not self._remote_connected:
@@ -133,35 +175,43 @@ class PreviewBridge(QObject):
             self.remoteConnectedChanged.emit()
         self._odas_running = True
         self.odasRunningChanged.emit()
-        self._set_status("Preview remote odaslive running")
-        self._set_remote_log_lines(["Preview mode active", "Remote odaslive running"])
+        self._set_status("预览模式中的远程 odaslive 运行中")
+        self._set_remote_log_lines(["预览模式已启用", "远程 odaslive 运行中"])
 
     @Slot()
     def toggleStreams(self) -> None:
         if self._streams_active:
             self._streams_active = False
             self.streamsActiveChanged.emit()
-            self._set_status("Preview streams stopped")
-            self._set_remote_log_lines(["Preview mode active", "Streams stopped"])
+            self._set_status("预览模式中的监听已停止")
+            self._set_remote_log_lines(["预览模式已启用", "监听已停止"])
             return
 
         if not self._odas_running:
-            self._set_status("Preview requires remote odaslive")
+            self._set_status("预览模式需要先启动远程 odaslive")
             return
 
         self._streams_active = True
         self.streamsActiveChanged.emit()
-        self._set_status("Preview streams running")
-        self._set_remote_log_lines(["Preview mode active", "Streams running"])
+        self._set_status("预览模式中的监听运行中")
+        self._set_remote_log_lines(["预览模式已启用", "监听运行中"])
 
     @Slot(int, bool)
     def setSourceSelected(self, source_id: int, selected: bool) -> None:
-        if source_id <= 0:
+        valid_source_ids = {int(source["id"]) for source in self._scenario_sources()}
+        if source_id not in valid_source_ids:
             return
+
         if selected:
+            if source_id in self._selected_source_ids:
+                return
             self._selected_source_ids.add(source_id)
         else:
-            self._selected_source_ids.discard(source_id)
+            if source_id not in self._selected_source_ids:
+                return
+            self._selected_source_ids.remove(source_id)
+
+        self._emit_preview_data_changed()
 
     @Slot(int, result=bool)
     def isSourceSelected(self, source_id: int) -> bool:
@@ -173,7 +223,7 @@ class PreviewBridge(QObject):
             return
         self._sources_enabled = enabled
         self.sourcesEnabledChanged.emit()
-        self._set_status("Preview source visibility updated")
+        self._set_status("预览声源显示状态已更新")
 
     @Slot(bool)
     def setPotentialsEnabled(self, enabled: bool) -> None:
@@ -181,7 +231,7 @@ class PreviewBridge(QObject):
             return
         self._potentials_enabled = enabled
         self.potentialsEnabledChanged.emit()
-        self._set_status("Preview potential filter updated")
+        self._set_status("预览候选点筛选状态已更新")
 
     @Slot(float, float)
     def setPotentialEnergyRange(self, minimum: float, maximum: float) -> None:
@@ -192,22 +242,50 @@ class PreviewBridge(QObject):
         self._potential_min = low
         self._potential_max = high
         self.potentialRangeChanged.emit()
-        self._set_status("Preview energy range updated")
+        self._set_status("预览能量范围已更新")
 
     @Slot(str)
     def setPreviewScenario(self, key: str) -> None:
         if key not in self._preview_scenario_keys or key == self._preview_scenario_key:
             return
         self._preview_scenario_key = key
+        self._reset_selected_sources()
+        self._apply_scenario_metadata()
         self.previewScenarioKeyChanged.emit()
-        self.sourcePositionsChanged.emit()
-        self.elevationSeriesChanged.emit()
-        self.azimuthSeriesChanged.emit()
-        self._set_status(f"Preview scenario: {key}")
-        self._set_remote_log_lines(["Preview mode active", f"Scenario set to {key}"])
+        self._emit_preview_data_changed()
 
     def _active_scenario(self) -> dict[str, Any]:
         return get_preview_scenario(self._preview_scenario_key)
+
+    def _scenario_sources(self) -> list[dict[str, Any]]:
+        scenario = self._active_scenario()
+        return list(scenario.get("sources", []))
+
+    def _selected_sources(self) -> list[dict[str, Any]]:
+        return [
+            source
+            for source in self._scenario_sources()
+            if int(source["id"]) in self._selected_source_ids
+        ]
+
+    def _reset_selected_sources(self) -> None:
+        self._selected_source_ids = {int(source["id"]) for source in self._scenario_sources()}
+
+    def _apply_scenario_metadata(self) -> None:
+        scenario = self._active_scenario()
+        self._set_status(str(scenario.get("status", f"Preview scenario: {self._preview_scenario_key}")))
+        log_lines = scenario.get(
+            "remoteLogLines",
+            ["Preview mode active", f"Scenario set to {self._preview_scenario_key}"],
+        )
+        self._set_remote_log_lines(list(log_lines))
+
+    def _emit_preview_data_changed(self) -> None:
+        self.sourceIdsChanged.emit()
+        self.sourcePositionsChanged.emit()
+        self.sourceRowsChanged.emit()
+        self.elevationSeriesChanged.emit()
+        self.azimuthSeriesChanged.emit()
 
     def _set_status(self, status: str) -> None:
         if self._status == status:

@@ -3,7 +3,20 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 Column {
+    id: root
+
     required property QtObject theme
+    required property QtObject appBridge
+
+    function currentScenarioIndex() {
+        const options = Array.isArray(root.appBridge.previewScenarioOptions) ? root.appBridge.previewScenarioOptions : []
+        for (let index = 0; index < options.length; index += 1) {
+            if (options[index].key === root.appBridge.previewScenarioKey) {
+                return index
+            }
+        }
+        return 0
+    }
 
     width: parent ? parent.width : 0
     spacing: 0
@@ -83,8 +96,42 @@ Column {
                 Layout.fillWidth: true
             }
 
+            RowLayout {
+                visible: root.appBridge.previewMode
+                spacing: 8
+
+                Label {
+                    text: "预览场景"
+                    color: "white"
+                    font.pixelSize: theme.bodyFont
+                    font.bold: true
+                    Layout.alignment: Qt.AlignVCenter
+                }
+
+                ComboBox {
+                    id: previewScenarioSelector
+                    Layout.preferredWidth: 190
+                    Layout.alignment: Qt.AlignVCenter
+                    model: root.appBridge.previewScenarioOptions
+                    textRole: "label"
+                    currentIndex: currentScenarioIndex()
+
+                    onActivated: function(index) {
+                        const options = root.appBridge.previewScenarioOptions
+                        if (Array.isArray(options) && index >= 0 && index < options.length) {
+                            root.appBridge.setPreviewScenario(options[index].key)
+                        }
+                    }
+
+                    delegate: ItemDelegate {
+                        width: previewScenarioSelector.width
+                        text: modelData.label
+                    }
+                }
+            }
+
             Repeater {
-                model: ["配置", "录制", "相机"]
+                model: root.appBridge.previewMode ? [] : ["配置", "录制", "相机"]
 
                 delegate: Label {
                     text: modelData

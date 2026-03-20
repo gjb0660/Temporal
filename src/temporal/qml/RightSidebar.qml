@@ -5,9 +5,34 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+
     required property QtObject theme
+    required property QtObject appBridge
     required property var sourceRows
     required property var recordingSessions
+
+    readonly property bool previewMode: root.appBridge.previewMode
+    readonly property var displayedSourceRows: {
+        if (Array.isArray(sourceRows) && sourceRows.length > 0) {
+            return sourceRows
+        }
+        if (previewMode) {
+            return []
+        }
+
+        const rows = []
+        for (let index = 0; index < 4; index += 1) {
+            rows.push({
+                sourceId: -1,
+                label: "声源",
+                checked: true,
+                enabled: false,
+                badge: "",
+                badgeColor: theme.accentPurple
+            })
+        }
+        return rows
+    }
 
     Layout.preferredWidth: theme.rightPanelWidth
     Layout.fillHeight: true
@@ -29,7 +54,7 @@ Rectangle {
         }
 
         Repeater {
-            model: sourceRows
+            model: root.displayedSourceRows
 
             delegate: ColumnLayout {
                 required property var modelData
@@ -48,7 +73,7 @@ Rectangle {
                         Layout.alignment: Qt.AlignVCenter
                         onToggled: {
                             if (modelData.enabled) {
-                                appBridge.setSourceSelected(modelData.sourceId, checked)
+                                root.appBridge.setSourceSelected(modelData.sourceId, checked)
                             }
                         }
                     }
@@ -56,7 +81,7 @@ Rectangle {
                     Rectangle {
                         visible: modelData.badge !== ""
                         radius: height / 2
-                        color: theme.accentPurple
+                        color: modelData.badgeColor || theme.accentPurple
                         Layout.preferredHeight: 20
                         Layout.preferredWidth: Math.max(24, badgeText.implicitWidth + 12)
                         Layout.alignment: Qt.AlignVCenter
@@ -103,15 +128,15 @@ Rectangle {
         AppSideCheckBox {
             theme: root.theme
             text: "声源"
-            checked: appBridge.sourcesEnabled
-            onToggled: appBridge.setSourcesEnabled(checked)
+            checked: root.appBridge.sourcesEnabled
+            onToggled: root.appBridge.setSourcesEnabled(checked)
         }
 
         AppSideCheckBox {
             theme: root.theme
             text: "候选点"
-            checked: appBridge.potentialsEnabled
-            onToggled: appBridge.setPotentialsEnabled(checked)
+            checked: root.appBridge.potentialsEnabled
+            onToggled: root.appBridge.setPotentialsEnabled(checked)
         }
 
         Item {
@@ -119,7 +144,7 @@ Rectangle {
         }
 
         Label {
-            text: "候选声源\n能量范围:"
+            text: "候选声源能量范围:"
             color: "#55635d"
             font.pixelSize: theme.bodyFont
         }
@@ -131,7 +156,7 @@ Rectangle {
             Label {
                 anchors.left: parent.left
                 anchors.top: parent.top
-                text: appBridge.potentialEnergyMin.toFixed(0)
+                text: root.appBridge.potentialEnergyMin.toFixed(0)
                 color: "#3f4743"
                 font.pixelSize: theme.bodyFont
             }
@@ -144,11 +169,11 @@ Rectangle {
                 anchors.topMargin: 22
                 from: 0
                 to: 1
-                first.value: appBridge.potentialEnergyMin
-                second.value: appBridge.potentialEnergyMax
+                first.value: root.appBridge.potentialEnergyMin
+                second.value: root.appBridge.potentialEnergyMax
 
-                first.onValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
-                second.onValueChanged: appBridge.setPotentialEnergyRange(first.value, second.value)
+                first.onValueChanged: root.appBridge.setPotentialEnergyRange(first.value, second.value)
+                second.onValueChanged: root.appBridge.setPotentialEnergyRange(first.value, second.value)
 
                 background: Rectangle {
                     x: parent.leftPadding
@@ -190,7 +215,7 @@ Rectangle {
                 anchors.left: parent.left
                 anchors.top: energySlider.bottom
                 anchors.topMargin: 4
-                text: appBridge.potentialEnergyMax.toFixed(0)
+                text: root.appBridge.potentialEnergyMax.toFixed(0)
                 color: "#3f4743"
                 font.pixelSize: theme.bodyFont
             }

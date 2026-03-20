@@ -15,8 +15,11 @@ PREVIEW_SCENARIO_KEYS = (
 _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
     "referenceSingle": {
         "key": "referenceSingle",
-        "sourcePositions": [
-            {"id": 15, "color": "#cf54ea", "x": -0.42, "y": 0.18, "z": 0.64},
+        "displayName": "Reference Single",
+        "status": "Preview scenario: referenceSingle",
+        "remoteLogLines": ["Preview mode active", "Scenario set to referenceSingle"],
+        "sources": [
+            {"id": 15, "color": "#cf54ea", "x": -0.42, "y": 0.18, "z": 0.64, "energy": 0.88},
         ],
         "elevationSeries": [
             {
@@ -35,11 +38,14 @@ _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
     },
     "hemisphereSpread": {
         "key": "hemisphereSpread",
-        "sourcePositions": [
-            {"id": 7, "color": "#4dc6d8", "x": -0.56, "y": 0.28, "z": 0.58},
-            {"id": 15, "color": "#cf54ea", "x": 0.46, "y": 0.18, "z": 0.62},
-            {"id": 21, "color": "#5ac97c", "x": -0.18, "y": -0.42, "z": -0.50},
-            {"id": 31, "color": "#6a88ff", "x": 0.54, "y": -0.36, "z": 0.10},
+        "displayName": "Hemisphere Spread",
+        "status": "Preview scenario: hemisphereSpread",
+        "remoteLogLines": ["Preview mode active", "Scenario set to hemisphereSpread"],
+        "sources": [
+            {"id": 7, "color": "#4dc6d8", "x": -0.56, "y": 0.28, "z": 0.58, "energy": 0.76},
+            {"id": 15, "color": "#cf54ea", "x": 0.46, "y": 0.18, "z": 0.62, "energy": 0.88},
+            {"id": 21, "color": "#5ac97c", "x": -0.18, "y": -0.42, "z": -0.50, "energy": 0.42},
+            {"id": 31, "color": "#6a88ff", "x": 0.54, "y": -0.36, "z": 0.10, "energy": 0.61},
         ],
         "elevationSeries": [
             {
@@ -88,11 +94,14 @@ _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
     },
     "equatorBoundary": {
         "key": "equatorBoundary",
-        "sourcePositions": [
-            {"id": 12, "color": "#ff9c47", "x": 0.98, "y": 0.00, "z": 0.02},
-            {"id": 15, "color": "#cf54ea", "x": -0.96, "y": 0.02, "z": -0.01},
-            {"id": 27, "color": "#f16f7d", "x": 0.02, "y": 0.00, "z": 0.98},
-            {"id": 31, "color": "#6a88ff", "x": 0.04, "y": -0.02, "z": -0.96},
+        "displayName": "Equator Boundary",
+        "status": "Preview scenario: equatorBoundary",
+        "remoteLogLines": ["Preview mode active", "Scenario set to equatorBoundary"],
+        "sources": [
+            {"id": 12, "color": "#ff9c47", "x": 0.98, "y": 0.00, "z": 0.02, "energy": 0.74},
+            {"id": 15, "color": "#cf54ea", "x": -0.96, "y": 0.02, "z": -0.01, "energy": 0.82},
+            {"id": 27, "color": "#f16f7d", "x": 0.02, "y": 0.00, "z": 0.98, "energy": 0.67},
+            {"id": 31, "color": "#6a88ff", "x": 0.04, "y": -0.02, "z": -0.96, "energy": 0.59},
         ],
         "elevationSeries": [
             {
@@ -141,7 +150,10 @@ _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
     },
     "emptyState": {
         "key": "emptyState",
-        "sourcePositions": [],
+        "displayName": "Empty State",
+        "status": "Preview scenario: emptyState",
+        "remoteLogLines": ["Preview mode active", "Scenario set to emptyState"],
+        "sources": [],
         "elevationSeries": [],
         "azimuthSeries": [],
     },
@@ -150,6 +162,13 @@ _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
 
 def preview_scenario_keys() -> list[str]:
     return list(PREVIEW_SCENARIO_KEYS)
+
+
+def preview_scenario_options() -> list[dict[str, str]]:
+    return [
+        {"key": scenario_key, "label": _PREVIEW_CATALOG[scenario_key]["displayName"]}
+        for scenario_key in PREVIEW_SCENARIO_KEYS
+    ]
 
 
 def get_preview_scenario(key: str) -> dict[str, Any]:

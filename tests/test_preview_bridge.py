@@ -68,30 +68,63 @@ def _fake_config() -> TemporalConfig:
 
 
 class TestPreviewBridge(unittest.TestCase):
-    def test_defaults_to_preview_reference_single(self) -> None:
+    def test_defaults_to_preview_reference_single_with_source_rows(self) -> None:
         bridge = PreviewBridge()
+        source_rows = cast(list[dict[str, Any]], bridge.sourceRows)
         source_positions = cast(list[dict[str, Any]], bridge.sourcePositions)
 
         self.assertTrue(bridge.previewMode)
         self.assertEqual(bridge.previewScenarioKey, DEFAULT_PREVIEW_SCENARIO_KEY)
         self.assertEqual(bridge.previewScenarioKeys, list(PREVIEW_SCENARIO_KEYS))
-        self.assertEqual(bridge.sourceIds, [])
-        self.assertEqual(bridge.recordingSessions, [])
+        self.assertEqual(len(source_rows), 1)
+        self.assertEqual(source_rows[0]["sourceId"], 15)
+        self.assertTrue(source_rows[0]["checked"])
+        self.assertEqual(bridge.sourceIds, [15])
         self.assertEqual(len(source_positions), 1)
         self.assertEqual(source_positions[0]["id"], 15)
+        self.assertEqual(bridge.recordingSessions, [])
 
-    def test_set_preview_scenario_updates_preview_data(self) -> None:
+    def test_scenarios_keep_rows_positions_and_series_in_sync(self) -> None:
+        expectations = {
+            "referenceSingle": 1,
+            "hemisphereSpread": 4,
+            "equatorBoundary": 4,
+            "emptyState": 0,
+        }
         bridge = PreviewBridge()
 
-        bridge.setPreviewScenario("hemisphereSpread")
+        for scenario_key, expected_count in expectations.items():
+            bridge.setPreviewScenario(scenario_key)
 
-        source_positions = cast(list[dict[str, Any]], bridge.sourcePositions)
-        elevation_series = cast(list[dict[str, Any]], bridge.elevationSeries)
-        azimuth_series = cast(list[dict[str, Any]], bridge.azimuthSeries)
-        self.assertEqual(bridge.previewScenarioKey, "hemisphereSpread")
-        self.assertEqual(len(source_positions), 4)
-        self.assertEqual(len(elevation_series), 4)
-        self.assertEqual(len(azimuth_series), 4)
+            source_rows = cast(list[dict[str, Any]], bridge.sourceRows)
+            source_positions = cast(list[dict[str, Any]], bridge.sourcePositions)
+            elevation_series = cast(list[dict[str, Any]], bridge.elevationSeries)
+            azimuth_series = cast(list[dict[str, Any]], bridge.azimuthSeries)
+
+            self.assertEqual(len(source_rows), expected_count)
+            self.assertEqual(len(bridge.sourceIds), expected_count)
+            self.assertEqual(len(source_positions), expected_count)
+            self.assertEqual(len(elevation_series), expected_count)
+            self.assertEqual(len(azimuth_series), expected_count)
+
+    def test_preview_scenario_options_are_exposed(self) -> None:
+        bridge = PreviewBridge()
+
+        options = cast(list[dict[str, str]], bridge.previewScenarioOptions)
+
+        self.assertEqual([item["key"] for item in options], list(PREVIEW_SCENARIO_KEYS))
+        self.assertEqual(options[0]["label"], "Reference Single")
+
+    def test_scenario_switch_resets_all_sources_to_selected(self) -> None:
+        bridge = PreviewBridge()
+        bridge.setPreviewScenario("hemisphereSpread")
+        bridge.setSourceSelected(7, False)
+        self.assertNotIn(7, bridge.sourceIds)
+
+        bridge.setPreviewScenario("equatorBoundary")
+
+        self.assertEqual(sorted(bridge.sourceIds), [12, 15, 27, 31])
+        self.assertTrue(all(row["checked"] for row in bridge.sourceRows))
 
     def test_unknown_preview_scenario_is_ignored(self) -> None:
         bridge = PreviewBridge()
@@ -99,6 +132,34 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.setPreviewScenario("missingScenario")
 
         self.assertEqual(bridge.previewScenarioKey, DEFAULT_PREVIEW_SCENARIO_KEY)
+
+    def test_set_source_selected_updates_sidebar_charts_and_positions(self) -> None:
+        bridge = PreviewBridge()
+        bridge.setPreviewScenario("hemisphereSpread")
+
+        bridge.setSourceSelected(21, False)
+
+        self.assertNotIn(21, bridge.sourceIds)
+        self.assertNotIn(21, [item["sourceId"] for item in bridge.sourceRows if item["checked"]])
+        self.assertNotIn(21, [item["id"] for item in bridge.sourcePositions])
+        self.assertNotIn(21, [item["sourceId"] for item in bridge.elevationSeries])
+        self.assertNotIn(21, [item["sourceId"] for item in bridge.azimuthSeries])
+
+        bridge.setSourceSelected(21, True)
+
+        self.assertIn(21, bridge.sourceIds)
+        self.assertIn(21, [item["sourceId"] for item in bridge.elevationSeries])
+
+    def test_empty_state_yields_no_fake_sources(self) -> None:
+        bridge = PreviewBridge()
+
+        bridge.setPreviewScenario("emptyState")
+
+        self.assertEqual(bridge.sourceRows, [])
+        self.assertEqual(bridge.sourceIds, [])
+        self.assertEqual(bridge.sourcePositions, [])
+        self.assertEqual(bridge.elevationSeries, [])
+        self.assertEqual(bridge.azimuthSeries, [])
 
     def test_toggle_remote_and_streams_only_changes_local_state(self) -> None:
         bridge = PreviewBridge()
@@ -116,6 +177,7 @@ class TestPreviewBridge(unittest.TestCase):
 
     def test_filter_state_updates_without_changing_preview_data(self) -> None:
         bridge = PreviewBridge()
+        original_rows = bridge.sourceRows
         original_positions = bridge.sourcePositions
         original_elevation = bridge.elevationSeries
         original_azimuth = bridge.azimuthSeries
@@ -128,6 +190,7 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(bridge.potentialsEnabled)
         self.assertEqual(bridge.potentialEnergyMin, 0.2)
         self.assertEqual(bridge.potentialEnergyMax, 0.8)
+        self.assertEqual(bridge.sourceRows, original_rows)
         self.assertEqual(bridge.sourcePositions, original_positions)
         self.assertEqual(bridge.elevationSeries, original_elevation)
         self.assertEqual(bridge.azimuthSeries, original_azimuth)
@@ -146,6 +209,8 @@ class TestAppBridgePreviewDefaults(unittest.TestCase):
         self.assertFalse(bridge.previewMode)
         self.assertEqual(bridge.previewScenarioKey, "")
         self.assertEqual(bridge.previewScenarioKeys, [])
+        self.assertEqual(bridge.previewScenarioOptions, [])
+        self.assertEqual(bridge.sourceRows, [])
         self.assertEqual(bridge.elevationSeries, [])
         self.assertEqual(bridge.azimuthSeries, [])
         bridge.setPreviewScenario("referenceSingle")

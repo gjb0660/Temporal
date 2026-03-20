@@ -6,6 +6,7 @@ Rectangle {
     id: root
 
     required property QtObject theme
+    required property QtObject appBridge
 
     Layout.preferredWidth: theme.leftPanelWidth
     Layout.fillHeight: true
@@ -68,9 +69,9 @@ Rectangle {
                                 TextArea {
                                     width: parent.width
                                     readOnly: true
-                                    wrapMode: TextArea.WrapAnywhere
+                                    wrapMode: TextArea.NoWrap
                                     selectByMouse: true
-                                    text: appBridge.remoteLogLines.join("\n")
+                                    text: root.appBridge.remoteLogLines.join("\n")
                                     color: "#24303a"
                                     font.family: "Consolas"
                                     font.pixelSize: theme.codeFont
@@ -120,7 +121,7 @@ Rectangle {
                                     readOnly: true
                                     wrapMode: TextArea.Wrap
                                     selectByMouse: true
-                                    text: appBridge.status
+                                    text: root.appBridge.status
                                     color: theme.mutedText
                                     font.pixelSize: theme.bodyFont
                                     padding: 0
@@ -135,18 +136,19 @@ Rectangle {
 
                             AppActionButton {
                                 theme: root.theme
-                                text: appBridge.odasStarting ? "启动中" : (appBridge.odasRunning ? "停止" : "启动")
-                                enabled: !appBridge.odasStarting
+                                text: root.appBridge.odasStarting
+                                    ? "启动中"
+                                    : (root.appBridge.odasRunning ? "停止" : "启动")
+                                enabled: !root.appBridge.odasStarting
                                 Layout.fillWidth: true
-                                onClicked: appBridge.toggleRemoteOdas()
+                                onClicked: root.appBridge.toggleRemoteOdas()
                             }
 
                             AppActionButton {
                                 theme: root.theme
-                                text: appBridge.streamsActive ? "停止监听" : "监听"
-                                enabled: appBridge.odasRunning || appBridge.streamsActive
+                                text: root.appBridge.streamsActive ? "停止监听" : "监听"
                                 Layout.fillWidth: true
-                                onClicked: appBridge.toggleStreams()
+                                onClicked: root.appBridge.toggleStreams()
                             }
                         }
                     }
