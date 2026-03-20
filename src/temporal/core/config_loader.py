@@ -17,8 +17,23 @@ class TemporalConfig:
 def _optional_string(value: object) -> str | None:
     if value is None:
         return None
-    text = str(value).strip()
+    if not isinstance(value, str):
+        raise ValueError("expected a string value")
+    text = value.strip()
     return text or None
+
+
+def _required_string(value: object, field_name: str, default: str) -> str:
+    if value is None:
+        text = default
+    else:
+        if not isinstance(value, str):
+            raise ValueError(f"{field_name} must be a string")
+        text = value
+    text = text.strip()
+    if not text:
+        raise ValueError(f"{field_name} must not be blank")
+    return text
 
 
 def _parse_odas_args(value: object) -> list[str]:
@@ -27,9 +42,14 @@ def _parse_odas_args(value: object) -> list[str]:
     if not isinstance(value, list):
         raise ValueError("odas.args must be an array of strings")
 
-    args = [str(item).strip() for item in value]
-    if any(not item for item in args):
-        raise ValueError("odas.args must not contain blank items")
+    args: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError("odas.args must be an array of strings")
+        text = item.strip()
+        if not text:
+            raise ValueError("odas.args must not contain blank items")
+        args.append(text)
     return args
 
 
@@ -50,10 +70,10 @@ def load_config(path: str | Path) -> TemporalConfig:
         port=int(remote_raw.get("port", 22)),
         username=_optional_string(remote_raw.get("username")),
         private_key=_optional_string(remote_raw.get("private_key")),
-        odas_command=str(odas_raw.get("command", "odaslive")).strip() or "odaslive",
+        odas_command=_required_string(odas_raw.get("command"), "odas.command", "odaslive"),
         odas_args=_parse_odas_args(odas_raw.get("args")),
         odas_cwd=_optional_string(odas_raw.get("cwd")),
-        odas_log=str(odas_raw.get("log", "odaslive.log")).strip() or "odaslive.log",
+        odas_log=_required_string(odas_raw.get("log"), "odas.log", "odaslive.log"),
     )
 
     host = remote.host

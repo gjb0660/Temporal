@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import posixpath
 import shlex
 import threading
 from dataclasses import dataclass
@@ -55,29 +56,41 @@ class RemoteOdasController:
         code = stdout.channel.recv_exit_status()
         return CommandResult(code=code, stdout=out, stderr=err)
 
+    def _wrap_in_cwd(self, shell_script: str) -> str:
+        if self._cfg.odas_cwd is None:
+            return shell_script
+        escaped_cwd = shlex.quote(self._cfg.odas_cwd)
+        return f"cd {escaped_cwd} || exit 1\n{shell_script}"
+
+    def _quoted_log_path(self) -> str:
+        return shlex.quote(self._cfg.odas_log)
+
+    def _quoted_command(self) -> str:
+        return " ".join(
+            [
+                shlex.quote(self._cfg.odas_command),
+                *[shlex.quote(arg) for arg in self._cfg.odas_args],
+            ]
+        )
+
+    def _quoted_process_name(self) -> str:
+        return shlex.quote(posixpath.basename(self._cfg.odas_command))
+
     def start_odaslive(self) -> CommandResult:
-        escaped_command = shlex.quote(self._cfg.odas_command)
-        escaped_args = " ".join(shlex.quote(arg) for arg in self._cfg.odas_args)
-        command = escaped_command
-        if escaped_args:
-            command = f"{command} {escaped_args}"
-        if self._cfg.odas_cwd is not None:
-            escaped_cwd = shlex.quote(self._cfg.odas_cwd)
-            command = f"cd {escaped_cwd} && {command}"
-        escaped_log = shlex.quote(self._cfg.odas_log)
-        shell_script = f"{command} >{escaped_log} 2>&1 < /dev/null & echo $!"
-        cmd = f"sh -lc {shlex.quote(shell_script)}"
+        escaped_log = self._quoted_log_path()
+        shell_script = f"{self._quoted_command()} >> {escaped_log} 2>&1 < /dev/null & echo $!"
+        cmd = f"sh -lc {shlex.quote(self._wrap_in_cwd(shell_script))}"
         return self._exec(cmd)
 
     def stop_odaslive(self) -> CommandResult:
-        return self._exec("pkill -f odaslive || true")
+        return self._exec(f"pkill -f {self._quoted_process_name()} || true")
 
     def status(self) -> CommandResult:
-        return self._exec("pgrep -af odaslive || true")
+        return self._exec(f"pgrep -af {self._quoted_process_name()} || true")
 
     def read_log_tail(self, lines: int = 80) -> CommandResult:
         safe_lines = max(1, min(lines, 200))
-        escaped_log = shlex.quote(self._cfg.odas_log)
+        escaped_log = self._quoted_log_path()
         shell_script = f"if [ -f {escaped_log} ]; then tail -n {safe_lines} {escaped_log}; fi"
-        cmd = f"sh -lc {shlex.quote(shell_script)}"
+        cmd = f"sh -lc {shlex.quote(self._wrap_in_cwd(shell_script))}"
         return self._exec(cmd)

@@ -8,6 +8,7 @@ from temporal.app import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.core.recording.auto_recorder import AutoRecorder
+from temporal.core.ssh.remote_odas import CommandResult
 
 
 class _FakeClock:
@@ -39,6 +40,15 @@ class _FakeRemoteOdasController:
     def connect(self) -> None:
         self.connected = True
 
+    def start_odaslive(self) -> CommandResult:
+        return CommandResult(code=0, stdout="123\n", stderr="")
+
+    def stop_odaslive(self) -> CommandResult:
+        return CommandResult(code=0, stdout="", stderr="")
+
+    def read_log_tail(self, _lines: int = 80) -> CommandResult:
+        return CommandResult(code=0, stdout="startup ok\nready\n", stderr="")
+
 
 def _fake_config() -> TemporalConfig:
     remote = RemoteOdasConfig(
@@ -46,6 +56,7 @@ def _fake_config() -> TemporalConfig:
         port=22,
         username="odas",
         private_key="~/.ssh/id_rsa",
+        odas_command="custom-odas-launcher",
         odas_args=["-c", "/opt/odas/config/odas.cfg", "-v"],
         odas_log="/tmp/odaslive.log",
     )
@@ -137,6 +148,20 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertTrue(any(name.endswith("_pf.wav") for name in names))
             for name in names:
                 self.assertRegex(name, r"^ODAS_3_\d{8}_\d{6}_\d{6}_(sp|pf)\.wav$")
+
+    def test_remote_log_poll_updates_lines(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            with (
+                patch("temporal.app.load_config", return_value=_fake_config()),
+                patch("temporal.app.OdasClient", _FakeOdasClient),
+                patch("temporal.app.RemoteOdasController", _FakeRemoteOdasController),
+                patch("temporal.app.AutoRecorder", return_value=recorder),
+            ):
+                bridge = AppBridge()
+                bridge._poll_remote_log()
+
+            self.assertEqual(bridge.remoteLogLines, ["startup ok", "ready"])
 
 
 if __name__ == "__main__":
