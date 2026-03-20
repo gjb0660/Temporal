@@ -80,6 +80,14 @@
 - Rule update: `specs/in-progress.md` only updated during handoff stage
   Spec: [phase-e-agent-governance.md](./plans/phase-e-agent-governance.md)
 
+- Rule update: governance language ownership deduplicated,
+  and historical handoff normalization started
+  Spec: [phase-e-agent-governance.md](./plans/phase-e-agent-governance.md)
+
+- Rule update: root-cause-first prompt aligned with
+  question-first exploration and no-assumption governance
+  Spec: [phase-e-agent-governance.md](./plans/phase-e-agent-governance.md)
+
 ## Session Lessons
 
 - In this uv project, run toolchain commands with `uv run`.
@@ -87,3 +95,6 @@
   fix findings, then format.
 - Keep implementation and corresponding tests in one atomic commit.
 - Preview workflows should use a dedicated application entrypoint.
+- Keep specs and handoff docs on English headings with concise Chinese body.
+- For root-cause repair prompts, clarify first and do not proceed on
+  unstated assumptions.
