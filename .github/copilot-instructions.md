@@ -72,7 +72,14 @@ Run these checks before commit:
   before commit.
 - Keep AI execution content under `specs/` and export human-facing
   manuals under `docs/`.
-- Write AI-facing docs and code comments in concise English imperative style.
-- Write human-facing docs and chat responses in concise Chinese technical style.
+- English scenario: keep `.github/**` instruction files,
+  `AGENTS.md`, code comments, and git commit messages in concise English;
+  allow English Markdown only for retained legacy files
+  or imported external reference material.
+- Chinese scenario: write new `specs/**/*.md`, `specs/handoffs/**/*.md`,
+  and `docs/**/*.md` with English headings and concise Chinese body text;
+  keep tables and explanatory comment examples in Chinese,
+  preserve stable technical terms in English,
+  and store Markdown files as UTF-8 without BOM and LF line endings.
 - Only use git add and git commit; never rewrite or delete git history.
 - Never modify or delete files outside the current workspace.

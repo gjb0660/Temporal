@@ -21,6 +21,18 @@
 - `specs/handoffs/`: session history and continuation notes.
 - `docs/`: exported manuals and delivery-facing documentation.
 
+## Document Contract
+
+- English scenario: keep `.github/**` instruction files,
+  `AGENTS.md`, code comments, and git commit messages in English;
+  allow English Markdown only for retained legacy files
+  or imported external reference material.
+- Chinese scenario: write newly created `specs/**/*.md` and `docs/**/*.md`
+  with English headings and Chinese body text;
+  keep tables and explanatory comment examples in Chinese,
+  preserve stable technical terms in English,
+  and store Markdown files as UTF-8 without BOM and LF line endings.
+
 ## Reading Principles
 
 - New feature startup: read `specs/in-progress.md` first
@@ -47,6 +59,8 @@
   - assumptions
   - validation performed
   - unresolved risks
+- Create new handoff documents with English headings and Chinese body text.
+- Gradually normalize historical handoff documents to Chinese.
 
 ## Decision Boundaries
 

@@ -34,36 +34,18 @@ and `specs/**` only when they define or repeat agent workflow rules.
 ## Procedure
 
 1. Read the active governance baseline.
-2. Check every required workflow contract.
+2. Check every required workflow contract in
+   [workflow-contracts](./references/workflow-contracts.md).
 3. Record findings by severity and file.
 4. Produce a minimal consolidation plan.
 5. Produce a validation checklist.
 
-## Workflow Contracts To Check
+## Audit Reference
 
-1. Python changes require lint -> fix -> format.
-2. QML changes require lint -> fix -> format.
-3. TDD must complete Red -> Green -> Refactor.
-4. Rule documents must stay terse and avoid repeated guidance.
-5. Agents must use `vscode_askQuestions` only at true blocking decisions.
-6. Agents must not require a pre-code approval step
-   for implementable tasks.
-7. Workflow must be Explore -> Spec -> Plan -> Code.
-8. `specs/index.md` is the static entry; `specs/in-progress.md`
-   is the dynamic routing and state board.
-9. New feature startup must check `specs/in-progress.md`
-   for duplicate demand.
-10. Code requires Definition and Execution unless the target feature
-    declares `Exception: small-change`.
-11. `small-change` relaxes Plan only; it does not waive Refactor.
-12. Code completion requires Red -> Green -> Refactor -> Commit.
-13. High-risk or test-driven behavior changes must run
-    the existing Review Agent before Code is considered complete.
-14. `docs/` is exported human-facing output,
-    not the AI execution source.
-15. Code is not complete until the commit is recorded in git.
-16. If risk classification is unclear, audit must treat the change
-    as high-risk by default.
+- Use [workflow-contracts](./references/workflow-contracts.md)
+  as the canonical audit checklist.
+- Keep the main SKILL focused on scope, process,
+  output structure, and constraints.
 
 ## Output Format
 

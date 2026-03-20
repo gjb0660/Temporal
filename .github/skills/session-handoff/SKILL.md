@@ -64,6 +64,9 @@ Typical triggers:
 - Use repository convention for handoff path and date naming.
 - Temporal default: `specs/handoffs/session-YYYY-MM-DD.md`.
 - Use [handoff template](./references/handoff-template.md).
+- Write new handoff documents with English headings
+  and concise Chinese technical body text.
+- Store handoff Markdown files as UTF-8 without BOM and LF line endings.
 - Include handoff contract fields when available
   (for example from AGENTS workflow):
   - changed files list
@@ -89,7 +92,7 @@ Typical triggers:
 ## Quality Checklist
 
 - Documentation is concise and audience-appropriate
-  (Temporal commonly uses concise Chinese for human-facing docs).
+  (Temporal handoff docs use English headings and concise Chinese body text).
 - Validation facts are consistent with actual git/test outputs.
 - Content does not conflict with active repository rules
   (for Temporal: `.github/copilot-instructions.md` and `AGENTS.md`).

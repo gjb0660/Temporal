@@ -56,6 +56,9 @@ Typical triggers:
   - review gate too conditional
   - static index points to the wrong live board
   - skill or handoff still names a retired file
+  - document language rules conflict across layers
+  - heading language and body language rules conflict
+  - UTF-8/LF policy is missing or unenforced
 - Check the current workspace state before editing.
 - Treat recent user edits as authoritative unless they directly conflict
   with the requested repair.
@@ -80,6 +83,8 @@ Edit only the files needed to fix the active bucket.
 - Put dynamic routing and live state in `specs/in-progress.md`.
 - Put audit checks in `.github/skills/rules-audit/SKILL.md`.
 - Put task-specific end-of-session procedure in the relevant skill.
+- Put document language and encoding policy in the governance layer,
+  plus repo config when enforcement is required.
 - If a rule points to a live file that does not exist,
   create the file or retarget the rule immediately.
 - Prefer imperative bullets over narrative paragraphs.
@@ -92,6 +97,10 @@ Edit only the files needed to fix the active bucket.
 - Confirm that newly referenced files actually exist in the workspace.
 - Confirm that the repaired rule is present in every required layer,
   but not duplicated into unrelated layers.
+- Confirm language-layer rules and UTF-8/LF policy do not conflict
+  across governance files and repo config.
+- Confirm heading-language rules, body-language rules,
+  and code-comment language rules remain aligned.
 - If the repair changes completion semantics,
   confirm the wording is explicit enough to audit mechanically.
 

@@ -1,35 +1,34 @@
 # Temporal Session Handoff (YYYY-MM-DD)
 
-This template can be adapted for other repositories
-by replacing project-specific sections.
+可按仓库实际情况调整下列章节。
 
 ## Scope Completed
 
-- TBD
+- 待补充
 
 ## Key Commits
 
-- `<hash>` commit summary
+- `<hash>` 提交摘要
 
 ## Validation Performed
 
-- TBD
+- 待补充
 
 ## Changed Files
 
-- TBD
+- 待补充
 
 ## Assumptions
 
-- TBD
+- 待补充
 
 ## Unresolved Risks
 
-- TBD
+- 待补充
 
 ## Next Session First Commands
 
-Use commands that match the repository toolchain. Temporal example:
+命令应与仓库工具链保持一致。Temporal 示例：
 
 1. `git status --short --untracked-files=all`
 2. `uv run ruff check src tests`
