@@ -23,15 +23,14 @@
 
 ## Document Contract
 
-- English scenario: keep `.github/**` instruction files,
-  `AGENTS.md`, code comments, and git commit messages in English;
-  allow English Markdown only for retained legacy files
-  or imported external reference material.
-- Chinese scenario: write newly created `specs/**/*.md` and `docs/**/*.md`
-  with English headings and Chinese body text;
-  keep tables and explanatory comment examples in Chinese,
-  preserve stable technical terms in English,
-  and store Markdown files as UTF-8 without BOM and LF line endings.
+- Write newly created `specs/**/*.md` with English headings and concise
+  Chinese body text.
+- Keep tables and explanatory comment examples in Chinese.
+- Preserve stable technical terms in English.
+- Read `.github/copilot-instructions.md` for docs-language rules and
+  historical docs handling.
+- Retained historical English spec material may remain temporarily and should
+  be tracked as audit statistics instead of standalone findings.
 
 ## Reading Principles
 
@@ -59,8 +58,10 @@
   - assumptions
   - validation performed
   - unresolved risks
-- Create new handoff documents with English headings and Chinese body text.
-- Gradually normalize historical handoff documents to Chinese.
+- Create new handoff documents under `specs/handoffs/` with English headings
+  and concise Chinese body text.
+- Historical handoff documents may drift temporarily and should be normalized
+  in scheduled batches instead of ad hoc rewrites.
 
 ## Decision Boundaries
 

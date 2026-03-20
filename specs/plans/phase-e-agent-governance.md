@@ -15,7 +15,7 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 - Define a push prompt for advancing work with
    spec update, test-first execution, and final commit discipline.
 - Define document language, encoding, and line-ending rules
-  for `specs/`, `docs/`, and historical handoff material.
+  with explicit ownership boundaries across governance files.
 
 ## Non-Goals
 
@@ -27,37 +27,26 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 
 1. Keep instruction files discoverable under .github hierarchy.
 2. Keep rule wording actionable and concise.
-3. Enforce Explore -> Spec -> Plan -> Code workflow.
-4. Require `vscode_askQuestions` only for true blocking decisions
-   or missing required inputs.
-5. Include constraints for non-destructive git operations.
-6. Do not require a pre-code approval step for implementable tasks.
-7. Keep `specs/index.md` as the static contract entry.
-8. Keep `specs/in-progress.md` as the dynamic routing and state source.
-9. Keep handoff contract only in `specs/index.md`.
-10. Define Code as `Red -> Green -> Refactor -> Commit`
-   after Spec and Plan entry conditions are satisfied.
-11. Use the existing Review Agent to evaluate Refactor quality
-   for high-risk or test-driven behavior changes.
-12. Treat code work as incomplete until the commit is recorded in git.
-13. Treat unclear risk classification as high-risk by default.
-14. Keep governance repair workflow under
+3. Keep `AGENTS.md` as the workflow authority for execution order,
+   code entry, code exit, and git-safety behavior.
+4. Keep `specs/index.md` as the static contract entry.
+5. Keep `specs/in-progress.md` as the dynamic routing and state source.
+6. Keep handoff contract only in `specs/index.md`.
+7. Keep governance repair workflow under
       `.github/skills/rules-governance/`.
-15. Keep governance audit workflow under
+8. Keep governance audit workflow under
       `.github/skills/rules-audit/` instead of prompt form.
-16. Keep next-step progression prompt under
+9. Keep next-step progression prompt under
    `.github/prompts/push.prompt.md`.
-17. English scenario: keep `.github/**` instruction files,
-    `AGENTS.md`, code comments, and git commit messages in English;
-    allow English Markdown only for retained legacy files
-    or imported external reference material.
-18. Chinese scenario: write newly created `specs/**/*.md`,
-    `specs/handoffs/**/*.md`, and `docs/**/*.md`
-    with English headings and Chinese body text;
-    keep tables and explanatory comment examples in Chinese,
-    preserve stable technical terms in English,
-    store Markdown files as UTF-8 without BOM and LF line endings,
-    and gradually normalize historical handoff documents to Chinese.
+10. Keep `specs/index.md` as the language contract for new
+   `specs/**/*.md` and `specs/handoffs/**/*.md` files.
+11. Keep `.github/copilot-instructions.md` as the language contract for new
+   `docs/**/*.md`, source code comments, git commit messages,
+   and repository encoding or line-ending policy.
+12. Treat retained English historical specs, docs, and handoffs as audit
+   observations or statistics instead of standalone findings.
+13. Normalize historical handoff language in scheduled batches,
+   not through incidental rewrites.
 
 ## Quality Requirements
 
@@ -76,5 +65,5 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 3. Review agent priorities cover regression and data-loss risks.
 4. Governance audit and repair workflows are discoverable as skills.
 5. Next-step progression workflow is discoverable as a prompt.
-6. Language and encoding rules distinguish the English scenario
-   from the Chinese scenario without ambiguity.
+6. Language and encoding rules are assigned to explicit governance owners
+   without ambiguity.

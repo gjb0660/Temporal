@@ -26,15 +26,19 @@ define or repeat agent workflow rules.
 15. Code is not complete until the commit is recorded in git.
 16. If risk classification is unclear, audit must treat the change
     as high-risk by default.
-17. English scenario: keep `.github/**` instruction files,
-    `AGENTS.md`, code comments, and git commit messages in English;
-    allow English Markdown only for retained legacy files
-    or imported external reference material.
-18. Chinese scenario: write newly created `specs/**/*.md`,
-    `specs/handoffs/**/*.md`, and `docs/**/*.md`
-    with English headings and Chinese body text;
-    keep tables and explanatory comment examples in Chinese,
-    preserve stable technical terms in English,
-    and store Markdown files as UTF-8 without BOM and LF line endings.
-19. Historical handoff documents must be governed
-    by an explicit Chinese-normalization plan.
+17. `.github/**` instruction files, `AGENTS.md`, source code comments,
+    and git commit messages must stay in English.
+18. New `docs/**/*.md` must use English headings and concise Chinese body
+    text; tables and explanatory comment examples stay in Chinese, and
+    stable technical terms may remain in English.
+19. New `specs/**/*.md` must use English headings and concise Chinese body
+    text; tables and explanatory comment examples stay in Chinese, and
+    stable technical terms may remain in English.
+20. New handoff documents under `specs/handoffs/` must follow the handoff
+    contract in `specs/index.md`, including required fields and the current
+    language convention.
+21. Repository text-file encoding and line-ending policy must be enforced
+    through repo config using UTF-8 without BOM and LF.
+22. Retained English historical specs, docs, or handoffs may be reported as
+    audit observations or statistics, but not as standalone findings unless
+    another repository rule is violated.
