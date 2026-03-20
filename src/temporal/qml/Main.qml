@@ -13,9 +13,6 @@ ApplicationWindow {
     title: "Temporal 实时数据"
     color: "#eef2f6"
     font.family: "Segoe UI"
-    property bool previewMode: false
-    property string previewScenarioKey: "referenceSingle"
-
     readonly property QtObject theme: QtObject {
         readonly property color pageBackground: "#eef2f6"
         readonly property color panelBackground: "#edf4ef"
@@ -59,7 +56,7 @@ ApplicationWindow {
     }
 
     function sourceRows() {
-        const ids = appBridge.sourceIds
+        const ids = Array.isArray(appBridge.sourceIds) ? appBridge.sourceIds : []
         const rows = []
         if (ids.length === 0) {
             for (let index = 0; index < 4; index += 1) {
@@ -111,8 +108,8 @@ ApplicationWindow {
             CenterPane {
                 theme: root.theme
                 sourcePositions: appBridge.sourcePositions
-                previewMode: root.previewMode
-                previewScenarioKey: root.previewScenarioKey
+                previewMode: appBridge.previewMode
+                previewScenarioKey: appBridge.previewScenarioKey
             }
 
             RightSidebar {

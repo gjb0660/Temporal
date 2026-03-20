@@ -9,17 +9,19 @@
 
 - 组织两张图表和一张 3D 声源位置视图。
 - 维护三个内容块的标题、间距和相对视觉权重。
-- 在开发期预览模式下，将同一组 fixture 同步提供给两张图表和 3D 视图。
+- 在预览模式下仅通过 `appBridge` 消费预览数据。
 
 ## Data Contract
 
 ### Inputs
 
 - `sourcePositions`
-- `theme.chartHeight`
-- `theme.sphereHeight`
 - `previewMode`
 - `previewScenarioKey`
+- `appBridge.elevationSeries`
+- `appBridge.azimuthSeries`
+- `theme.chartHeight`
+- `theme.sphereHeight`
 
 ### Rules
 
@@ -27,6 +29,7 @@
 - 下方声源位置区保持更强视觉权重，不能被压缩得过小。
 - `previewMode=true` 时，两张图表和 3D 视图必须消费同一组预览场景。
 - `previewMode=false` 时，3D 视图继续消费运行态 `sourcePositions`，图表保持占位/预览曲线。
+- 预览 fixture 数据不得保留在本地 QML JavaScript 中。
 
 ## Visual Requirements
 
@@ -37,12 +40,15 @@
 ## Interaction Requirements
 
 - 当窗口变窄时，图表与球体区域仍需保持标题、内容和边距可读。
-- 预览模式仅作为开发入口，不做用户可见开关。
+- 预览行为属于开发/测试模式，不是用户可见开关。
+- 中栏本身不持有场景切换状态。
+- `previewScenarioKey` 仅用于向 `SourceSphereView` 转发预览兜底行为。
 
 ## Technical Constraints
 
 - 图表绘制和 3D 渲染细节由子组件负责。
-- 预览场景至少包含：
+- 预览场景数据保留在 Python bridge 模块中。
+- 预览基线场景保持为：
   - `referenceSingle`
   - `hemisphereSpread`
   - `equatorBoundary`
@@ -50,16 +56,18 @@
 
 ## Non-Goals
 
-- 不在容器层实现后端数据采样和绘图算法。
-- 不在该层引入新的业务逻辑或协议绑定。
+- 不在该组件中实现预览声源行联动。
+- 不在该组件中实现预览能量过滤。
+- 不在本阶段补充正式环境的 SST 历史绘制。
 
 ## Acceptance Criteria
 
-1. 默认窗口下两张图表和球体区域的层级接近参考图。
-2. 球体区域在视觉上是中栏下半区主体。
-3. 预览模式切换场景后，两张图表和 3D 视图的数据同步变化。
+1. 默认窗口尺寸下，两张图表和 3D 球体维持既定的视觉层级。
+2. 预览模式下，图表和 3D 数据来自同一个活动预览场景。
+3. 运行模式下，即使没有实时历史数据，图表也保持稳定空态。
 
 ## Validation
 
 - `uv run pyside6-qmllint src/temporal/qml/CenterPane.qml`
-- 逐个切换预览场景并截图，检查图表与 3D 是否一致
+- 启动 `uv run temporal-preview`，确认中栏在不依赖本地 QML fixture 的前提
+  下渲染出预览图表和预览 3D 数据。

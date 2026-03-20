@@ -2,8 +2,8 @@
 
 ## Goal
 
-Promote preview mode from a local QML development switch into a standard
-application entrypoint exposed as `uv run temporal-preview`.
+Promote preview mode from a local QML switch into a standard application
+entrypoint exposed as `uv run temporal-preview`.
 
 ## Scope
 
@@ -12,6 +12,19 @@ application entrypoint exposed as `uv run temporal-preview`.
 - Keep preview and production entrypoints on the same `Main.qml`.
 - Define the minimum preview bridge API required by existing left, center, and
   right panels.
+
+## Implemented Shape
+
+- `pyproject.toml` exposes:
+  - `temporal = "temporal.main:main"`
+  - `temporal-preview = "temporal.preview_main:main"`
+- `src/temporal/app.py` exposes a shared `run_with_bridge()` startup helper.
+- `src/temporal/preview_main.py` launches `Main.qml` through
+  `run_with_bridge(PreviewBridge())`.
+- `src/temporal/preview_bridge.py` owns preview state and preview-safe control
+  behavior.
+- `src/temporal/preview_data.py` is the Python source of truth for preview
+  scenarios.
 
 ## Non-Goals
 
@@ -23,12 +36,12 @@ application entrypoint exposed as `uv run temporal-preview`.
 ## Functional Requirements
 
 1. `uv run temporal-preview` launches the existing main window layout without
-   requiring any manual QML edits.
+   requiring manual QML edits.
 2. Preview mode uses `PreviewBridge`, while `uv run temporal` continues to use
    `AppBridge`.
 3. Both bridges are exposed to QML as `appBridge`.
 4. `PreviewBridge` provides safe implementations for all QML methods and
-   properties already used by:
+   properties currently used by:
    - left sidebar controls and status text
    - center pane chart and 3D bindings
    - right sidebar source and filter controls
@@ -52,19 +65,26 @@ QML can bind the same interface in both entrypoints.
 - Keep `Main.qml` shared between preview and production.
 - Keep preview bridge behavior deterministic and local-only.
 - Do not require QML branching on different bridge object names.
+- Keep preview fixture data in Python rather than local QML JavaScript.
 
 ## Acceptance Criteria
 
 1. `uv run temporal-preview` launches the main UI successfully.
 2. `uv run temporal` behavior remains unchanged.
 3. No QML file edits are required to enter preview mode.
-4. Existing page sections can render using preview bridge data and no-op
-   controls without runtime errors.
+4. Existing page sections render using preview bridge data and no-op controls
+   without runtime errors.
+5. `CenterPane.qml` no longer imports a local preview fixture script.
 
 ## Validation Workflow
 
-1. Add the `temporal-preview` script entry.
-2. Launch `uv run temporal-preview`.
-3. Verify the page loads with the same layout shell as production.
-4. Verify left sidebar buttons and right sidebar controls no longer depend on
-   live backend connectivity in preview mode.
+- `uv run pyside6-qmllint src/temporal/qml/Main.qml`
+- `uv run pyside6-qmllint src/temporal/qml/CenterPane.qml`
+- `uv run pyside6-qmllint src/temporal/qml/RightSidebar.qml`
+- `uv run ruff check src tests`
+- `uv run python -m unittest discover -s tests -p "test_*.py" -v`
+- Launch `uv run temporal-preview` and verify:
+  - the main layout renders without editing QML
+  - center pane shows preview charts and 3D data
+  - right sidebar still shows placeholder source rows in this phase
+  - left sidebar actions only change local preview state

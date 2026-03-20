@@ -2,8 +2,9 @@
 
 ## Goal
 
-定义 `src/temporal/qml/Main.qml` 的页面级需求。
-该窗口是 Temporal 的实时数据主界面，需要统一承载菜单、品牌头部、底栏和三栏主内容区域，并在布局比例、视觉层级和可操作性上接近参考版 ODAS Studio。
+定义 `src/temporal/qml/Main.qml` 的主窗口需求。该窗口是实时数据应用的页面级外
+壳，负责组织布局、主题 token 和顶层组件组合，并通过 `appBridge` 统一接收业
+务状态。
 
 ## Component Responsibility
 
@@ -20,12 +21,15 @@
 - `appBridge.sourcePositions`
 - `appBridge.recordingSessions`
 - `appBridge.isSourceSelected(sourceId)`
+- `appBridge.previewMode`
+- `appBridge.previewScenarioKey`
 
 ### Rules
 
-- 页面本身不直接实现业务控制逻辑。
-- 当没有真实数据时，页面仍需显示稳定的占位内容。
-- 子组件统一从 `theme` 读取视觉参数。
+- 页面本身不直接实现后端业务逻辑。
+- 当没有真实声源数据时，页面仍需显示稳定占位内容。
+- 子组件统一通过 `theme` 获取视觉参数。
+- 预览状态由 `appBridge` 持有，而不是本地 QML 属性。
 
 ## Visual Requirements
 
@@ -48,19 +52,23 @@
 
 - QML 不能直接访问 SSH、socket 或文件系统。
 - 所有业务动作都通过 `appBridge` 进入后端。
+- 预览态向中栏的传递必须使用 `appBridge.previewMode` 和
+  `appBridge.previewScenarioKey`。
 
 ## Non-Goals
 
 - 不在主窗口组件内实现图表绘制细节。
 - 不在主窗口组件内实现声源球体的 3D 几何细节。
+- 不在本阶段于主窗口内实现预览场景切换控件。
 
 ## Acceptance Criteria
 
-1. 启动应用后可以稳定显示完整的主界面框架。
+1. 正式入口和预览入口都可以稳定显示完整的主界面框架。
 2. 默认尺寸下三栏比例与参考图接近。
-3. 在无数据场景下右栏和中栏仍有合理占位内容。
+3. 中栏通过 `appBridge` 接收预览状态，不再由本地 QML 持有预览开关。
 
 ## Validation
 
 - `uv run pyside6-qmllint src/temporal/qml/Main.qml`
 - `uv run temporal`
+- `uv run temporal-preview`

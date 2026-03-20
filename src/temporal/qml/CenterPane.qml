@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "CenterPanePreviewData.js" as PreviewData
 
 Rectangle {
     id: root
@@ -9,21 +8,12 @@ Rectangle {
     required property QtObject theme
     property var sourcePositions: []
     property bool previewMode: false
-    property string previewScenarioKey: "referenceSingle"
-
-    readonly property var previewCatalog: PreviewData.buildCatalog(theme)
-    readonly property var activePreview: previewCatalog[previewScenarioKey] || previewCatalog.referenceSingle
+    property string previewScenarioKey: ""
     readonly property var previewXTicks: ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
     readonly property var runtimeXTicks: ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600"]
-    readonly property var displayedSourcePositions: {
-        if (previewMode) {
-            return activePreview.sourcePositions
-        }
-        return Array.isArray(sourcePositions) ? sourcePositions : []
-    }
-    readonly property var displayedElevationSeries: previewMode ? activePreview.elevationSeries : []
-    readonly property var displayedAzimuthSeries: previewMode ? activePreview.azimuthSeries : []
-    readonly property var displayedSourceColors: previewMode ? activePreview.sourceColors : ({})
+    readonly property var displayedSourcePositions: Array.isArray(sourcePositions) ? sourcePositions : []
+    readonly property var displayedElevationSeries: previewMode ? appBridge.elevationSeries : []
+    readonly property var displayedAzimuthSeries: previewMode ? appBridge.azimuthSeries : []
     readonly property var displayedXTicks: previewMode ? previewXTicks : runtimeXTicks
 
     Layout.fillWidth: true
@@ -93,8 +83,8 @@ Rectangle {
         SourceSphereView {
             theme: root.theme
             sourcePositions: root.displayedSourcePositions
-            sourceColors: root.displayedSourceColors
-            previewScenarioKey: root.previewMode ? root.activePreview.key : ""
+            sourceColors: ({})
+            previewScenarioKey: root.previewMode ? root.previewScenarioKey : ""
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumHeight: theme.sphereHeight

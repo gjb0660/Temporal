@@ -43,6 +43,7 @@ class AppBridge(QObject):
     sourcesEnabledChanged = Signal()
     potentialsEnabledChanged = Signal()
     potentialRangeChanged = Signal()
+    previewStateChanged = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -155,6 +156,26 @@ class AppBridge(QObject):
     @Property(float, notify=potentialRangeChanged)  # type: ignore[reportCallIssue]
     def potentialEnergyMax(self) -> float:
         return self._potential_max
+
+    @Property(bool, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def previewMode(self) -> bool:
+        return False
+
+    @Property(str, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def previewScenarioKey(self) -> str:
+        return ""
+
+    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def previewScenarioKeys(self) -> list[str]:
+        return []
+
+    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def elevationSeries(self) -> list[dict]:
+        return []
+
+    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    def azimuthSeries(self) -> list[dict]:
+        return []
 
     @Slot(str)
     def setStatus(self, status: str) -> None:
@@ -727,11 +748,16 @@ class AppBridge(QObject):
             self.potentialCountChanged.emit()
 
 
-def run() -> int:
-    app = QGuiApplication(sys.argv)
-    engine = QQmlApplicationEngine()
+    @Slot(str)
+    def setPreviewScenario(self, _key: str) -> None:
+        return
 
-    bridge = AppBridge()
+
+def run_with_bridge(bridge: QObject) -> int:
+    app = QGuiApplication.instance()
+    if app is None:
+        app = QGuiApplication(sys.argv)
+    engine = QQmlApplicationEngine()
     engine.rootContext().setContextProperty("appBridge", bridge)
 
     qml_path = Path(__file__).resolve().parent / "qml" / "Main.qml"
@@ -741,3 +767,7 @@ def run() -> int:
         return 1
 
     return app.exec()
+
+
+def run() -> int:
+    return run_with_bridge(AppBridge())
