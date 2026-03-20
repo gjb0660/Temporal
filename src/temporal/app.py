@@ -24,9 +24,12 @@ from temporal.core.ssh.remote_odas import RemoteOdasController
 class AppBridge(QObject):
     _AUDIO_CHANNELS = 4
     _AUDIO_SAMPLE_WIDTH = 2
+    _STARTUP_VERIFY_INTERVAL_MS = 200
+    _STARTUP_VERIFY_ATTEMPTS = 11
 
     statusChanged = Signal()
     remoteConnectedChanged = Signal()
+    odasStartingChanged = Signal()
     odasRunningChanged = Signal()
     streamsActiveChanged = Signal()
     sourceItemsChanged = Signal()
@@ -65,12 +68,18 @@ class AppBridge(QObject):
         self._potential_min = 0.0
         self._potential_max = 1.0
         self._remote_connected = False
+        self._odas_starting = False
         self._odas_running = False
         self._streams_active = False
+        self._startup_attempts_remaining = 0
+        self._startup_failure_hint = ""
         self._recorder = AutoRecorder(self._root / "recordings")
         self._log_timer = QTimer(self)
         self._log_timer.setInterval(1500)
         self._log_timer.timeout.connect(self._poll_remote_log)
+        self._startup_timer = QTimer(self)
+        self._startup_timer.setInterval(self._STARTUP_VERIFY_INTERVAL_MS)
+        self._startup_timer.timeout.connect(self._verify_odas_startup)
         self._client = OdasClient(
             config=self._cfg.streams,
             on_sst=self._on_sst,
@@ -86,6 +95,10 @@ class AppBridge(QObject):
     @Property(bool, notify=remoteConnectedChanged)  # type: ignore[reportCallIssue]
     def remoteConnected(self) -> bool:
         return self._remote_connected
+
+    @Property(bool, notify=odasStartingChanged)  # type: ignore[reportCallIssue]
+    def odasStarting(self) -> bool:
+        return self._odas_starting
 
     @Property(bool, notify=odasRunningChanged)  # type: ignore[reportCallIssue]
     def odasRunning(self) -> bool:
@@ -155,6 +168,7 @@ class AppBridge(QObject):
         try:
             self._remote.connect()
         except Exception as exc:
+            self._cancel_odas_startup()
             self._set_remote_connected(False)
             self._set_odas_running(False)
             self.setStatus(f"SSH 连接失败: {exc}")
@@ -177,19 +191,31 @@ class AppBridge(QObject):
             self.setStatus("请先连接远程 SSH")
             return
 
+        if self._odas_starting:
+            self.setStatus("远程 odaslive 启动中")
+            return
+
         try:
             result = self._remote.start_odaslive()
         except Exception as exc:
+            self._cancel_odas_startup()
+            self._set_odas_running(False)
             self.setStatus(f"启动失败: {exc}")
             return
 
-        if result.code == 0:
-            self._set_odas_running(True)
-            self.setStatus("远程 odaslive 已启动")
-        else:
-            self._sync_remote_odas_state()
-            self.setStatus(result.stderr.strip() or "远程 odaslive 启动失败")
         self._poll_remote_log()
+        if result.code != 0:
+            self._cancel_odas_startup()
+            self._set_odas_running(False)
+            self._set_startup_failure_status(self._pick_startup_failure_reason(result))
+            return
+
+        self._startup_failure_hint = result.stderr.strip() or result.stdout.strip()
+        self._startup_attempts_remaining = self._STARTUP_VERIFY_ATTEMPTS
+        self._set_odas_running(False)
+        self._set_odas_starting(True)
+        self.setStatus("远程 odaslive 启动中")
+        self._verify_odas_startup()
 
     @Slot()
     def stopRemoteOdas(self) -> None:
@@ -203,6 +229,7 @@ class AppBridge(QObject):
             self.setStatus(f"停止失败: {exc}")
             return
 
+        self._cancel_odas_startup()
         if result.code == 0:
             self._set_odas_running(False)
             self.setStatus("远程 odaslive 已停止")
@@ -213,6 +240,9 @@ class AppBridge(QObject):
 
     @Slot()
     def toggleRemoteOdas(self) -> None:
+        if self._odas_starting:
+            self.setStatus("远程 odaslive 启动中")
+            return
         if self._odas_running:
             if self._streams_active:
                 self.stopStreams()
@@ -413,6 +443,12 @@ class AppBridge(QObject):
         self._odas_running = running
         self.odasRunningChanged.emit()
 
+    def _set_odas_starting(self, starting: bool) -> None:
+        if self._odas_starting == starting:
+            return
+        self._odas_starting = starting
+        self.odasStartingChanged.emit()
+
     def _set_streams_active(self, active: bool) -> None:
         if self._streams_active == active:
             return
@@ -432,18 +468,98 @@ class AppBridge(QObject):
         self._remote_log_lines = clean_lines
         self.remoteLogLinesChanged.emit()
 
-    def _sync_remote_odas_state(self) -> None:
+    def _sync_remote_odas_state(self, update_status: bool = False) -> None:
+        previous_running = self._odas_running
         if not self._remote_connected:
+            self._set_odas_starting(False)
             self._set_odas_running(False)
             return
 
         try:
             result = self._remote.status()
         except Exception:
+            self._set_odas_starting(False)
             self._set_odas_running(False)
             return
 
-        self._set_odas_running(bool(result.stdout.strip()))
+        running = bool(result.stdout.strip())
+        self._set_odas_starting(False)
+        self._set_odas_running(running)
+        if not update_status or previous_running == running:
+            return
+        if running:
+            self.setStatus("SSH 已连接，远程 odaslive 运行中")
+            return
+        self.setStatus("SSH 已连接，远程 odaslive 未运行")
+
+    def _cancel_odas_startup(self) -> None:
+        if self._startup_timer.isActive():
+            self._startup_timer.stop()
+        self._startup_attempts_remaining = 0
+        self._startup_failure_hint = ""
+        self._set_odas_starting(False)
+
+    def _latest_remote_log_reason(self) -> str:
+        for line in reversed(self._remote_log_lines):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("等待连接远程 odaslive"):
+                continue
+            if stripped.startswith("远程日志为空"):
+                continue
+            return stripped
+        return ""
+
+    def _pick_startup_failure_reason(self, result: object | None = None) -> str:
+        log_reason = self._latest_remote_log_reason()
+        if log_reason:
+            return log_reason
+        if result is not None:
+            stderr = getattr(result, "stderr", "")
+            stdout = getattr(result, "stdout", "")
+            message = stderr.strip() or stdout.strip()
+            if message:
+                return message
+        if self._startup_failure_hint:
+            return self._startup_failure_hint
+        return "远程 odaslive 启动失败"
+
+    def _set_startup_failure_status(self, reason: str) -> None:
+        if reason.startswith("启动失败"):
+            self.setStatus(reason)
+            return
+        self.setStatus(f"启动失败: {reason}")
+
+    def _verify_odas_startup(self) -> None:
+        if not self._odas_starting:
+            return
+
+        try:
+            result = self._remote.status()
+        except Exception as exc:
+            self._cancel_odas_startup()
+            self._set_odas_running(False)
+            self.setStatus(f"启动失败: {exc}")
+            return
+
+        if result.stdout.strip():
+            self._cancel_odas_startup()
+            self._set_odas_running(True)
+            self.setStatus("远程 odaslive 已启动")
+            return
+
+        self._startup_attempts_remaining -= 1
+        self._poll_remote_log()
+        if self._startup_attempts_remaining <= 0:
+            reason = self._pick_startup_failure_reason()
+            self._cancel_odas_startup()
+            self._set_odas_running(False)
+            self._set_startup_failure_status(reason)
+            return
+
+        if not self._startup_timer.isActive():
+            self._startup_timer.start()
 
     def _poll_remote_log(self) -> None:
         try:
@@ -451,6 +567,7 @@ class AppBridge(QObject):
         except Exception as exc:
             message = str(exc)
             if "SSH is not connected" in message:
+                self._cancel_odas_startup()
                 self._set_remote_connected(False)
                 self._set_odas_running(False)
                 if self._log_timer.isActive():
@@ -462,13 +579,15 @@ class AppBridge(QObject):
 
         if result.code != 0 and result.stderr.strip():
             self._set_remote_log_lines([f"日志读取失败: {result.stderr.strip()}"])
-            return
+        else:
+            lines = [line for line in result.stdout.splitlines() if line.strip()]
+            if not lines:
+                self._set_remote_log_lines(["远程日志为空，等待 odaslive 输出..."])
+            else:
+                self._set_remote_log_lines(lines)
 
-        lines = [line for line in result.stdout.splitlines() if line.strip()]
-        if not lines:
-            self._set_remote_log_lines(["远程日志为空，等待 odaslive 输出..."])
-            return
-        self._set_remote_log_lines(lines)
+        if self._remote_connected and not self._odas_starting:
+            self._sync_remote_odas_state(update_status=True)
 
     def _set_recording_sessions(self, sessions: list[str]) -> None:
         if self._recording_sessions == sessions:

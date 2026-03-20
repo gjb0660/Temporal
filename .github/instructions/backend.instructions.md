@@ -9,6 +9,8 @@ applyTo: "src/temporal/{core/**,app.py,main.py}"
 - For touched Python files, run `uv run ruff check` first,
   fix findings, then run `uv run ruff format`.
 - SSH controller must expose connect/start/stop/status with explicit errors.
+- Single-instance remote process control must not use name matching as instance identity;
+  use explicit control state such as a pid file and verify the real process.
 - JSON TCP parser must tolerate chunk boundaries and junk lines.
 - Audio consumers must avoid blocking socket threads.
 - Prefer pure functions for message normalization to ease testing.

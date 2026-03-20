@@ -135,7 +135,8 @@ Rectangle {
 
                             AppActionButton {
                                 theme: root.theme
-                                text: appBridge.odasRunning ? "停止" : "启动"
+                                text: appBridge.odasStarting ? "启动中" : (appBridge.odasRunning ? "停止" : "启动")
+                                enabled: !appBridge.odasStarting
                                 Layout.fillWidth: true
                                 onClicked: appBridge.toggleRemoteOdas()
                             }

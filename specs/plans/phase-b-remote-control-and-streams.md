@@ -34,6 +34,8 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 - `odas.cwd` is optional working directory.
 - `odas.log` is the runtime log path; default is `odaslive.log`.
 - Relative `odas.log` resolves under `odas.cwd` when `odas.cwd` is set.
+- Derive the control pid path from `odas.log`:
+  replace the last extension with `.pid`, or append `.pid` when no extension exists.
 - Remove legacy key compatibility; do not read deprecated fields.
 
 ## SSH Semantics
@@ -41,10 +43,25 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 - Call `paramiko.SSHClient.connect` once and pass optional credentials as `None`.
 - Start odaslive in background without `nohup`.
 - Apply `odas.cwd` before start, stop, status, and log read when configured.
-- Start appends runtime output to `odas.log`.
-- Status uses `pgrep -af` against the executable name derived from `odas.command`.
-- Stop uses `pkill -f` against the executable name derived from `odas.command`.
+- Start appends runtime output to `odas.log`
+  and writes the spawned pid into the derived pid file.
+- Treat one config target as one derived pid file and one controlled instance.
+- Status reads only the derived pid file and validates:
+  pid file exists, pid is numeric, `kill -0` succeeds,
+  `/proc/<pid>/cmdline` exactly matches `odas.command + odas.args`,
+  and `/proc/<pid>/cwd` exactly matches `odas.cwd` when configured.
+- Stop targets only the pid recorded in the derived pid file.
 - Read log tail from `odas.log` path.
+- Treat validated process existence as the only source of truth
+  for "odaslive has started".
+- Do not treat `start_odaslive()` exit code alone as proof that odaslive is running.
+- Verify startup by polling `status()` every 200 ms for up to 2 seconds.
+- Expose three UI lifecycle states: stopped, starting, running.
+- Adopt a remote instance after connect only when the same derived pid file is valid.
+- Treat a same-name process without the derived pid file as "not running".
+- Automatically delete stale or invalid pid files and treat them as "not running".
+- Prefer the latest non-empty remote log line as the startup failure reason.
+- Fall back to start command stderr or stdout when the log does not explain the failure.
 
 ## Quality Requirements
 
@@ -59,4 +76,7 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 4. Config loader maps `odas.command`, `odas.args`, `odas.cwd`,
     and `odas.log` to backend model.
 5. SSH start command supports optional working directory and does not use `nohup`.
-6. SSH status and stop use `pgrep/pkill` with the configured executable name.
+6. SSH status and stop use the derived pid file and process identity validation.
+7. Left-panel status says "starting" until process existence is verified.
+8. Left-panel status never says "started" when odaslive failed to stay running.
+9. Connection adopts only instances backed by the derived pid file.
