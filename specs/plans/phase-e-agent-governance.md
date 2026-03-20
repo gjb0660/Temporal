@@ -14,6 +14,9 @@ Codify stable Copilot collaboration rules for Temporal delivery.
    for repeatable rule maintenance.
 - Define a push prompt for advancing work with
    spec update, test-first execution, and final commit discipline.
+- Define a root-cause-fix prompt for first-principles repair,
+   exploration-stage clarification, spec update, closed-loop testing,
+   and explicit rejection of symptom-only patches.
 - Define document language, encoding, and line-ending rules
   with explicit ownership boundaries across governance files.
 
@@ -38,14 +41,16 @@ Codify stable Copilot collaboration rules for Temporal delivery.
       `.github/skills/rules-audit/` instead of prompt form.
 9. Keep next-step progression prompt under
    `.github/prompts/push.prompt.md`.
-10. Keep `specs/index.md` as the language contract for new
+10. Keep root-cause-first repair prompt under
+   `.github/prompts/root-cause-fix.prompt.md`.
+11. Keep `specs/index.md` as the language contract for new
    `specs/**/*.md` and `specs/handoffs/**/*.md` files.
-11. Keep `.github/copilot-instructions.md` as the language contract for new
+12. Keep `.github/copilot-instructions.md` as the language contract for new
    `docs/**/*.md`, source code comments, git commit messages,
    and repository encoding or line-ending policy.
-12. Treat retained English historical specs, docs, and handoffs as audit
+13. Treat retained English historical specs, docs, and handoffs as audit
    observations or statistics instead of standalone findings.
-13. Normalize historical handoff language in scheduled batches,
+14. Normalize historical handoff language in scheduled batches,
    not through incidental rewrites.
 
 ## Quality Requirements
@@ -65,5 +70,6 @@ Codify stable Copilot collaboration rules for Temporal delivery.
 3. Review agent priorities cover regression and data-loss risks.
 4. Governance audit and repair workflows are discoverable as skills.
 5. Next-step progression workflow is discoverable as a prompt.
-6. Language and encoding rules are assigned to explicit governance owners
+6. Root-cause-first repair workflow is discoverable as a prompt.
+7. Language and encoding rules are assigned to explicit governance owners
    without ambiguity.
