@@ -62,6 +62,11 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 - Automatically delete stale or invalid pid files and treat them as "not running".
 - Prefer the latest non-empty remote log line as the startup failure reason.
 - Fall back to start command stderr or stdout when the log does not explain the failure.
+- Wrap remote log panel lines in the UI instead of forcing horizontal scrolling.
+- Filter raw startup failure details into a short human-readable reason
+  before showing them in the status panel.
+- Keep the raw log text in the log panel for diagnosis; only the status panel
+  uses the filtered reason.
 
 ## Quality Requirements
 
@@ -80,3 +85,6 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 7. Left-panel status says "starting" until process existence is verified.
 8. Left-panel status never says "started" when odaslive failed to stay running.
 9. Connection adopts only instances backed by the derived pid file.
+10. Remote log text wraps in the left log panel.
+11. The left status panel shows a filtered human-readable failure reason
+    instead of raw shell paths and traces.

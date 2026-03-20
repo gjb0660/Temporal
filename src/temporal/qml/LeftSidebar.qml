@@ -68,7 +68,7 @@ Rectangle {
                                 TextArea {
                                     width: parent.width
                                     readOnly: true
-                                    wrapMode: TextArea.NoWrap
+                                    wrapMode: TextArea.WrapAnywhere
                                     selectByMouse: true
                                     text: appBridge.remoteLogLines.join("\n")
                                     color: "#24303a"

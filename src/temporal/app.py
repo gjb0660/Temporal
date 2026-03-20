@@ -525,11 +525,38 @@ class AppBridge(QObject):
             return self._startup_failure_hint
         return "远程 odaslive 启动失败"
 
+    def _humanize_startup_failure_reason(self, reason: str) -> str:
+        normalized = reason.strip()
+        lower = normalized.lower()
+
+        if normalized.startswith("日志读取失败"):
+            if "cd:" in lower and "no such file or directory" in lower:
+                return "远程工作目录不存在或不可访问"
+            if "permission denied" in lower:
+                return "远程日志路径不可读或不可写"
+            return "远程日志读取失败"
+        if "command not found" in lower:
+            return "远程命令不存在或未安装"
+        if "permission denied" in lower:
+            return "远程命令或目录权限不足"
+        if "no such file or directory" in lower:
+            return "远程文件或目录不存在"
+        if "not connected" in lower:
+            return "远程 SSH 连接已断开"
+        if "timed out" in lower:
+            return "远程连接超时"
+        if normalized.startswith("启动失败:"):
+            remainder = normalized.split(":", 1)[1].strip()
+            if remainder:
+                return self._humanize_startup_failure_reason(remainder)
+        return normalized
+
     def _set_startup_failure_status(self, reason: str) -> None:
-        if reason.startswith("启动失败"):
-            self.setStatus(reason)
+        humanized = self._humanize_startup_failure_reason(reason)
+        if humanized.startswith("启动失败"):
+            self.setStatus(humanized)
             return
-        self.setStatus(f"启动失败: {reason}")
+        self.setStatus(f"启动失败: {humanized}")
 
     def _verify_odas_startup(self) -> None:
         if not self._odas_starting:

@@ -189,7 +189,26 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertFalse(bridge.odasStarting)
             self.assertFalse(bridge.odasRunning)
-            self.assertIn("command not found", bridge._status)
+            self.assertEqual(bridge._status, "启动失败: 远程命令不存在或未安装")
+
+    def test_start_failure_filters_log_read_error_into_human_reason(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.log_output = (
+                "日志读取失败: /home/garrett/.profile.d/02-function.sh: "
+                "line 18: cd: ~/workspace/ODAS/odas: No such file or directory\n"
+            )
+
+            bridge.startRemoteOdas()
+            self._drain_startup(bridge)
+
+            self.assertFalse(bridge.odasStarting)
+            self.assertFalse(bridge.odasRunning)
+            self.assertEqual(bridge._status, "启动失败: 远程工作目录不存在或不可访问")
 
     def test_start_transitions_from_starting_to_running_after_pid_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -224,7 +243,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertFalse(bridge.odasStarting)
             self.assertFalse(bridge.odasRunning)
-            self.assertIn("permission denied", bridge._status)
+            self.assertEqual(bridge._status, "启动失败: 远程命令或目录权限不足")
 
     def test_repeated_start_click_is_ignored_while_starting(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
