@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# pyright: reportMissingImports=false
+
 from dataclasses import dataclass
 from pathlib import Path
 

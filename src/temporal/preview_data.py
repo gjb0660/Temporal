@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from math import cos, pi, sin
 from typing import Any
 
 
@@ -12,150 +13,193 @@ PREVIEW_SCENARIO_KEYS = (
     "emptyState",
 )
 
+_DEFAULT_SAMPLE_WINDOW = {
+    "sampleStart": 1512,
+    "sampleStep": 16,
+    "windowSize": 10,
+    "tickCount": 10,
+    "tickStride": 1,
+    "advancePerTick": 2,
+    "timerIntervalMs": 400,
+}
+
+
+def _normalize_vector(x: float, y: float, z: float) -> tuple[float, float, float]:
+    length = max(0.0001, (x * x + y * y + z * z) ** 0.5)
+    return (x / length, y / length, z / length)
+
+
+def _build_tracking_frames(
+    anchors: list[dict[str, Any]],
+    phase_offsets: dict[int, float],
+    sample_window: dict[str, int],
+) -> list[dict[str, Any]]:
+    frame_count = max(24, sample_window["windowSize"] * 2)
+    frames: list[dict[str, Any]] = []
+
+    for frame_index in range(frame_count):
+        ratio = frame_index / frame_count
+        sample = sample_window["sampleStart"] + frame_index * sample_window["sampleStep"]
+        sources: list[dict[str, Any]] = []
+
+        for anchor in anchors:
+            source_id = int(anchor["id"])
+            phase = phase_offsets.get(source_id, 0.0)
+            theta = 2 * pi * ratio + phase
+            wobble = float(anchor.get("motionScale", 0.0))
+
+            x, y, z = _normalize_vector(
+                float(anchor["anchorX"]) + wobble * cos(theta),
+                float(anchor["anchorY"]) + wobble * 0.55 * sin(theta * 0.75 + phase * 0.25),
+                float(anchor["anchorZ"]) + wobble * sin(theta),
+            )
+            sources.append({"id": source_id, "x": x, "y": y, "z": z})
+
+        frames.append({"sample": sample, "sources": sources})
+
+    return frames
+
+
+def _scenario_entry(
+    key: str,
+    display_name: str,
+    remote_log_lines: list[str],
+    anchors: list[dict[str, Any]],
+    phase_offsets: dict[int, float],
+) -> dict[str, Any]:
+    sample_window = dict(_DEFAULT_SAMPLE_WINDOW)
+    return {
+        "key": key,
+        "displayName": display_name,
+        "status": "Temporal 就绪",
+        "remoteLogLines": list(remote_log_lines),
+        "sampleWindow": sample_window,
+        "sources": [
+            {
+                "id": int(anchor["id"]),
+                "color": str(anchor["color"]),
+                "energy": float(anchor["energy"]),
+            }
+            for anchor in anchors
+        ],
+        "trackingFrames": _build_tracking_frames(anchors, phase_offsets, sample_window),
+    }
+
+
 _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
-    "referenceSingle": {
-        "key": "referenceSingle",
-        "displayName": "参考单点",
-        "status": "Temporal 就绪",
-        "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：参考单点"],
-        "sources": [
-            {"id": 15, "color": "#cf54ea", "x": -0.42, "y": 0.18, "z": 0.64, "energy": 0.88},
-        ],
-        "elevationSeries": [
+    "referenceSingle": _scenario_entry(
+        key="referenceSingle",
+        display_name="参考单点",
+        remote_log_lines=["等待连接远程 odaslive...", "当前场景：参考单点"],
+        anchors=[
             {
-                "sourceId": 15,
+                "id": 15,
                 "color": "#cf54ea",
-                "values": [0.40, 0.44, 0.49, 0.54, 0.58, 0.60, 0.61, 0.60, 0.59, 0.58],
-            },
+                "energy": 0.88,
+                "anchorX": -0.42,
+                "anchorY": 0.18,
+                "anchorZ": 0.64,
+                "motionScale": 0.11,
+            }
         ],
-        "azimuthSeries": [
+        phase_offsets={15: 0.2},
+    ),
+    "hemisphereSpread": _scenario_entry(
+        key="hemisphereSpread",
+        display_name="半球分布",
+        remote_log_lines=["等待连接远程 odaslive...", "当前场景：半球分布"],
+        anchors=[
             {
-                "sourceId": 15,
-                "color": "#cf54ea",
-                "values": [0.88, 0.88, 0.87, 0.86, 0.85, 0.84, 0.82, 0.81, 0.82, 0.83],
-            },
-        ],
-    },
-    "hemisphereSpread": {
-        "key": "hemisphereSpread",
-        "displayName": "半球分布",
-        "status": "Temporal 就绪",
-        "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：半球分布"],
-        "sources": [
-            {"id": 7, "color": "#4dc6d8", "x": -0.56, "y": 0.28, "z": 0.58, "energy": 0.76},
-            {"id": 15, "color": "#cf54ea", "x": 0.46, "y": 0.18, "z": 0.62, "energy": 0.88},
-            {"id": 21, "color": "#5ac97c", "x": -0.18, "y": -0.42, "z": -0.50, "energy": 0.42},
-            {"id": 31, "color": "#6a88ff", "x": 0.54, "y": -0.36, "z": 0.10, "energy": 0.61},
-        ],
-        "elevationSeries": [
-            {
-                "sourceId": 7,
+                "id": 7,
                 "color": "#4dc6d8",
-                "values": [0.56, 0.57, 0.57, 0.56, 0.55, 0.54, 0.54, 0.54, 0.53, 0.53],
+                "energy": 0.76,
+                "anchorX": -0.56,
+                "anchorY": 0.28,
+                "anchorZ": 0.58,
+                "motionScale": 0.09,
             },
             {
-                "sourceId": 15,
+                "id": 15,
                 "color": "#cf54ea",
-                "values": [0.34, 0.36, 0.40, 0.45, 0.50, 0.55, 0.57, 0.58, 0.59, 0.60],
+                "energy": 0.88,
+                "anchorX": 0.46,
+                "anchorY": 0.18,
+                "anchorZ": 0.62,
+                "motionScale": 0.12,
             },
             {
-                "sourceId": 21,
+                "id": 21,
                 "color": "#5ac97c",
-                "values": [0.18, 0.17, 0.16, 0.14, 0.13, 0.11, 0.10, 0.10, 0.09, 0.08],
+                "energy": 0.42,
+                "anchorX": -0.18,
+                "anchorY": -0.42,
+                "anchorZ": -0.50,
+                "motionScale": 0.08,
             },
             {
-                "sourceId": 31,
+                "id": 31,
                 "color": "#6a88ff",
-                "values": [0.48, 0.47, 0.46, 0.44, 0.42, 0.41, 0.39, 0.38, 0.37, 0.36],
+                "energy": 0.61,
+                "anchorX": 0.54,
+                "anchorY": -0.36,
+                "anchorZ": 0.10,
+                "motionScale": 0.10,
             },
         ],
-        "azimuthSeries": [
+        phase_offsets={7: 0.1, 15: 1.2, 21: 2.4, 31: 3.0},
+    ),
+    "equatorBoundary": _scenario_entry(
+        key="equatorBoundary",
+        display_name="赤道边界",
+        remote_log_lines=["等待连接远程 odaslive...", "当前场景：赤道边界"],
+        anchors=[
             {
-                "sourceId": 7,
-                "color": "#4dc6d8",
-                "values": [0.12, 0.12, 0.13, 0.14, 0.14, 0.14, 0.15, 0.15, 0.15, 0.16],
-            },
-            {
-                "sourceId": 15,
-                "color": "#cf54ea",
-                "values": [0.84, 0.84, 0.83, 0.82, 0.81, 0.80, 0.79, 0.78, 0.78, 0.77],
-            },
-            {
-                "sourceId": 21,
-                "color": "#5ac97c",
-                "values": [0.62, 0.61, 0.60, 0.58, 0.57, 0.55, 0.54, 0.53, 0.52, 0.50],
-            },
-            {
-                "sourceId": 31,
-                "color": "#6a88ff",
-                "values": [0.34, 0.35, 0.37, 0.39, 0.41, 0.42, 0.43, 0.44, 0.45, 0.46],
-            },
-        ],
-    },
-    "equatorBoundary": {
-        "key": "equatorBoundary",
-        "displayName": "赤道边界",
-        "status": "Temporal 就绪",
-        "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：赤道边界"],
-        "sources": [
-            {"id": 12, "color": "#ff9c47", "x": 0.98, "y": 0.00, "z": 0.02, "energy": 0.74},
-            {"id": 15, "color": "#cf54ea", "x": -0.96, "y": 0.02, "z": -0.01, "energy": 0.82},
-            {"id": 27, "color": "#f16f7d", "x": 0.02, "y": 0.00, "z": 0.98, "energy": 0.67},
-            {"id": 31, "color": "#6a88ff", "x": 0.04, "y": -0.02, "z": -0.96, "energy": 0.59},
-        ],
-        "elevationSeries": [
-            {
-                "sourceId": 12,
+                "id": 12,
                 "color": "#ff9c47",
-                "values": [0.51, 0.50, 0.50, 0.49, 0.49, 0.48, 0.48, 0.48, 0.47, 0.47],
+                "energy": 0.74,
+                "anchorX": 0.98,
+                "anchorY": 0.00,
+                "anchorZ": 0.02,
+                "motionScale": 0.05,
             },
             {
-                "sourceId": 15,
+                "id": 15,
                 "color": "#cf54ea",
-                "values": [0.49, 0.49, 0.50, 0.50, 0.51, 0.51, 0.52, 0.52, 0.53, 0.53],
+                "energy": 0.82,
+                "anchorX": -0.96,
+                "anchorY": 0.02,
+                "anchorZ": -0.01,
+                "motionScale": 0.05,
             },
             {
-                "sourceId": 27,
+                "id": 27,
                 "color": "#f16f7d",
-                "values": [0.83, 0.84, 0.85, 0.86, 0.87, 0.88, 0.89, 0.89, 0.90, 0.90],
+                "energy": 0.67,
+                "anchorX": 0.02,
+                "anchorY": 0.00,
+                "anchorZ": 0.98,
+                "motionScale": 0.04,
             },
             {
-                "sourceId": 31,
+                "id": 31,
                 "color": "#6a88ff",
-                "values": [0.17, 0.16, 0.16, 0.15, 0.14, 0.14, 0.13, 0.12, 0.11, 0.10],
+                "energy": 0.59,
+                "anchorX": 0.04,
+                "anchorY": -0.02,
+                "anchorZ": -0.96,
+                "motionScale": 0.04,
             },
         ],
-        "azimuthSeries": [
-            {
-                "sourceId": 12,
-                "color": "#ff9c47",
-                "values": [0.51, 0.52, 0.52, 0.53, 0.53, 0.54, 0.54, 0.55, 0.55, 0.56],
-            },
-            {
-                "sourceId": 15,
-                "color": "#cf54ea",
-                "values": [0.49, 0.48, 0.48, 0.47, 0.47, 0.46, 0.46, 0.45, 0.45, 0.44],
-            },
-            {
-                "sourceId": 27,
-                "color": "#f16f7d",
-                "values": [0.74, 0.74, 0.74, 0.75, 0.75, 0.76, 0.76, 0.77, 0.77, 0.78],
-            },
-            {
-                "sourceId": 31,
-                "color": "#6a88ff",
-                "values": [0.24, 0.24, 0.23, 0.23, 0.22, 0.22, 0.21, 0.21, 0.20, 0.20],
-            },
-        ],
-    },
+        phase_offsets={12: 0.5, 15: 1.8, 27: 2.2, 31: 3.4},
+    ),
     "emptyState": {
         "key": "emptyState",
         "displayName": "空状态",
         "status": "Temporal 就绪",
         "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：空状态"],
+        "sampleWindow": dict(_DEFAULT_SAMPLE_WINDOW),
         "sources": [],
-        "elevationSeries": [],
-        "azimuthSeries": [],
+        "trackingFrames": [],
     },
 }
 

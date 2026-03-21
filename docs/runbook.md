@@ -2,73 +2,74 @@
 
 ## 目标
 
-本文档面向运维和联调人员，说明 Temporal 与远端 ODAS 的正确协作方式。
+本文档面向运维和开发联调人员，提供可复现的运行步骤、检查点和常见故障排查方法。
+本轮补充 preview 入口顺序、监听独立启停和主按钮的新状态机语义，作为 UI 联调与手工验收的统一操作手册。
 
-- 数据流方向固定为 `ODAS -> Temporal`
-- Temporal 通过 SSH 远程启动 `odaslive`
-- `odaslive` 主动连接 Temporal 本地监听端口推送 SST、SSL、SSS 数据
-
-## 启动前检查
+## 1. 启动前检查
 
 1. 确认 Python 环境和依赖已安装。
-2. 检查配置文件 [config/odas.example.toml](../config/odas.example.toml)。
-3. 确认 `[streams].listen_host` 是远端 ODAS 可访问到的 Temporal 本机地址。
-   未显式配置时，Temporal 默认监听 `0.0.0.0`。
-4. 确认 `sst_port`、`ssl_port`、`sss_sep_port`、`sss_pf_port` 未被本机占用。
-5. 确认远端 SSH 可达，且 `odas.cwd`、`odas.command`、ODAS cfg 路径配置正确。
+2. 确认配置文件 [config/odas.example.toml](config/odas.example.toml) 已填写远端主机、SSH 密钥路径和端口。
+3. 确认远端 ODAS 主机可达，端口 `22/9000/9001/10000/10010` 可访问。
+4. 运行 preview 前，确认本地 Qt 环境可创建 `QGuiApplication`，避免入口阶段出现 `QObject::startTimer` 告警。
 
-## 推荐操作顺序
+## 2. 启动应用
 
-1. 启动 Temporal：`uv run temporal`
-2. 在界面中连接 SSH。
-3. 启动监听。
-4. 启动远端 `odaslive`。
-5. 观察日志、声源和录音状态。
-6. 结束时先停监听，再停远端 `odaslive`。
+1. 预览联调执行：`uv run temporal-preview`
+2. 正式运行执行：`uv run temporal`
+3. 界面出现后检查状态文本为“Temporal 就绪”。
+4. preview 默认只渲染首帧静态结果，不自动滚动。
+5. 若 preview 启动日志出现 Qt timer 相关告警，应优先检查入口是否在 `QGuiApplication` 创建前构造了 `PreviewBridge`。
 
-## 远端配置要求
+## 3. 远端控制流程
 
-- `odas.cwd` 为相对路径时，按远端 `$HOME/<cwd>` 解析。
-- `odas.command` 必须是可执行命令或脚本。
-- `odas.args` 中必须能定位到 ODAS cfg 文件，或 wrapper 脚本中能解析出 cfg 路径。
-- ODAS cfg 中必须检查真实 sink block：
-  `tracked`、`potential`、`separated`、`postfiltered`。
-- 上述 block 内的 `interface.ip` 和 `interface.port`
-  必须指向 Temporal 的 `streams.listen_host` 和对应端口。
-- 若 `streams.listen_host = 0.0.0.0`，它只表示本地监听所有接口；
-  远端 cfg 仍应填写一个真实可达的 Temporal IP，preflight 仅校验端口。
+1. 点击主按钮“启动”时，系统应先确保 SSH 已连接。
+2. 若本地 listener 尚未开启，主按钮启动流程会先开启 listener，再启动远端 `odaslive`。
+3. 主按钮启动完成后，应看到远端已启动状态，并进入 `SST/SSL/SSS` 监听态。
+4. 点击主按钮“停止”时，系统应先停止本地监听，再停止远端 `odaslive`。
+5. 主按钮停止后默认不断开 SSH，便于继续查看日志或再次启动。
 
-## 启动语义
+## 4. 数据流与录制流程
 
-- Temporal 不再主动连接 `remote.host:9000/9001/10000/10010`。
-- 启动远端 `odaslive` 前，Temporal 会先启动本地监听端并执行远端 preflight。
-- preflight 失败时，界面状态显示摘要原因，原始错误保留在日志区。
-- 只有远端实例通过 PID 校验后，状态才会变为“运行中”。
+1. 监听按钮可以在远端未运行时独立开启本地 listener。
+2. preview 模式下，只有监听开启后，sample window、图表和 3D 点位才会推进。
+3. 监听关闭后，preview 应停留在当前静态结果，不再继续滚动。
+4. 再次开启监听时，preview 应从场景起点重新开始，保证复现稳定。
+5. 正式运行时，检查 Sources 列表是否出现有效 source id（非 `0`）。
+6. 检查 `recordingSourceCount` 是否与可映射 source 数一致。
+7. 检查 `recordingSessions` 是否出现 `Source {id} [sp|pf] ...wav`。
+8. 单独点击“停止监听”后，监听端口关闭，但不会自动停止远端 `odaslive`。
 
-## 常见问题
+## 5. 录制文件检查
 
-### `Sink tracks/hops: Cannot connect to server`
+1. 打开 [recordings](recordings) 目录。
+2. 检查文件名格式：`ODAS_{source_id}_{timestamp}_{sp|pf}.wav`。
+3. 使用播放器或脚本确认文件可打开且非空。
+4. 若存在多源场景，确认只有被通道映射接管的 source 会生成录音文件。
 
-这通常不是 Temporal 本地解析故障，而是远端 ODAS 无法连接到 Temporal 监听端。
+## 6. 常见问题排查
 
-排查顺序：
+### 6.1 SSH 连接失败
 
-1. 检查 `[streams].listen_host` 是否填写为远端 ODAS 可访问的 Temporal 地址。
-2. 检查远端 ODAS cfg 中 sink 的 host/port 是否与 Temporal 配置完全一致。
-3. 检查 Temporal 是否已经启动监听。
-4. 检查本机防火墙是否放通 `9000/9001/10000/10010`。
+1. 检查用户名和私钥路径。
+2. 在终端手动验证 SSH：`ssh -i <key> <user>@<host>`。
+3. 检查远端防火墙和安全组。
 
-### 远端工作目录不存在
+### 6.2 有源但不录制
 
-若状态显示“远程工作目录不存在或不可访问”：
+1. 确认 source 在前 `4` 个映射通道内。
+2. 确认 source 未被取消勾选。
+3. 确认 `SSS` 端口无阻塞。
 
-1. 检查 `odas.cwd` 是否写错。
-2. 若为相对路径，确认其相对的是远端 `$HOME`，不是登录 shell 的当前目录。
+### 6.3 录制中断频繁
 
-### 远端命令不存在或不可执行
+1. 检查网络抖动和 `SST` 更新间隔。
+2. 检查 inactive timeout 是否过短。
+3. 必要时先停止监听并重新开始。
 
-若状态显示“远程命令不存在或未安装”或“远程命令或目录权限不足”：
+## 7. 建议操作顺序
 
-1. 检查 `odas.command` 是否存在。
-2. 检查 wrapper 脚本是否有执行权限。
-3. 检查 wrapper 内部引用的 cfg 和二进制路径是否仍有效。
+1. 预览联调时，先启动 `temporal-preview`，确认首帧静态画面正常。
+2. 点击“监听”，确认图表和 3D 开始同步推进。
+3. 如需联动远端，再点击主按钮“启动”，确认其自动补开监听并启动远端。
+4. 验收结束时，优先测试“单独停止监听”路径。
+5. 最后再测试主按钮“停止”路径，确认顺序为“先停监听，再停远端”。
