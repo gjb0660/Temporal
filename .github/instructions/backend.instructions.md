@@ -17,6 +17,11 @@ applyTo: "src/temporal/{core/**,app.py,main.py}"
   do not report streams active before bind/listen succeeds.
 - Static cfg validation must parse active sink targets;
   do not rely on whole-file string presence checks.
+- Remote SSH helper functions must be bootstrapped once per live non-interactive
+  `sh` control session and automatically re-bootstrapped after shell loss.
+- UI-facing SSH-connected state must reflect live control-channel health.
+- When `odas.command` uses a wrapper script, remote stop must terminate the whole
+  controlled process group, not only the wrapper entry pid.
 - JSON TCP parser must tolerate chunk boundaries and junk lines.
 - Audio consumers must avoid blocking socket threads.
 - Prefer pure functions for message normalization to ease testing.

@@ -56,16 +56,27 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 - Call `paramiko.SSHClient.connect` once and pass optional credentials as `None`.
 - Do not auto-connect SSH on page open; connect lazily when an operator
   starts remote odaslive and no SSH session exists yet.
+- Bootstrap remote helper functions once per live non-interactive `sh`
+  control session after the first successful SSH connect; do not resend the
+  full helper body for every control command.
+- Host remote helpers in a persistent SSH session channel that runs `sh`;
+  do not rely on `invoke_shell()` or the remote user's login shell.
+- If the control shell is lost while the SSH client transport is still alive,
+  rebuild the `sh` control session automatically and re-bootstrap the helper
+  before the next control command.
 - Start odaslive in background without `nohup`.
 - Apply `odas.cwd` before start, stop, status, and log read when configured.
 - Start appends runtime output to `odas.log`
-  and writes the spawned pid into the derived pid file.
+  and writes the spawned process-group leader pid into the derived pid file.
 - Treat one config target as one derived pid file and one controlled instance.
+- Launch remote odaslive inside a dedicated process group so wrapper scripts
+  and the child `odaslive` process share one stoppable lifecycle.
 - Status reads only the derived pid file and validates:
   pid file exists, pid is numeric, `kill -0` succeeds,
   `/proc/<pid>/cmdline` exactly matches `odas.command + odas.args`,
   and `/proc/<pid>/cwd` exactly matches `odas.cwd` when configured.
-- Stop targets only the pid recorded in the derived pid file.
+- Stop targets the process group rooted at the pid recorded in the derived pid file,
+  so wrapper scripts and their child `odaslive` process are terminated together.
 - Read log tail from `odas.log` path.
 - Treat validated process existence as the only source of truth
   for "odaslive has started".
@@ -118,6 +129,9 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 - Treat local listeners as an operator-controlled resource:
   operators may start or stop listeners independently of the remote-odas
   running state.
+- Starting or stopping local listeners requires an active SSH control channel.
+- Listener-button enabled state must depend on live SSH control-channel health,
+  not on a stale remembered connection flag.
 - Stopping listeners closes only local listening sockets and local recording
   state; it must not stop remote odaslive and must not disconnect SSH.
 - If remote odaslive keeps running after listeners stop, allow it to continue
@@ -145,3 +159,7 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
     instead of raw shell paths and traces.
 12. Temporal local listeners are started before remote odaslive launches.
 13. Stopping listeners does not stop remote odaslive and does not disconnect SSH.
+14. Remote control helpers are bootstrapped once per live non-interactive
+    `sh` control session, and are automatically re-bootstrapped after
+    control-session loss.
+15. The listener button is enabled only while the SSH control channel is alive.

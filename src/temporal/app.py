@@ -36,6 +36,7 @@ class AppBridge(QObject):
     odasStartingChanged = Signal()
     odasRunningChanged = Signal()
     streamsActiveChanged = Signal()
+    canToggleStreamsChanged = Signal()
     sourceItemsChanged = Signal()
     sourceIdsChanged = Signal()
     sourceCountChanged = Signal()
@@ -135,6 +136,10 @@ class AppBridge(QObject):
     @Property(bool, notify=streamsActiveChanged)  # type: ignore[reportCallIssue]
     def streamsActive(self) -> bool:
         return self._streams_active
+
+    @Property(bool, notify=canToggleStreamsChanged)  # type: ignore[reportCallIssue]
+    def canToggleStreams(self) -> bool:
+        return self._remote_connected
 
     @Property(list, notify=sourceItemsChanged)  # type: ignore[reportCallIssue]
     def sourceItems(self) -> list[str]:
@@ -251,22 +256,23 @@ class AppBridge(QObject):
             self._cancel_odas_startup()
             self._set_remote_connected(False)
             self._set_odas_running(False)
-            self.setStatus(f"SSH 连接失败: {exc}")
-            self._set_remote_log_lines([f"远程连接失败: {exc}"])
+            reason = self._humanize_control_channel_error(str(exc))
+            self.setStatus(reason)
+            self._set_remote_log_lines([reason])
             return
 
-        self._set_remote_connected(True)
+        self._refresh_remote_connection_state()
         if not self._log_timer.isActive():
             self._log_timer.start()
         self._poll_remote_log()
         self._sync_remote_odas_state()
-        if self._odas_running:
-            self.setStatus("SSH 已连接，远程 odaslive 运行中")
-        else:
-            self.setStatus("SSH 已连接")
+        self._apply_state_status()
 
     @Slot()
     def startRemoteOdas(self) -> None:
+        if not self._refresh_remote_connection_state():
+            self.setStatus("请先连接远程 SSH")
+            return
         if self._odas_starting:
             self.setStatus("远程 odaslive 启动中")
             return
@@ -286,7 +292,7 @@ class AppBridge(QObject):
         except Exception as exc:
             self._cancel_odas_startup()
             self._set_odas_running(False)
-            self.setStatus(f"启动失败: {exc}")
+            self.setStatus(f"启动失败: {self._humanize_control_channel_error(str(exc))}")
             return
 
         self._poll_remote_log()
@@ -305,29 +311,30 @@ class AppBridge(QObject):
 
     @Slot()
     def stopRemoteOdas(self) -> None:
-        if not self._remote_connected:
-            self._cancel_odas_startup()
+        if not self._refresh_remote_connection_state():
             self.setStatus("SSH 未连接")
             return
-
-        if self._streams_active:
-            self.stopStreams()
 
         try:
             result = self._remote.stop_odaslive()
         except Exception as exc:
-            self._cancel_odas_startup()
-            self.setStatus(f"停止失败: {exc}")
+            self.setStatus(f"停止失败: {self._humanize_control_channel_error(str(exc))}")
             return
 
         self._cancel_odas_startup()
         if result.code == 0:
-            self._set_odas_running(False)
-            self.setStatus("远程 odaslive 已停止")
+            running = self._sync_remote_odas_state(update_status=False)
+            if running is None:
+                self.setStatus("停止失败: 远程控制通道已断开")
+            elif running:
+                self.setStatus("远程 odaslive 停止失败")
+            else:
+                self._apply_state_status()
         else:
             self._sync_remote_odas_state()
             self.setStatus(result.stderr.strip() or "远程 odaslive 停止失败")
-        self._poll_remote_log()
+        if self._remote_connected:
+            self._poll_remote_log()
 
     @Slot()
     def toggleRemoteOdas(self) -> None:
@@ -335,14 +342,25 @@ class AppBridge(QObject):
             self.setStatus("远程 odaslive 启动中")
             return
         if self._odas_running:
+            if not self._refresh_remote_connection_state():
+                self.connectRemote()
+                if not self._refresh_remote_connection_state():
+                    return
             self.stopRemoteOdas()
             return
+        if not self._remote_connected:
+            self.connectRemote()
+            if not self._remote_connected:
+                return
         self.startRemoteOdas()
 
     @Slot()
     def startStreams(self) -> None:
         if self._streams_active:
             self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
+            return
+        if not self._refresh_remote_connection_state():
+            self.setStatus("请先连接远程 SSH")
             return
 
         try:
@@ -353,11 +371,7 @@ class AppBridge(QObject):
             return
 
         self._set_streams_active(True)
-        if self._odas_running:
-            self._set_remote_log_lines(["远程 odaslive 已启动", "正在监听 SST/SSL/SSS 数据流"])
-        else:
-            self._set_remote_log_lines(["本地 listener 已开启", "等待远程 odaslive 接入"])
-        self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
+        self._apply_state_status()
 
     @Slot()
     def stopStreams(self) -> None:
@@ -368,11 +382,7 @@ class AppBridge(QObject):
         self._set_streams_active(False)
         self._set_recording_source_count(0)
         self._set_recording_sessions([])
-        if self._odas_running or self._odas_starting:
-            self._set_remote_log_lines(["远程 odaslive 已启动", "已停止监听 SST/SSL/SSS 数据流"])
-        else:
-            self._set_remote_log_lines(["本地 listener 已关闭", "等待连接远程 odaslive..."])
-        self.setStatus("数据流已关闭")
+        self._apply_state_status()
 
     @Slot()
     def toggleStreams(self) -> None:
@@ -530,11 +540,32 @@ class AppBridge(QObject):
             f"录制中={self._recording_source_count}"
         )
 
+    def _apply_state_status(self) -> None:
+        if self._odas_starting:
+            self.setStatus("远程 odaslive 启动中")
+            return
+        if self._streams_active:
+            self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
+            return
+        if self._odas_running:
+            self.setStatus("SSH 已连接，远程 odaslive 运行中")
+            return
+        if self._remote_connected:
+            self.setStatus("SSH 已连接，远程 odaslive 未运行")
+            return
+        self.setStatus("Temporal 就绪")
+
+    def _refresh_remote_connection_state(self) -> bool:
+        connected = self._remote.is_connected()
+        self._set_remote_connected(connected)
+        return connected
+
     def _set_remote_connected(self, connected: bool) -> None:
         if self._remote_connected == connected:
             return
         self._remote_connected = connected
         self.remoteConnectedChanged.emit()
+        self.canToggleStreamsChanged.emit()
 
     def _set_odas_starting(self, starting: bool) -> None:
         if self._odas_starting == starting:
@@ -553,6 +584,7 @@ class AppBridge(QObject):
             return
         self._streams_active = active
         self.streamsActiveChanged.emit()
+        self.canToggleStreamsChanged.emit()
 
     def _set_recording_source_count(self, value: int) -> None:
         if self._recording_source_count == value:
@@ -592,29 +624,30 @@ class AppBridge(QObject):
             ]
         )
 
-    def _sync_remote_odas_state(self, update_status: bool = False) -> None:
+    def _sync_remote_odas_state(self, update_status: bool = False) -> bool | None:
         previous_running = self._odas_running
-        if not self._remote_connected:
+        if not self._refresh_remote_connection_state():
             self._set_odas_starting(False)
-            self._set_odas_running(False)
-            return
+            if update_status:
+                self.setStatus("远程控制通道已断开")
+            return None
 
         try:
             result = self._remote.status()
-        except Exception:
+        except Exception as exc:
             self._set_odas_starting(False)
-            self._set_odas_running(False)
-            return
+            self._refresh_remote_connection_state()
+            if update_status:
+                self.setStatus(self._humanize_control_channel_error(str(exc)))
+            return None
 
         running = bool(result.stdout.strip())
         self._set_odas_starting(False)
         self._set_odas_running(running)
         if not update_status or previous_running == running:
-            return
-        if running:
-            self.setStatus("SSH 已连接，远程 odaslive 运行中")
-            return
-        self.setStatus("SSH 已连接，远程 odaslive 未运行")
+            return running
+        self._apply_state_status()
+        return running
 
     def _cancel_odas_startup(self) -> None:
         if self._startup_timer.isActive():
@@ -709,6 +742,17 @@ class AppBridge(QObject):
                 return self._humanize_startup_failure_reason(remainder)
         return normalized
 
+    def _humanize_control_channel_error(self, reason: str) -> str:
+        normalized = reason.strip()
+        lower = normalized.lower()
+        if "ssh control shell timed out" in lower:
+            return "远程控制通道初始化失败"
+        if "ssh control shell lost" in lower or "protocol desynced" in lower:
+            return "远程控制通道已断开"
+        if "ssh is not connected" in lower:
+            return "远程 SSH 连接已断开"
+        return normalized
+
     def _set_startup_failure_status(self, reason: str) -> None:
         humanized = self._humanize_startup_failure_reason(reason)
         if humanized.startswith("启动失败"):
@@ -724,14 +768,15 @@ class AppBridge(QObject):
             result = self._remote.status()
         except Exception as exc:
             self._cancel_odas_startup()
+            self._refresh_remote_connection_state()
             self._set_odas_running(False)
-            self.setStatus(f"启动失败: {exc}")
+            self.setStatus(f"启动失败: {self._humanize_control_channel_error(str(exc))}")
             return
 
         if result.stdout.strip():
             self._cancel_odas_startup()
             self._set_odas_running(True)
-            self.setStatus("远程 odaslive 已启动")
+            self._apply_state_status()
             return
 
         self._startup_attempts_remaining -= 1
@@ -751,13 +796,14 @@ class AppBridge(QObject):
             result = self._remote.read_log_tail(80)
         except Exception as exc:
             message = str(exc)
-            if "SSH is not connected" in message:
+            if "SSH is not connected" in message or "SSH control shell" in message:
                 self._cancel_odas_startup()
-                self._set_remote_connected(False)
-                self._set_odas_running(False)
+                self._refresh_remote_connection_state()
                 if self._log_timer.isActive():
                     self._log_timer.stop()
-                self._set_remote_log_lines(list(self._EMPTY_REMOTE_LOG))
+                reason = self._humanize_control_channel_error(message)
+                self._set_remote_log_lines([reason])
+                self.setStatus(reason)
                 return
             self._set_remote_log_lines([f"日志读取失败: {message}"])
             return

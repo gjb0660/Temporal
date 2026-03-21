@@ -69,7 +69,7 @@ Rectangle {
                                 TextArea {
                                     width: parent.width
                                     readOnly: true
-                                    wrapMode: TextArea.NoWrap
+                                    wrapMode: TextArea.WrapAnywhere
                                     selectByMouse: true
                                     text: root.appBridge.remoteLogText
                                     color: "#24303a"
@@ -147,6 +147,7 @@ Rectangle {
                             AppActionButton {
                                 theme: root.theme
                                 text: root.appBridge.streamsActive ? "停止监听" : "监听"
+                                enabled: root.appBridge.canToggleStreams
                                 Layout.fillWidth: true
                                 onClicked: root.appBridge.toggleStreams()
                             }

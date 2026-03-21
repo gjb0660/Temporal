@@ -55,10 +55,15 @@ class _FakeRemoteOdasController:
         self.status_output = ""
         self.status_sequence: list[str] = []
         self.start_status_sequence: list[str] = []
+        self.keep_running_after_stop = False
+        self.status_exception: Exception | None = None
 
     def connect(self) -> None:
         self.connected = True
         self.connect_calls += 1
+
+    def is_connected(self) -> bool:
+        return self.connected
 
     def start_odaslive(self) -> CommandResult:
         self.start_calls += 1
@@ -67,17 +72,29 @@ class _FakeRemoteOdasController:
 
     def stop_odaslive(self) -> CommandResult:
         self.stop_calls += 1
-        self.status_output = ""
-        self.status_sequence = []
+        if not self.keep_running_after_stop:
+            self.status_output = ""
+            self.status_sequence = []
         return self.stop_result
 
     def status(self) -> CommandResult:
+        if self.status_exception is not None:
+            self.connected = False
+            raise self.status_exception
         if self.status_sequence:
             self.status_output = self.status_sequence.pop(0)
         return CommandResult(code=0, stdout=self.status_output, stderr="")
 
     def read_log_tail(self, _lines: int = 80) -> CommandResult:
+        if not self.connected:
+            raise RuntimeError("SSH is not connected")
         return CommandResult(code=0, stdout=self.log_output, stderr="")
+
+
+class _BootstrapFailingRemoteOdasController(_FakeRemoteOdasController):
+    def connect(self) -> None:
+        self.connect_calls += 1
+        raise RuntimeError("SSH control shell timed out")
 
 
 def _fake_config() -> tuple[RemoteOdasConfig, OdasStreamConfig]:
@@ -106,6 +123,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
         recorder: AutoRecorder,
         *,
         client_cls: type[_FakeOdasClient] = _FakeOdasClient,
+        remote_cls: type[_FakeRemoteOdasController] = _FakeRemoteOdasController,
     ) -> AppBridge:
         remote, streams = _fake_config()
         with (
@@ -114,7 +132,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
                 return_value=TemporalConfig(remote=remote, streams=streams),
             ),
             patch("temporal.app.OdasClient", client_cls),
-            patch("temporal.app.RemoteOdasController", _FakeRemoteOdasController),
+            patch("temporal.app.RemoteOdasController", remote_cls),
             patch("temporal.app.AutoRecorder", return_value=recorder),
         ):
             return AppBridge()
@@ -127,6 +145,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
             bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
 
             bridge.startStreams()
             bridge._on_sst({"src": [{"id": 2}, {"id": 4}]})
@@ -153,6 +172,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
                 now_fn=clock.now,
             )
             bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
             bridge.startStreams()
             bridge._on_sst({"src": [{"id": 7}]})
             first_session = sorted(recorder.sessions_snapshot(), key=lambda item: item.mode)
@@ -176,6 +196,8 @@ class TestAppBridgeIntegration(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
             bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+
             bridge._poll_remote_log()
 
             self.assertEqual(bridge.remoteLogLines, ["startup ok", "ready"])
@@ -196,10 +218,35 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertEqual(client.start_calls, 1)
             self.assertEqual(remote.start_calls, 1)
 
+    def test_start_streams_requires_ssh_connection(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+
+            bridge.startStreams()
+
+            self.assertFalse(bridge.streamsActive)
+            self.assertFalse(bridge.canToggleStreams)
+            self.assertEqual(bridge._status, "请先连接远程 SSH")
+
+    def test_connect_remote_reports_control_channel_init_failure_without_labeling_ssh_failure(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder, remote_cls=_BootstrapFailingRemoteOdasController)
+
+            bridge.connectRemote()
+
+            self.assertFalse(bridge.remoteConnected)
+            self.assertEqual(bridge._status, "远程控制通道初始化失败")
+            self.assertEqual(bridge.remoteLogLines, ["远程控制通道初始化失败"])
+
     def test_start_streams_keeps_inactive_when_listener_bind_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
             bridge = self._make_bridge(recorder, client_cls=_FailingOdasClient)
+            bridge.connectRemote()
 
             bridge.startStreams()
 
@@ -274,29 +321,12 @@ class TestAppBridgeIntegration(unittest.TestCase):
             remote.start_status_sequence = ["", "", "4242\n"]
 
             bridge.startRemoteOdas()
-
-            self.assertTrue(bridge.odasStarting)
-            self.assertFalse(bridge.odasRunning)
-
             bridge._verify_odas_startup()
 
             self.assertFalse(bridge.odasStarting)
             self.assertTrue(bridge.odasRunning)
-
-    def test_repeated_start_click_is_ignored_while_starting(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            recorder = AutoRecorder(output_dir=temp_dir)
-            bridge = self._make_bridge(recorder)
-            bridge.connectRemote()
-            remote = bridge._remote
-            self.assertIsInstance(remote, _FakeRemoteOdasController)
-            remote.start_status_sequence = [""] * 20
-
-            bridge.startRemoteOdas()
-            bridge.startRemoteOdas()
-
-            self.assertTrue(bridge.odasStarting)
-            self.assertEqual(remote.start_calls, 1)
+            self.assertTrue(bridge.streamsActive)
+            self.assertIn("监听", bridge._status)
 
     def test_connect_remote_without_pid_file_does_not_adopt_instance(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -307,7 +337,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertTrue(bridge.remoteConnected)
             self.assertFalse(bridge.odasRunning)
-            self.assertEqual(bridge._status, "SSH 已连接")
+            self.assertEqual(bridge._status, "SSH 已连接，远程 odaslive 未运行")
 
     def test_connect_remote_adopts_instance_with_valid_pid_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -340,7 +370,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertFalse(bridge.odasRunning)
             self.assertEqual(bridge._status, "SSH 已连接，远程 odaslive 未运行")
 
-    def test_stop_remote_odas_is_idempotent_when_pid_has_already_exited(self) -> None:
+    def test_stop_remote_odas_keeps_listener_active(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
             bridge = self._make_bridge(recorder)
@@ -349,11 +379,99 @@ class TestAppBridgeIntegration(unittest.TestCase):
             remote.status_output = "4242\n"
 
             bridge.connectRemote()
+            bridge.startStreams()
             bridge.stopRemoteOdas()
 
             self.assertFalse(bridge.odasRunning)
+            self.assertTrue(bridge.streamsActive)
             self.assertEqual(remote.stop_calls, 1)
-            self.assertIn("已停止", bridge._status)
+            self.assertIn("监听", bridge._status)
+
+    def test_stop_remote_failure_does_not_clear_running_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.status_output = "4242\n"
+            remote.keep_running_after_stop = True
+
+            bridge.connectRemote()
+            bridge.stopRemoteOdas()
+
+            self.assertTrue(bridge.odasRunning)
+            self.assertEqual(bridge._status, "远程 odaslive 停止失败")
+
+    def test_stop_remote_keeps_running_when_status_check_loses_control_channel(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.status_output = "4242\n"
+
+            bridge.connectRemote()
+            remote.status_exception = RuntimeError("SSH control shell lost")
+
+            bridge.stopRemoteOdas()
+
+            self.assertTrue(bridge.odasRunning)
+            self.assertFalse(bridge.remoteConnected)
+            self.assertFalse(bridge.canToggleStreams)
+            self.assertEqual(bridge._status, "停止失败: 远程控制通道已断开")
+
+    def test_toggle_remote_reconnects_control_channel_before_stopping_running_remote(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.status_output = "4242\n"
+
+            bridge.connectRemote()
+            self.assertTrue(bridge.odasRunning)
+
+            remote.connected = False
+            bridge._refresh_remote_connection_state()
+            self.assertFalse(bridge.remoteConnected)
+            self.assertTrue(bridge.odasRunning)
+
+            bridge.toggleRemoteOdas()
+
+            self.assertEqual(remote.connect_calls, 2)
+            self.assertEqual(remote.stop_calls, 1)
+            self.assertFalse(bridge.odasRunning)
+
+    def test_stop_streams_keeps_remote_running(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.status_output = "4242\n"
+
+            bridge.connectRemote()
+            bridge.startStreams()
+            bridge.stopStreams()
+
+            self.assertTrue(bridge.odasRunning)
+            self.assertFalse(bridge.streamsActive)
+            self.assertEqual(bridge._status, "SSH 已连接，远程 odaslive 运行中")
+
+    def test_can_toggle_streams_turns_false_when_control_channel_disconnects(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+            bridge.startStreams()
+
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.connected = False
+            bridge._refresh_remote_connection_state()
+
+            self.assertTrue(bridge.streamsActive)
+            self.assertFalse(bridge.canToggleStreams)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import shlex
 import threading
+import time
 from dataclasses import dataclass
 
 import paramiko
@@ -22,6 +23,12 @@ class _PreflightRuntime:
     home_dir: str
     working_dir: str
     resolved_command: str
+
+
+class _ControlShellLost(RuntimeError):
+    def __init__(self, message: str, *, retryable: bool) -> None:
+        super().__init__(message)
+        self.retryable = retryable
 
 
 def _strip_cfg_comments(text: str) -> str:
@@ -169,18 +176,33 @@ class RemoteOdasController:
 
     _STOP_WAIT_ATTEMPTS = 10
     _STOP_WAIT_SEC = 0.1
+    _SHELL_TIMEOUT_SEC = 8.0
+    _SHELL_POLL_SEC = 0.02
+    _MARKER = "\x1e"
+    _BOOTSTRAP_NAME = "TEMPORAL_BOOTSTRAP_READY"
 
     def __init__(self, config: RemoteOdasConfig, streams: OdasStreamConfig) -> None:
         self._cfg = config
         self._streams = streams
         self._client: paramiko.SSHClient | None = None
+        self._shell: paramiko.Channel | None = None
+        self._shell_stdout_buffer = ""
+        self._shell_stderr_buffer = ""
+        self._request_counter = 0
         self._lock = threading.Lock()
+        self._shell_config_assignments = self._build_config_assignments()
+        self._shell_path_shell = self._build_path_shell()
+        self._shell_command_shell = self._build_command_shell()
+        self._shell_pid_shell = self._build_pid_shell()
+        self._helper_shell = self._build_helper_shell()
 
     def connect(self) -> None:
         with self._lock:
-            if self._client is not None:
+            if self._transport_is_active_locked():
+                self._ensure_control_shell_locked()
                 return
-
+            self._close_shell_locked()
+            self._close_client_locked()
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             client.connect(
@@ -191,24 +213,57 @@ class RemoteOdasController:
                 timeout=8,
             )
             self._client = client
+            self._ensure_control_shell_locked()
 
     def close(self) -> None:
         with self._lock:
-            if self._client is not None:
-                self._client.close()
-                self._client = None
+            self._close_shell_locked()
+            self._close_client_locked()
 
-    def _exec(self, cmd: str) -> CommandResult:
+    def is_connected(self) -> bool:
+        with self._lock:
+            return self._transport_is_active_locked() and self._shell_is_active_locked()
+
+    def _close_shell_locked(self) -> None:
+        if self._shell is not None:
+            try:
+                self._shell.close()
+            except Exception:
+                pass
+            self._shell = None
+        self._shell_stdout_buffer = ""
+        self._shell_stderr_buffer = ""
+
+    def _close_client_locked(self) -> None:
+        if self._client is not None:
+            self._client.close()
+            self._client = None
+
+    def _transport_is_active_locked(self) -> bool:
         if self._client is None:
-            raise RuntimeError("SSH is not connected")
-        _, stdout, stderr = self._client.exec_command(cmd)
-        out = stdout.read().decode("utf-8", errors="replace")
-        err = stderr.read().decode("utf-8", errors="replace")
-        code = stdout.channel.recv_exit_status()
-        return CommandResult(code=code, stdout=out, stderr=err)
+            return False
+        transport = self._client.get_transport()
+        return bool(transport is not None and transport.is_active())
 
-    def _shell_command(self, shell_script: str) -> str:
-        return f"sh -lc {shlex.quote(shell_script)}"
+    def _shell_is_active_locked(self) -> bool:
+        if self._shell is None:
+            return False
+        try:
+            return not self._shell.closed and not self._shell.exit_status_ready()
+        except Exception:
+            return False
+
+    def _compose_shell(self, *parts: str) -> str:
+        return "\n".join(part for part in parts if part)
+
+    def _build_config_assignments(self) -> str:
+        return "\n".join(
+            [
+                f"cfg_cwd={shlex.quote(self._cfg.odas_cwd or '')}",
+                f"cfg_log={shlex.quote(self._cfg.odas_log)}",
+                f"cfg_command={shlex.quote(self._cfg.odas_command)}",
+            ]
+        )
 
     def _quoted_command(self) -> str:
         return " ".join(
@@ -236,103 +291,8 @@ class RemoteOdasController:
     def _preflight_failed(self, reason: str) -> CommandResult:
         return CommandResult(code=1, stdout="", stderr=reason)
 
-    def _metadata_script(self) -> str:
-        return "\n".join(
-            [
-                self._common_shell_prelude(),
-                "resolve_runtime_paths || exit 1",
-                "resolve_command_path || exit 1",
-                'printf "home=%s\\n" "$HOME"',
-                'printf "working_dir=%s\\n" "$working_dir"',
-                'printf "resolved_command=%s\\n" "$resolved_command"',
-            ]
-        )
-
-    def _parse_metadata(self, stdout: str) -> _PreflightRuntime:
-        values: dict[str, str] = {}
-        for line in stdout.splitlines():
-            if "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            values[key] = value
-        return _PreflightRuntime(
-            home_dir=values.get("home", ""),
-            working_dir=values.get("working_dir", ""),
-            resolved_command=values.get("resolved_command", ""),
-        )
-
-    def _read_remote_text(self, path: str, missing_reason: str) -> CommandResult:
-        file_path = shlex.quote(path)
-        result = self._exec(
-            self._shell_command(
-                "\n".join(
-                    [
-                        f"file_path={file_path}",
-                        'if [ ! -f "$file_path" ]; then',
-                        f"    printf {shlex.quote(missing_reason + chr(10))} >&2",
-                        "    exit 1",
-                        "fi",
-                        'cat -- "$file_path"',
-                    ]
-                )
-            )
-        )
-        if result.code == 0:
-            return result
-        stderr = result.stderr.strip() or missing_reason
-        return CommandResult(code=result.code, stdout=result.stdout, stderr=stderr)
-
-    def _resolve_cfg_path_for_preflight(self, runtime: _PreflightRuntime) -> CommandResult | str:
-        raw_cfg_path = self._cfg_arg_path()
-        if raw_cfg_path is None:
-            wrapper_result = self._read_remote_text(
-                runtime.resolved_command,
-                "preflight: odas config path missing",
-            )
-            if wrapper_result.code != 0:
-                return self._preflight_failed("preflight: odas config path missing")
-            raw_cfg_path = _extract_wrapper_cfg_path(wrapper_result.stdout)
-        if not raw_cfg_path:
-            return self._preflight_failed("preflight: odas config path missing")
-        return _resolve_cfg_path(raw_cfg_path, runtime)
-
-    def _validate_static_preflight(self) -> CommandResult:
-        metadata_result = self._exec(self._shell_command(self._metadata_script()))
-        if metadata_result.code != 0:
-            return metadata_result
-        runtime = self._parse_metadata(metadata_result.stdout)
-        cfg_path = self._resolve_cfg_path_for_preflight(runtime)
-        if isinstance(cfg_path, CommandResult):
-            return cfg_path
-        cfg_result = self._read_remote_text(cfg_path, "preflight: odas config file missing")
-        if cfg_result.code != 0:
-            return self._preflight_failed("preflight: odas config file missing")
-        sink_error = _sink_targets_match(cfg_result.stdout, self._streams)
-        if sink_error is not None:
-            return self._preflight_failed(sink_error)
-        return CommandResult(code=0, stdout="", stderr="")
-
-    def _common_shell_prelude(self) -> str:
-        cfg_cwd = shlex.quote(self._cfg.odas_cwd or "")
-        cfg_log = shlex.quote(self._cfg.odas_log)
-        cfg_command = shlex.quote(self._cfg.odas_command)
-        arg_check_lines: list[str] = []
-        for arg in self._cfg.odas_args:
-            arg_check_lines.extend(
-                [
-                    f"    if ! printf '%s\\n' \"$actual_cmdline\" | grep -Fxq -- {shlex.quote(arg)}; then",
-                    "        cleanup_pid",
-                    "        return 1",
-                    "    fi",
-                ]
-            )
-        flattened_arg_checks = "\n".join(arg_check_lines)
-        return "\n".join(
-            [
-                f"cfg_cwd={cfg_cwd}",
-                f"cfg_log={cfg_log}",
-                f"cfg_command={cfg_command}",
-                r"""
+    def _build_path_shell(self) -> str:
+        return r"""
 resolve_home_relative() {
     path_input="$1"
     if [ -z "$path_input" ]; then
@@ -356,6 +316,10 @@ resolve_home_relative() {
 }
 
 resolve_runtime_paths() {
+    cd "$HOME" || {
+        printf 'preflight: remote working directory inaccessible\n' >&2
+        return 1
+    }
     resolved_cwd="$(resolve_home_relative "$cfg_cwd")"
     if [ -n "$resolved_cwd" ]; then
         if [ ! -d "$resolved_cwd" ]; then
@@ -392,7 +356,10 @@ resolve_runtime_paths() {
     esac
     pid_path="$log_dir/$pid_file"
 }
+""".strip()
 
+    def _build_command_shell(self) -> str:
+        return r"""
 resolve_command_path() {
     case "$cfg_command" in
         */*)
@@ -421,7 +388,21 @@ preflight_or_exit() {
     resolve_runtime_paths || return 1
     resolve_command_path || return 1
 }
+""".strip()
 
+    def _build_pid_shell(self) -> str:
+        arg_check_lines: list[str] = []
+        for arg in self._cfg.odas_args:
+            arg_check_lines.extend(
+                [
+                    f"    if ! printf '%s\\n' \"$actual_cmdline\" | grep -Fxq -- {shlex.quote(arg)}; then",
+                    "        cleanup_pid",
+                    "        return 1",
+                    "    fi",
+                ]
+            )
+        flattened_arg_checks = "\n".join(arg_check_lines)
+        return r"""
 cleanup_pid() {
     rm -f "$pid_path"
 }
@@ -463,88 +444,332 @@ __ARG_CHECKS__
     fi
     return 0
 }
-""".replace("__ARG_CHECKS__", flattened_arg_checks).strip(),
-            ]
+""".replace("__ARG_CHECKS__", flattened_arg_checks).strip()
+
+    def _bootstrap_marker(self) -> str:
+        return f"{self._MARKER}{self._BOOTSTRAP_NAME}{self._MARKER}"
+
+    def _marker(self, kind: str, payload: str) -> str:
+        return f"{self._MARKER}TEMPORAL_{kind}:{payload}{self._MARKER}"
+
+    def _build_helper_shell(self) -> str:
+        return self._compose_shell(
+            self._shell_config_assignments,
+            self._shell_path_shell,
+            self._shell_command_shell,
+            self._shell_pid_shell,
+            self._build_public_helper_shell(),
+            f"printf {shlex.quote(self._bootstrap_marker())}",
         )
 
-    def _start_script(self) -> str:
-        return "\n".join(
-            [
-                self._common_shell_prelude(),
-                "preflight_or_exit || exit 1",
-                "if load_valid_pid; then",
-                "    printf '%s\\n' \"$pid\"",
-                "    exit 0",
-                "fi",
-                f'{self._quoted_command()} >> "$resolved_log" 2>&1 < /dev/null &',
-                'pid="$!"',
-                'printf "%s\\n" "$pid" > "$pid_path"',
-                'printf "%s\\n" "$pid"',
-            ]
+    def _build_public_helper_shell(self) -> str:
+        stop_body = f"""
+temporal_stop() {{
+    resolve_runtime_paths >/dev/null 2>&1 || return 0
+    resolve_command_path >/dev/null 2>&1 || return 0
+    if ! load_valid_pid; then
+        return 0
+    fi
+    if ! kill -TERM -- "-$pid" 2>/dev/null; then
+        if ! kill -TERM "$pid" 2>/dev/null; then
+            if ! kill -0 "$pid" 2>/dev/null; then
+                cleanup_pid
+                return 0
+            fi
+            printf "failed to stop pid %s\\n" "$pid" >&2
+            return 1
+        fi
+    fi
+    attempt=0
+    while kill -0 -- "-$pid" 2>/dev/null || kill -0 "$pid" 2>/dev/null; do
+        attempt=$((attempt + 1))
+        if [ "$attempt" -ge {self._STOP_WAIT_ATTEMPTS} ]; then
+            printf "failed to stop pid %s\\n" "$pid" >&2
+            return 1
+        fi
+        sleep {self._STOP_WAIT_SEC}
+    done
+    cleanup_pid
+}}
+""".strip()
+        return self._compose_shell(
+            r"""
+temporal_metadata() {
+    preflight_or_exit || return 1
+    printf 'home=%s\n' "$HOME"
+    printf 'working_dir=%s\n' "$working_dir"
+    printf 'resolved_command=%s\n' "$resolved_command"
+}
+
+temporal_cat_file() {
+    file_path="$1"
+    missing_reason="$2"
+    if [ ! -f "$file_path" ]; then
+        printf '%s\n' "$missing_reason" >&2
+        return 1
+    fi
+    cat -- "$file_path"
+}
+
+temporal_start() {
+    preflight_or_exit || return 1
+    if load_valid_pid; then
+        printf '%s\n' "$pid"
+        return 0
+    fi
+""".strip(),
+            f'setsid {self._quoted_command()} >> "$resolved_log" 2>&1 < /dev/null &',
+            r"""
+    pid="$!"
+    printf "%s\n" "$pid" > "$pid_path"
+    printf "%s\n" "$pid"
+}
+
+temporal_status() {
+    resolve_runtime_paths >/dev/null 2>&1 || return 0
+    resolve_command_path >/dev/null 2>&1 || return 0
+    if ! load_valid_pid; then
+        return 0
+    fi
+    printf "%s\n" "$pid"
+}
+temporal_log_tail() {
+    requested_lines="$1"
+    if [ -z "$requested_lines" ]; then
+        requested_lines="80"
+    fi
+    resolve_runtime_paths >/dev/null 2>&1 || return 0
+    if [ -f "$resolved_log" ]; then
+        tail -n "$requested_lines" "$resolved_log"
+    fi
+}
+
+temporal_run() {
+    request_id="$1"
+    shift
+    stdout_file="$(mktemp)"
+    stderr_file="$(mktemp)"
+    "$@" >"$stdout_file" 2>"$stderr_file"
+    exit_code="$?"
+    printf '\036TEMPORAL_BEGIN:%s\036' "$request_id"
+    printf '\036TEMPORAL_STDOUT:%s\036' "$request_id"
+    cat "$stdout_file"
+    printf '\036TEMPORAL_STDERR:%s\036' "$request_id"
+    cat "$stderr_file"
+    printf '\036TEMPORAL_EXIT:%s:%s\036' "$request_id" "$exit_code"
+    printf '\036TEMPORAL_END:%s\036' "$request_id"
+    rm -f "$stdout_file" "$stderr_file"
+}
+""".strip(),
+            stop_body,
         )
 
-    def _runtime_script(self, *lines: str, needs_command_path: bool = False) -> str:
-        script_lines = [
-            self._common_shell_prelude(),
-            "resolve_runtime_paths >/dev/null 2>&1 || exit 0",
-        ]
-        if needs_command_path:
-            script_lines.append("resolve_command_path >/dev/null 2>&1 || exit 0")
-        script_lines.extend(lines)
-        return "\n".join(script_lines)
+    def _ensure_control_shell_locked(self) -> None:
+        if not self._transport_is_active_locked():
+            raise RuntimeError("SSH is not connected")
+        if self._shell_is_active_locked():
+            return
+        assert self._client is not None
+        transport = self._client.get_transport()
+        if transport is None or not transport.is_active():
+            raise RuntimeError("SSH is not connected")
+        self._close_shell_locked()
+        shell = transport.open_session()
+        shell.settimeout(self._SHELL_TIMEOUT_SEC)
+        shell.exec_command("sh")
+        self._shell = shell
+        self._shell_stdout_buffer = ""
+        self._shell_stderr_buffer = ""
+        time.sleep(self._SHELL_POLL_SEC)
+        self._drain_shell_locked()
+        self._send_shell_text_locked(self._helper_shell + "\n")
+        self._read_until_contains_locked(self._bootstrap_marker())
+        self._discard_through_locked(self._bootstrap_marker())
 
-    def _status_script(self) -> str:
-        return self._runtime_script(
-            "if ! load_valid_pid; then",
-            "    exit 0",
-            "fi",
-            'printf "%s\\n" "$pid"',
-            needs_command_path=True,
+    def _drain_shell_locked(self) -> None:
+        if self._shell is None:
+            return
+        deadline = time.monotonic() + 0.2
+        while time.monotonic() < deadline:
+            if not self._shell.recv_ready() and not self._shell.recv_stderr_ready():
+                time.sleep(self._SHELL_POLL_SEC)
+                continue
+            self._read_available_locked()
+
+    def _send_shell_text_locked(self, text: str) -> None:
+        if not self._shell_is_active_locked() or self._shell is None:
+            raise _ControlShellLost("SSH control shell lost", retryable=True)
+        self._shell.sendall(text.encode("utf-8"))
+
+    def _read_available_locked(self) -> bool:
+        if self._shell is None:
+            return False
+        saw_activity = False
+        while self._shell.recv_ready():
+            chunk = self._shell.recv(4096)
+            if not chunk:
+                raise _ControlShellLost("SSH control shell lost", retryable=False)
+            self._shell_stdout_buffer += chunk.decode("utf-8", errors="replace")
+            saw_activity = True
+        while self._shell.recv_stderr_ready():
+            chunk = self._shell.recv_stderr(4096)
+            if not chunk:
+                raise _ControlShellLost("SSH control shell lost", retryable=False)
+            self._shell_stderr_buffer += chunk.decode("utf-8", errors="replace")
+            saw_activity = True
+        return saw_activity
+
+    def _shell_diagnostic_tail_locked(self) -> str:
+        diagnostic = self._shell_stderr_buffer.strip() or self._shell_stdout_buffer.strip()
+        if not diagnostic:
+            return ""
+        lines = diagnostic.splitlines()
+        return lines[-1].strip()
+
+    def _read_until_contains_locked(self, token: str) -> None:
+        deadline = time.monotonic() + self._SHELL_TIMEOUT_SEC
+        saw_activity = False
+        while token not in self._shell_stdout_buffer:
+            if time.monotonic() >= deadline:
+                tail = self._shell_diagnostic_tail_locked()
+                if tail:
+                    raise RuntimeError(f"SSH control shell timed out: {tail}")
+                raise RuntimeError("SSH control shell timed out")
+            if not self._shell_is_active_locked() or self._shell is None:
+                raise _ControlShellLost("SSH control shell lost", retryable=not saw_activity)
+            if not self._shell.recv_ready() and not self._shell.recv_stderr_ready():
+                time.sleep(self._SHELL_POLL_SEC)
+                continue
+            saw_activity = self._read_available_locked() or saw_activity
+
+    def _discard_through_locked(self, token: str) -> None:
+        marker_index = self._shell_stdout_buffer.find(token)
+        if marker_index < 0:
+            return
+        self._shell_stdout_buffer = self._shell_stdout_buffer[marker_index + len(token) :]
+        self._shell_stderr_buffer = ""
+
+    def _next_request_id_locked(self) -> str:
+        self._request_counter += 1
+        return str(self._request_counter)
+
+    def _parse_command_result_locked(self, request_id: str) -> CommandResult:
+        begin = self._marker("BEGIN", request_id)
+        stdout_marker = self._marker("STDOUT", request_id)
+        stderr_marker = self._marker("STDERR", request_id)
+        exit_prefix = f"{self._MARKER}TEMPORAL_EXIT:{request_id}:"
+        end = self._marker("END", request_id)
+        self._read_until_contains_locked(end)
+        begin_index = self._shell_stdout_buffer.find(begin)
+        if begin_index < 0:
+            raise RuntimeError("SSH control shell protocol desynced")
+        stdout_index = self._shell_stdout_buffer.find(stdout_marker, begin_index + len(begin))
+        stderr_index = self._shell_stdout_buffer.find(
+            stderr_marker, stdout_index + len(stdout_marker)
+        )
+        exit_index = self._shell_stdout_buffer.find(exit_prefix, stderr_index + len(stderr_marker))
+        exit_end_index = self._shell_stdout_buffer.find(self._MARKER, exit_index + len(exit_prefix))
+        end_index = self._shell_stdout_buffer.find(end, exit_end_index)
+        if min(stdout_index, stderr_index, exit_index, exit_end_index, end_index) < 0:
+            raise RuntimeError("SSH control shell protocol desynced")
+        stdout = self._shell_stdout_buffer[stdout_index + len(stdout_marker) : stderr_index]
+        stderr = self._shell_stdout_buffer[stderr_index + len(stderr_marker) : exit_index]
+        code_text = self._shell_stdout_buffer[exit_index + len(exit_prefix) : exit_end_index]
+        try:
+            code = int(code_text)
+        except ValueError as exc:
+            raise RuntimeError("SSH control shell returned invalid exit code") from exc
+        self._shell_stdout_buffer = self._shell_stdout_buffer[end_index + len(end) :]
+        self._shell_stderr_buffer = ""
+        return CommandResult(code=code, stdout=stdout, stderr=stderr)
+
+    def _run_shell_function(self, name: str, *args: str) -> CommandResult:
+        with self._lock:
+            last_error: RuntimeError | None = None
+            for _ in range(2):
+                try:
+                    self._ensure_control_shell_locked()
+                    request_id = self._next_request_id_locked()
+                    quoted_args = " ".join(shlex.quote(arg) for arg in args)
+                    command = f"temporal_run {shlex.quote(request_id)} {name}"
+                    if quoted_args:
+                        command = f"{command} {quoted_args}"
+                    self._send_shell_text_locked(command + "\n")
+                    return self._parse_command_result_locked(request_id)
+                except _ControlShellLost as exc:
+                    self._close_shell_locked()
+                    if not exc.retryable:
+                        raise RuntimeError(str(exc)) from exc
+                    last_error = RuntimeError(str(exc))
+            if last_error is not None:
+                raise last_error
+            raise RuntimeError("SSH control shell lost")
+
+    def _metadata_result(self) -> CommandResult:
+        return self._run_shell_function("temporal_metadata")
+
+    def _parse_metadata(self, stdout: str) -> _PreflightRuntime:
+        values: dict[str, str] = {}
+        for line in stdout.splitlines():
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key] = value
+        return _PreflightRuntime(
+            home_dir=values.get("home", ""),
+            working_dir=values.get("working_dir", ""),
+            resolved_command=values.get("resolved_command", ""),
         )
 
-    def _stop_script(self) -> str:
-        return self._runtime_script(
-            "if ! load_valid_pid; then",
-            "    exit 0",
-            "fi",
-            'if ! kill "$pid" 2>/dev/null; then',
-            '    if ! kill -0 "$pid" 2>/dev/null; then',
-            "        cleanup_pid",
-            "        exit 0",
-            "    fi",
-            '    printf "failed to stop pid %s\\n" "$pid" >&2',
-            "    exit 1",
-            "fi",
-            "attempt=0",
-            'while kill -0 "$pid" 2>/dev/null; do',
-            "    attempt=$((attempt + 1))",
-            f'    if [ "$attempt" -ge {self._STOP_WAIT_ATTEMPTS} ]; then',
-            '        printf "failed to stop pid %s\\n" "$pid" >&2',
-            "        exit 1",
-            "    fi",
-            f"    sleep {self._STOP_WAIT_SEC}",
-            "done",
-            "cleanup_pid",
-            needs_command_path=True,
-        )
+    def _read_remote_text(self, path: str, missing_reason: str) -> CommandResult:
+        result = self._run_shell_function("temporal_cat_file", path, missing_reason)
+        if result.code == 0:
+            return result
+        stderr = result.stderr.strip() or missing_reason
+        return CommandResult(code=result.code, stdout=result.stdout, stderr=stderr)
 
-    def _log_script(self, lines: int) -> str:
-        return self._runtime_script(
-            f'if [ -f "$resolved_log" ]; then tail -n {lines} "$resolved_log"; fi'
-        )
+    def _resolve_cfg_path_for_preflight(self, runtime: _PreflightRuntime) -> CommandResult | str:
+        raw_cfg_path = self._cfg_arg_path()
+        if raw_cfg_path is None:
+            wrapper_result = self._read_remote_text(
+                runtime.resolved_command,
+                "preflight: odas config path missing",
+            )
+            if wrapper_result.code != 0:
+                return self._preflight_failed("preflight: odas config path missing")
+            raw_cfg_path = _extract_wrapper_cfg_path(wrapper_result.stdout)
+        if not raw_cfg_path:
+            return self._preflight_failed("preflight: odas config path missing")
+        return _resolve_cfg_path(raw_cfg_path, runtime)
+
+    def _validate_static_preflight(self) -> CommandResult:
+        metadata_result = self._metadata_result()
+        if metadata_result.code != 0:
+            return metadata_result
+        runtime = self._parse_metadata(metadata_result.stdout)
+        cfg_path = self._resolve_cfg_path_for_preflight(runtime)
+        if isinstance(cfg_path, CommandResult):
+            return cfg_path
+        cfg_result = self._read_remote_text(cfg_path, "preflight: odas config file missing")
+        if cfg_result.code != 0:
+            return self._preflight_failed("preflight: odas config file missing")
+        sink_error = _sink_targets_match(cfg_result.stdout, self._streams)
+        if sink_error is not None:
+            return self._preflight_failed(sink_error)
+        return CommandResult(code=0, stdout="", stderr="")
 
     def start_odaslive(self) -> CommandResult:
         preflight = self._validate_static_preflight()
         if preflight.code != 0:
             return preflight
-        return self._exec(self._shell_command(self._start_script()))
+        return self._run_shell_function("temporal_start")
 
     def stop_odaslive(self) -> CommandResult:
-        return self._exec(self._shell_command(self._stop_script()))
+        return self._run_shell_function("temporal_stop")
 
     def status(self) -> CommandResult:
-        return self._exec(self._shell_command(self._status_script()))
+        return self._run_shell_function("temporal_status")
 
     def read_log_tail(self, lines: int = 80) -> CommandResult:
-        safe_lines = max(1, min(lines, 200))
-        return self._exec(self._shell_command(self._log_script(safe_lines)))
+        safe_lines = str(max(1, min(lines, 200)))
+        return self._run_shell_function("temporal_log_tail", safe_lines)

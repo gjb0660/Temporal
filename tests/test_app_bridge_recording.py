@@ -1,35 +1,12 @@
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 from unittest.mock import patch
 
 from temporal.app import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.core.ssh.remote_odas import CommandResult
-
-
-def _fake_config() -> TemporalConfig:
-    remote = RemoteOdasConfig(
-        host="127.0.0.1",
-        port=22,
-        username="odas",
-        private_key="~/.ssh/id_rsa",
-        odas_args=["-c", "/opt/odas/config/odas.cfg"],
-        odas_log="/tmp/odaslive.log",
-    )
-    streams = OdasStreamConfig(
-        sst=OdasEndpoint(host="127.0.0.1", port=9000),
-        ssl=OdasEndpoint(host="127.0.0.1", port=9001),
-        sss_sep=OdasEndpoint(host="127.0.0.1", port=10000),
-        sss_pf=OdasEndpoint(host="127.0.0.1", port=10010),
-    )
-    return TemporalConfig(remote=remote, streams=streams)
-
-
-def _status_text(bridge: AppBridge) -> str:
-    return cast(str, getattr(bridge, "status"))
 
 
 @dataclass
@@ -80,26 +57,18 @@ class _FakeRecorder:
 
 
 class _FakeClient:
-    event_log: list[str] | None = None
-
     def __init__(self, **_kwargs) -> None:
         self.start_calls = 0
         self.stop_calls = 0
 
     def start(self) -> None:
         self.start_calls += 1
-        if self.event_log is not None:
-            self.event_log.append("client.start")
 
     def stop(self) -> None:
         self.stop_calls += 1
-        if self.event_log is not None:
-            self.event_log.append("client.stop")
 
 
 class _FakeRemote:
-    event_log: list[str] | None = None
-
     def __init__(self, _config, _streams) -> None:
         self.connected = False
         self.running = False
@@ -110,25 +79,22 @@ class _FakeRemote:
     def connect(self) -> None:
         self.connected = True
         self.connect_calls += 1
-        if self.event_log is not None:
-            self.event_log.append("remote.connect")
+
+    def is_connected(self) -> bool:
+        return self.connected
 
     def start_odaslive(self) -> CommandResult:
         self.running = True
         self.start_calls += 1
-        if self.event_log is not None:
-            self.event_log.append("remote.start")
         return CommandResult(code=0, stdout="123\n", stderr="")
 
     def stop_odaslive(self) -> CommandResult:
         self.running = False
         self.stop_calls += 1
-        if self.event_log is not None:
-            self.event_log.append("remote.stop")
         return CommandResult(code=0, stdout="", stderr="")
 
     def status(self) -> CommandResult:
-        stdout = "odaslive -c /tmp/odas.cfg\n" if self.running else ""
+        stdout = "123\n" if self.running else ""
         return CommandResult(code=0, stdout=stdout, stderr="")
 
     def read_log_tail(self, _lines: int = 80) -> CommandResult:
@@ -138,39 +104,59 @@ class _FakeRemote:
         return CommandResult(code=0, stdout=stdout, stderr="")
 
 
-class TestAppBridgeRecording(unittest.TestCase):
-    def setUp(self) -> None:
-        _FakeClient.event_log = None
-        _FakeRemote.event_log = None
+def _fake_config() -> tuple[RemoteOdasConfig, OdasStreamConfig]:
+    remote = RemoteOdasConfig(
+        host="172.21.16.222",
+        port=22,
+        username="odas",
+        private_key="~/.ssh/id_rsa",
+        odas_command="./odas_loop.sh",
+        odas_args=[],
+        odas_cwd="workspace/ODAS/odas",
+        odas_log="odaslive.log",
+    )
+    streams = OdasStreamConfig(
+        sst=OdasEndpoint(host="192.168.1.50", port=9000),
+        ssl=OdasEndpoint(host="192.168.1.50", port=9001),
+        sss_sep=OdasEndpoint(host="192.168.1.50", port=10000),
+        sss_pf=OdasEndpoint(host="192.168.1.50", port=10010),
+    )
+    return remote, streams
 
-    def _build_bridge(self) -> AppBridge:
+
+class TestAppBridgeRecording(unittest.TestCase):
+    def _make_bridge(self) -> AppBridge:
+        remote, streams = _fake_config()
         with (
-            patch("temporal.app.load_config", return_value=_fake_config()),
             patch("temporal.app.AutoRecorder", _FakeRecorder),
+            patch(
+                "temporal.app.load_config",
+                return_value=TemporalConfig(remote=remote, streams=streams),
+            ),
             patch("temporal.app.OdasClient", _FakeClient),
             patch("temporal.app.RemoteOdasController", _FakeRemote),
         ):
             return AppBridge()
 
     def test_sst_updates_recording_count(self) -> None:
-        bridge = self._build_bridge()
+        bridge = self._make_bridge()
 
         bridge._on_sst({"src": [{"id": 2}, {"id": 0}, {"id": 5}]})
 
         self.assertEqual(bridge.recordingSourceCount, 2)
-        self.assertIn("录制中=2", _status_text(bridge))
+        self.assertIn("录制中=2", bridge._status)
 
     def test_stop_streams_resets_recording_count(self) -> None:
-        bridge = self._build_bridge()
+        bridge = self._make_bridge()
         bridge._on_sst({"src": [{"id": 3}]})
 
         bridge.stopStreams()
 
         self.assertEqual(bridge.recordingSourceCount, 0)
-        self.assertEqual(_status_text(bridge), "数据流已关闭")
+        self.assertEqual(bridge._status, "Temporal 就绪")
 
     def test_source_channel_map_reuses_existing_channel(self) -> None:
-        bridge = self._build_bridge()
+        bridge = self._make_bridge()
 
         bridge._on_sst({"src": [{"id": 10}, {"id": 20}]})
         self.assertEqual(bridge._source_channel_map, {10: 0, 20: 1})
@@ -179,7 +165,7 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(bridge._source_channel_map, {20: 1, 30: 0})
 
     def test_sep_audio_routes_to_mapped_sources(self) -> None:
-        bridge = self._build_bridge()
+        bridge = self._make_bridge()
         recorder = bridge._recorder
         self.assertIsInstance(recorder, _FakeRecorder)
 
@@ -199,7 +185,7 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_pf_audio_routes_to_mapped_sources(self) -> None:
-        bridge = self._build_bridge()
+        bridge = self._make_bridge()
         recorder = bridge._recorder
         self.assertIsInstance(recorder, _FakeRecorder)
 
@@ -213,7 +199,7 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(actual.get((2, "pf")), b"\x22\x00")
 
     def test_recording_sessions_updates_on_sst_and_stop(self) -> None:
-        bridge = self._build_bridge()
+        bridge = self._make_bridge()
 
         bridge._on_sst({"src": [{"id": 2}]})
 
@@ -225,8 +211,8 @@ class TestAppBridgeRecording(unittest.TestCase):
 
         self.assertEqual(bridge._recording_sessions, [])
 
-    def test_toggle_remote_odas_connects_then_starts_listener_and_remote(self) -> None:
-        bridge = self._build_bridge()
+    def test_toggle_remote_odas_connects_then_starts(self) -> None:
+        bridge = self._make_bridge()
 
         bridge.toggleRemoteOdas()
 
@@ -234,43 +220,39 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertTrue(bridge.odasRunning)
         self.assertTrue(bridge.streamsActive)
         self.assertEqual(bridge._remote.connect_calls, 1)
-        self.assertEqual(bridge._client.start_calls, 1)
         self.assertEqual(bridge._remote.start_calls, 1)
+        self.assertEqual(bridge._client.start_calls, 1)
 
-    def test_toggle_remote_odas_stops_listener_before_remote(self) -> None:
-        events: list[str] = []
-        _FakeClient.event_log = events
-        _FakeRemote.event_log = events
-        bridge = self._build_bridge()
-
+    def test_toggle_remote_odas_stops_remote_only(self) -> None:
+        bridge = self._make_bridge()
         bridge.toggleRemoteOdas()
+
         bridge.toggleRemoteOdas()
 
         self.assertFalse(bridge.odasRunning)
-        self.assertFalse(bridge.streamsActive)
+        self.assertTrue(bridge.streamsActive)
         self.assertEqual(bridge._remote.stop_calls, 1)
-        self.assertEqual(bridge._client.stop_calls, 1)
-        self.assertEqual(
-            events,
-            ["remote.connect", "client.start", "remote.start", "client.stop", "remote.stop"],
-        )
+        self.assertEqual(bridge._client.stop_calls, 0)
+        self.assertIn("监听", bridge._status)
 
-    def test_toggle_streams_can_run_without_remote(self) -> None:
-        bridge = self._build_bridge()
+    def test_toggle_streams_requires_live_control_channel(self) -> None:
+        bridge = self._make_bridge()
 
+        bridge.toggleStreams()
+        self.assertFalse(bridge.streamsActive)
+        self.assertEqual(bridge._status, "请先连接远程 SSH")
+
+        bridge.connectRemote()
         bridge.toggleStreams()
         self.assertTrue(bridge.streamsActive)
-        self.assertFalse(bridge.odasRunning)
         self.assertEqual(bridge._client.start_calls, 1)
-        self.assertEqual(bridge.remoteLogText, "本地 listener 已开启\n等待远程 odaslive 接入")
 
-        bridge.toggleStreams()
-        self.assertFalse(bridge.streamsActive)
-        self.assertEqual(bridge._client.stop_calls, 1)
-        self.assertEqual(_status_text(bridge), "数据流已关闭")
+        bridge._remote.connected = False
+        bridge._refresh_remote_connection_state()
+        self.assertFalse(bridge.canToggleStreams)
 
     def test_sst_over_capacity_limits_recording_to_mapped_sources(self) -> None:
-        bridge = self._build_bridge()
+        bridge = self._make_bridge()
 
         bridge._on_sst({"src": [{"id": 1}, {"id": 2}, {"id": 3}, {"id": 4}, {"id": 5}]})
 
