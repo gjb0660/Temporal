@@ -13,6 +13,8 @@
 - `specs/index.md`: static contract and reading principles.
 - `specs/in-progress.md`: active routing, feature state,
   and duplicate-demand checks.
+- `specs/phase-progress.md`: retired compatibility entry;
+  do not use it as the live progress board.
 - `specs/plans/`: transitional expansion area for complex plans
   until Execution is absorbed back into feature files.
 - `specs/knowledge/`: external and domain reference material.

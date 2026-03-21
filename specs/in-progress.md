@@ -2,105 +2,86 @@
 
 ## Usage
 
-- Check this file before starting a new feature.
-- Treat entries below as the live routing and state source.
-- Use `blocked` only when an external dependency or input
-  stops direct progress.
-- Do not treat blocked features as directly codable.
+- 开始新特性前先检查此文件。
+- 将下方条目视为当前唯一的活动路由与状态来源。
+- 只有在外部依赖或缺失输入直接阻断推进时才使用 `blocked`。
+- 不要把 `blocked` 条目当作可以直接开工编码的任务。
 
 ## Active Features
 
-- Phase H preview entry and bridge
-  State: planned
-  Summary: Implement Phase H preview entry and bridge so
-  `uv run temporal-preview` becomes the standard UI test entrypoint.
-  Spec: [phase-h-preview-entry-and-bridge.md](./plans/phase-h-preview-entry-and-bridge.md)
-
-- Phase H preview data linkage
-  State: planned
-  Summary: Implement Phase H preview data linkage for right sidebar source rows,
-  center charts, and 3D point synchronization.
-  Spec: [phase-h-preview-data-linkage.md](./plans/phase-h-preview-data-linkage.md)
-
-- Phase H preview filtering and validation
-  State: planned
-  Summary: Implement Phase H preview filtering and screenshot workflow so the
-  energy range control filters sidebar, charts, and 3D together.
-  Spec: [phase-h-preview-filtering-and-validation.md](./plans/phase-h-preview-filtering-and-validation.md)
+- Phase H preview model convergence follow-up
+  State: specified
+  Summary: 基于已落地的 preview 入口、共享 bridge 注入和统一 tracking
+  timeline，继续收口逐帧 energy、右栏动态数值，以及 preview/runtime
+  规范化数据模型对齐。
+  Specs:
+  [phase-h-preview-data-linkage.md](./plans/phase-h-preview-data-linkage.md),
+  [phase-h-preview-filtering-and-validation.md](./plans/phase-h-preview-filtering-and-validation.md)
 
 - Remote runtime validation and reconnect hardening
   State: specified
-  Summary: Validate remote Linux odaslive end-to-end: SSH connect, start/stop
-  lifecycle, remote log tail, SST/SSL updates, and recorder session visibility.
+  Summary: 补齐远端 Linux `odaslive` 的端到端验证与重连加固，包括 SSH
+  连接、启动/停止生命周期、远端日志跟随、SST/SSL 更新和录音会话可见性。
   Spec: [phase-f-integration-runbook-risks.md](./plans/phase-f-integration-runbook-risks.md)
 
 ## Recently Completed (Last 7 Days)
 
-- Remote stream listener direction corrected to `ODAS -> Temporal`,
-  with wildcard bind default and preflight coverage tightened
-  Spec: [phase-b-remote-control-and-streams.md](./plans/phase-b-remote-control-and-streams.md)
-
-- Phase A: project skeleton + runnable PySide6/QML shell
+- Phase A: 项目骨架与可运行的 PySide6/QML shell
   Spec: [phase-a-project-skeleton.md](./plans/phase-a-project-skeleton.md)
 
-- Phase B: SSH control + ODAS stream client scaffolding
+- Phase B: SSH 控制与 ODAS 流客户端脚手架，并修正 listener 方向为
+  `ODAS -> Temporal`、明确 wildcard bind 默认值并收紧 preflight 覆盖
   Spec: [phase-b-remote-control-and-streams.md](./plans/phase-b-remote-control-and-streams.md)
 
-- Phase C: source list and filters linked to SST/SSL stream state
+- Phase C: 声源列表与筛选联动到 SST/SSL 流状态
   Spec: [phase-c-sources-filters.md](./plans/phase-c-sources-filters.md)
 
-- Phase D: recorder lifecycle, filename contract,
-  and appBridge linkage baseline
+- Phase D: recorder 生命周期、文件名契约与 appBridge 联动基线
   Spec: [phase-d-auto-recording.md](./plans/phase-d-auto-recording.md)
 
-- Phase D extension: SSS routing and recorder session visibility
+- Phase D extension: SSS 路由与录音会话可见性
   Spec: [phase-d-sss-routing-and-session-visibility.md](./plans/phase-d-sss-routing-and-session-visibility.md)
 
-- Phase F extension: recorder activation aligned with channel mapping
+- Phase F extension: 录音激活逻辑与 channel mapping 对齐
   Spec: [phase-f-channel-cap-alignment.md](./plans/phase-f-channel-cap-alignment.md)
 
-- Phase F: integration validation, runbook, and risks documentation
+- Phase F: 集成验证、runbook 与风险文档
   Spec: [phase-f-validation-and-delivery.md](./plans/phase-f-validation-and-delivery.md)
 
-- Phase G: Chinese UI parity pass, remote odaslive log panel,
-  and 3D source view scaffolding
+- Phase G: 中文 UI 对齐、远端 odaslive 日志面板、3D 声源视图脚手架、
+  source sphere 重建、空态清理与默认 Z-up 朝向
   Spec: [phase-g-ui-visual-parity.md](./plans/phase-g-ui-visual-parity.md)
 
-- Phase G extension: source sphere rebuild, empty-state cleanup,
-  and default Z-up orientation
-  Spec: [phase-g-ui-visual-parity.md](./plans/phase-g-ui-visual-parity.md)
-
-- Phase H preview planning baseline: entry, linkage,
-  and validation specs defined
+- Phase H preview entry and bridge baseline: 完成 specs 定义、preview
+  入口落地、共享 bridge 注入，以及 header/center/sidebar 绑定迁移到
+  统一 bridge 契约
   Spec: [phase-h-preview-entry-and-bridge.md](./plans/phase-h-preview-entry-and-bridge.md)
 
-- Rule update: Pyright config aligned with Facade and namespace package rule
-  Spec: [phase-e-agent-governance.md](./plans/phase-e-agent-governance.md)
+- Phase H preview linkage and workflow baseline: 去除 QML 本地 preview 分支、
+  恢复 sidebar 目录集与可见集分离语义、将 timer 启动迁移到安全的应用路径、
+  对齐主按钮与 listener 的 runtime 语义，并在共享 `trackingFrames`
+  上统一图表与 3D 运动时钟
+  Specs:
+  [phase-h-preview-data-linkage.md](./plans/phase-h-preview-data-linkage.md),
+  [phase-h-preview-filtering-and-validation.md](./plans/phase-h-preview-filtering-and-validation.md)
 
-- Phase E: Agent governance files
-  (`.github/copilot-instructions.md`, `AGENTS.md`, `.github/instructions/*`)
-  Spec: [phase-e-agent-governance.md](./plans/phase-e-agent-governance.md)
-
-- Rule update: `specs/in-progress.md` only updated during handoff stage
-  Spec: [phase-e-agent-governance.md](./plans/phase-e-agent-governance.md)
-
-- Rule update: governance language ownership deduplicated,
-  and historical handoff normalization started
-  Spec: [phase-e-agent-governance.md](./plans/phase-e-agent-governance.md)
-
-- Rule update: root-cause-first prompt aligned with
-  question-first exploration and no-assumption governance
+- Phase E governance refresh: agent 治理文件落地、Pyright 配置与 Facade
+  及 namespace package 规则对齐、`specs/in-progress.md`
+  成为仅在 handoff 更新的 live board，并完成治理语言归属去重与
+  root-cause-first 探索规则收紧
   Spec: [phase-e-agent-governance.md](./plans/phase-e-agent-governance.md)
 
 ## Session Lessons
 
-- In this uv project, run toolchain commands with `uv run`.
-- For Python and QML changes, use lint first,
-  fix findings, then format.
-- Keep implementation and corresponding tests in one atomic commit.
-- Preview workflows should use a dedicated application entrypoint.
-- Keep specs and handoff docs on English headings with concise Chinese body.
-- For root-cause repair prompts, clarify first and do not proceed on
-  unstated assumptions.
-- For remote ODAS ingestion, wildcard bind (`0.0.0.0`) is a bind-only default;
-  do not treat it as the remote sink host literal in preflight checks.
+- 在这个 uv 项目里，工具链命令统一通过 `uv run` 执行。
+- Python 与 QML 改动先跑 lint，修完问题后再 format。
+- 实现与对应测试保持在同一个原子提交里。
+- Preview 工作流应使用独立的应用入口，而不是复用本地 QML 开关。
+- Preview 可以继续使用稳定演示数据，但数据 schema 应逐步向
+  真实 runtime 的统一规范模型收口，而不是长期保留 preview-only 结构。
+- Preview 右栏数字应逐步改成逐帧驱动，而不是长期停留在静态 metadata，
+  这样 UI 刷新逻辑才能与图表和 3D 共用同一时间线验证。
+- Specs 与 handoff 文档保持英文标题、中文正文。
+- 处理 root-cause 修复请求时，先澄清再推进，不要在关键前提未明确时自行假设。
+- 对远端 ODAS 接入来说，wildcard bind（`0.0.0.0`）只是 bind 侧默认值，
+  不能在 preflight 检查里当作远端 sink host 字面值使用。
