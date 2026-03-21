@@ -18,6 +18,9 @@
   [phase-h-preview-data-linkage.md](./plans/phase-h-preview-data-linkage.md),
   [phase-h-preview-filtering-and-validation.md](./plans/phase-h-preview-filtering-and-validation.md)
 
+- Phase I: 新增测试完整性与可靠性加固计划
+  Spec: [phase-i-test-completeness-and-hardening.md](./plans/phase-i-test-completeness-and-hardening.md)
+
 - Remote runtime validation and reconnect hardening
   State: specified
   Summary: 补齐远端 Linux `odaslive` 的端到端验证与重连加固，包括 SSH
@@ -29,8 +32,10 @@
 - Phase A: 项目骨架与可运行的 PySide6/QML shell
   Spec: [phase-a-project-skeleton.md](./plans/phase-a-project-skeleton.md)
 
-- Phase B: SSH 控制与 ODAS 流客户端脚手架，并修正 listener 方向为
-  `ODAS -> Temporal`、明确 wildcard bind 默认值并收紧 preflight 覆盖
+- Phase B: 完成 SSH 控制与 ODAS 流客户端脚手架，并持续收口远端控制与流监听语义，
+  包括修正 listener 方向为 `ODAS -> Temporal`、明确 wildcard bind 默认值、
+  收紧 preflight 覆盖、澄清远端 odaslive 与本地 listener 的独立生命周期、
+  以及将远端停止语义收紧到 wrapper 启动场景下的受控进程组
   Spec: [phase-b-remote-control-and-streams.md](./plans/phase-b-remote-control-and-streams.md)
 
 - Phase C: 声源列表与筛选联动到 SST/SSL 流状态
@@ -85,3 +90,10 @@
 - 处理 root-cause 修复请求时，先澄清再推进，不要在关键前提未明确时自行假设。
 - 对远端 ODAS 接入来说，wildcard bind（`0.0.0.0`）只是 bind 侧默认值，
   不能在 preflight 检查里当作远端 sink host 字面值使用。
+- 对 ODAS 控制交互来说，SSH、远端 odaslive 与本地 listener 的生命周期要显式区分：
+  SSH 只在远端启动时惰性连接，listener 是独立资源，停止监听不应隐含停止远端
+  odaslive 或断开 SSH。
+- 当远端 ODAS 通过 wrapper 脚本启动时，停止语义必须作用于整个受控进程组；
+  只杀 wrapper pid 不足以完成真正的远端停机。
+- UI 中 listener 按钮的可用态必须反映实时的 SSH 控制通道健康状态，
+  而不能只依赖“曾经连接成功过”的陈旧状态。
