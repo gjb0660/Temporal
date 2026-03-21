@@ -54,6 +54,8 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 ## SSH Semantics
 
 - Call `paramiko.SSHClient.connect` once and pass optional credentials as `None`.
+- Do not auto-connect SSH on page open; connect lazily when an operator
+  starts remote odaslive and no SSH session exists yet.
 - Start odaslive in background without `nohup`.
 - Apply `odas.cwd` before start, stop, status, and log read when configured.
 - Start appends runtime output to `odas.log`
@@ -97,6 +99,11 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 - Treat preflight failure as a startup failure.
 - If local listeners are not active when remote odaslive starts,
   Temporal must start them before launching odaslive.
+- Keep SSH connection lifecycle independent from stream-listener lifecycle:
+  stopping listeners must not disconnect SSH.
+- Keep remote odaslive lifecycle independent from stream-listener lifecycle
+  after startup: once remote odaslive is running, operators may stop local
+  listeners without automatically stopping the remote process.
 
 ## Stream Semantics
 
@@ -108,6 +115,13 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
   and it must roll back listeners that were already started in the same call.
 - Listener sockets must accept a connection, read until disconnect,
   and then continue accepting later reconnects.
+- Treat local listeners as an operator-controlled resource:
+  operators may start or stop listeners independently of the remote-odas
+  running state.
+- Stopping listeners closes only local listening sockets and local recording
+  state; it must not stop remote odaslive and must not disconnect SSH.
+- If remote odaslive keeps running after listeners stop, allow it to continue
+  and rely on remote logs to surface connection failures.
 
 ## Quality Requirements
 
@@ -130,3 +144,4 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 11. The left status panel shows a filtered human-readable failure reason
     instead of raw shell paths and traces.
 12. Temporal local listeners are started before remote odaslive launches.
+13. Stopping listeners does not stop remote odaslive and does not disconnect SSH.

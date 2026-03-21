@@ -33,19 +33,22 @@ closely matches the ODAS Studio reference in layout rhythm, control simplicity,
 ## Functional Requirements
 
 1. The page keeps a stable three-column structure when the window is resized.
-2. Header, content panels, and footer remain aligned without absolute page positioning.
+2. Header, content panels, and footer remain aligned without absolute page
+   positioning.
 3. Source and filter panels continue to bind to `appBridge` state.
 4. The ODAS control area shows only two buttons in QML:
    `启动/停止` and `监听/停止监听`.
-5. The start toggle connects SSH first when needed, starts remote odaslive,
-   and stops both odaslive and active streams when toggled off.
-6. The listen toggle starts or stops streams and remains disabled when remote
-   odaslive is not running.
-7. The left log panel continues to display remote `/tmp/odaslive.log` tail output.
+5. The start toggle connects SSH first when needed, auto-starts local
+   listeners when needed, starts remote odaslive, and stops only remote
+   odaslive when toggled off.
+6. The listen toggle starts or stops local listeners as an independent
+   operator-controlled resource; it must not stop remote odaslive and it must
+   not connect or disconnect SSH.
+7. The left log panel continues to display remote log tail output.
 8. The source-location area remains rotatable and displays active SST source
    positions when available.
-9. The source-location area includes a clearly visible XYZ axis indicator in the
-   lower-left overlay.
+9. The source-location area includes a clearly visible XYZ axis indicator in
+   the lower-left overlay.
 
 ## Interface Additions
 
@@ -73,24 +76,28 @@ uses the new toggle entry points.
   QML-only flags.
 - Future UI testing must use a dedicated preview entrypoint instead of editing
   `Main.qml` to enable preview mode.
-- Future preview datasets must drive both the center pane and the right sidebar
-  from one shared scenario model.
+- Future preview datasets must drive both the center pane and the right
+  sidebar from one shared scenario model.
 
 ## Quality Requirements
 
-- Use QML relative layouts, anchors, and size constraints instead of fixed page coordinates.
+- Use QML relative layouts, anchors, and size constraints instead of fixed page
+  coordinates.
 - Keep touched QML valid under qmllint and format it with `pyside6-qmlformat`.
 - Keep touched Python files clean under `ruff check` and `ruff format`.
 - Preserve readability at the default application size and at narrower widths.
 - Keep dynamic status or log text inside bounded containers; do not let it
   resize the control-button row.
+- Keep button semantics aligned with backend ownership:
+  start/stop controls remote odaslive, listen/stop-listening controls only
+  local stream listeners.
 
 ## Acceptance Criteria
 
 1. At the default application size, the page visually matches the reference in
    overall composition, spacing, and hierarchy.
-2. The left ODAS log area and left ODAS control area maintain an overall height
-   split close to 6:4.
+2. The left ODAS log area and left ODAS control area maintain an overall
+   height split close to 6:4.
 3. The left control area shows only the two toggle buttons and their state is
    consistent with bridge status.
 4. The 3D source-location sphere is visually larger than the current version
@@ -116,7 +123,8 @@ uses the new toggle entry points.
 
 - Keep the source-location area as a recognizable interactive 3D view; do not
   regress it to a placeholder or unreadable point cloud.
-- Keep listen control blocked when odaslive is not running; do not let QML
-  bypass backend safety checks.
+- Keep QML labels and enabled states aligned with backend ownership; do not
+  reintroduce UI logic that implicitly couples listener stop to remote-odas
+  stop.
 - Keep left-column card proportions explicit in layout constraints so future
   text changes do not collapse the control area again.
