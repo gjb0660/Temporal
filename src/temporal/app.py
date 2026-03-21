@@ -559,6 +559,22 @@ class AppBridge(QObject):
             return "远程 ODAS 配置文件不存在"
         if "preflight: sink host mismatch" in lower:
             return "远程 ODAS 配置中的输出地址与 Temporal 监听地址不一致"
+        if "preflight: tracked sink missing" in lower:
+            return "远程 ODAS 配置缺少 tracked 输出定义"
+        if "preflight: potential sink missing" in lower:
+            return "远程 ODAS 配置缺少 potential 输出定义"
+        if "preflight: separated sink missing" in lower:
+            return "远程 ODAS 配置缺少 separated 输出定义"
+        if "preflight: postfiltered sink missing" in lower:
+            return "远程 ODAS 配置缺少 postfiltered 输出定义"
+        if "preflight: tracked sink port mismatch" in lower:
+            return "远程 ODAS 配置中的 tracked 输出端口与 Temporal 不一致"
+        if "preflight: potential sink port mismatch" in lower:
+            return "远程 ODAS 配置中的 potential 输出端口与 Temporal 不一致"
+        if "preflight: separated sink port mismatch" in lower:
+            return "远程 ODAS 配置中的 separated 输出端口与 Temporal 不一致"
+        if "preflight: postfiltered sink port mismatch" in lower:
+            return "远程 ODAS 配置中的 postfiltered 输出端口与 Temporal 不一致"
         if "preflight: tracks sink port mismatch" in lower:
             return "远程 ODAS 配置中的 tracks 输出端口与 Temporal 不一致"
         if "preflight: hops sink port mismatch" in lower:

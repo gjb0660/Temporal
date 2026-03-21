@@ -86,8 +86,12 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
   the resolved working directory exists,
   the configured command is executable,
   the referenced ODAS cfg file exists,
-  and the active cfg sink targets point at `streams.listen_host`
+  and the active ODAS sink blocks point at `streams.listen_host`
   and the configured ports.
+- Map ODAS sink blocks as:
+  `tracked` -> SST, `potential` -> SSL,
+  `separated` -> SSS separated, `postfiltered` -> SSS postfiltered.
+- Validate `interface.ip` and `interface.port` inside those sink blocks.
 - Do not validate cfg sinks by grepping the whole cfg text;
   ignore comments, examples, disabled blocks, and unrelated numbers.
 - Treat preflight failure as a startup failure.

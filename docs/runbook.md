@@ -31,8 +31,10 @@
 - `odas.cwd` 为相对路径时，按远端 `$HOME/<cwd>` 解析。
 - `odas.command` 必须是可执行命令或脚本。
 - `odas.args` 中必须能定位到 ODAS cfg 文件，或 wrapper 脚本中能解析出 cfg 路径。
-- ODAS cfg 中 `tracks`、`hops`、音频 sink 的目标地址必须指向 Temporal 的
-  `streams.listen_host` 和对应端口。
+- ODAS cfg 中必须检查真实 sink block：
+  `tracked`、`potential`、`separated`、`postfiltered`。
+- 上述 block 内的 `interface.ip` 和 `interface.port`
+  必须指向 Temporal 的 `streams.listen_host` 和对应端口。
 - 若 `streams.listen_host = 0.0.0.0`，它只表示本地监听所有接口；
   远端 cfg 仍应填写一个真实可达的 Temporal IP，preflight 仅校验端口。
 

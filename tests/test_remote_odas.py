@@ -64,10 +64,36 @@ def _runtime_metadata_result(
 def _valid_cfg(host: str = "10.10.0.8") -> str:
     return "\n".join(
         [
-            f'tracks = {{ ip = "{host}", port = 9000 }}',
-            f'hops = {{ ip = "{host}", port = 9001 }}',
-            f'audio_sep = {{ ip = "{host}", port = 10000 }}',
-            f'audio_pf = {{ ip = "{host}", port = 10010 }}',
+            "tracked: {",
+            '  format = "json";',
+            "  interface: {",
+            '    type = "socket";',
+            f'    ip = "{host}";',
+            "    port = 9000;",
+            "  };",
+            "};",
+            "potential: {",
+            '  format = "json";',
+            "  interface: {",
+            '    type = "socket";',
+            f'    ip = "{host}";',
+            "    port = 9001;",
+            "  };",
+            "};",
+            "separated: {",
+            "  interface: {",
+            '    type = "socket";',
+            f'    ip = "{host}";',
+            "    port = 10000;",
+            "  };",
+            "};",
+            "postfiltered: {",
+            "  interface: {",
+            '    type = "socket";',
+            f'    ip = "{host}";',
+            "    port = 10010;",
+            "  };",
+            "};",
         ]
     )
 
@@ -125,20 +151,20 @@ class TestRemoteOdasController(unittest.TestCase):
     def test_sink_targets_reject_comment_only_port_matches(self) -> None:
         cfg_text = "\n".join(
             [
-                "# tracks port 9000",
-                "# hops port 9001",
-                "# audio sep port 10000",
-                "# audio pf port 10010",
-                'tracks = { ip = "10.10.0.8", port = 9100 }',
-                'hops = { ip = "10.10.0.8", port = 9101 }',
-                'audio_sep = { ip = "10.10.0.8", port = 10100 }',
-                'audio_pf = { ip = "10.10.0.8", port = 10110 }',
+                '# tracked: { interface: { ip = "10.10.0.8"; port = 9000; }; };',
+                '# potential: { interface: { ip = "10.10.0.8"; port = 9001; }; };',
+                '# separated: { interface: { ip = "10.10.0.8"; port = 10000; }; };',
+                '# postfiltered: { interface: { ip = "10.10.0.8"; port = 10010; }; };',
+                'tracked: { interface: { ip = "10.10.0.8"; port = 9100; }; };',
+                'potential: { interface: { ip = "10.10.0.8"; port = 9101; }; };',
+                'separated: { interface: { ip = "10.10.0.8"; port = 10100; }; };',
+                'postfiltered: { interface: { ip = "10.10.0.8"; port = 10110; }; };',
             ]
         )
 
         self.assertEqual(
             _sink_targets_match(cfg_text, _make_streams(listen_host="10.10.0.8")),
-            "preflight: tracks sink port mismatch",
+            "preflight: tracked sink port mismatch",
         )
 
     def test_sink_targets_skip_host_match_for_wildcard_but_keep_port_checks(self) -> None:
@@ -149,16 +175,31 @@ class TestRemoteOdasController(unittest.TestCase):
     def test_sink_targets_require_matching_ports_for_wildcard_bind(self) -> None:
         cfg_text = "\n".join(
             [
-                'tracks = { ip = "127.0.0.1", port = 9100 }',
-                'hops = { ip = "127.0.0.1", port = 9001 }',
-                'audio_sep = { ip = "127.0.0.1", port = 10000 }',
-                'audio_pf = { ip = "127.0.0.1", port = 10010 }',
+                'tracked: { interface: { ip = "127.0.0.1"; port = 9100; }; };',
+                'potential: { interface: { ip = "127.0.0.1"; port = 9001; }; };',
+                'separated: { interface: { ip = "127.0.0.1"; port = 10000; }; };',
+                'postfiltered: { interface: { ip = "127.0.0.1"; port = 10010; }; };',
             ]
         )
 
         self.assertEqual(
             _sink_targets_match(cfg_text, _make_streams(listen_host="0.0.0.0")),
-            "preflight: tracks sink port mismatch",
+            "preflight: tracked sink port mismatch",
+        )
+
+    def test_sink_targets_require_real_block_names(self) -> None:
+        cfg_text = "\n".join(
+            [
+                'tracks: { interface: { ip = "10.10.0.8"; port = 9000; }; };',
+                'hops: { interface: { ip = "10.10.0.8"; port = 9001; }; };',
+                'audio_sep: { interface: { ip = "10.10.0.8"; port = 10000; }; };',
+                'audio_pf: { interface: { ip = "10.10.0.8"; port = 10010; }; };',
+            ]
+        )
+
+        self.assertEqual(
+            _sink_targets_match(cfg_text, _make_streams(listen_host="10.10.0.8")),
+            "preflight: tracked sink missing",
         )
 
     def test_extract_wrapper_cfg_path(self) -> None:
@@ -183,7 +224,7 @@ class TestRemoteOdasController(unittest.TestCase):
         result = controller.start_odaslive()
 
         self.assertEqual(result.code, 1)
-        self.assertEqual(result.stderr, "preflight: tracks sink port mismatch")
+        self.assertEqual(result.stderr, "preflight: tracked sink port mismatch")
         self.assertEqual(len(controller.commands), 2)
 
     def test_start_odaslive_uses_wrapper_cfg_when_args_are_empty(self) -> None:

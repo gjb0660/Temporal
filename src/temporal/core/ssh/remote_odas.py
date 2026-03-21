@@ -50,12 +50,42 @@ def _strip_cfg_comments(text: str) -> str:
     return "\n".join(cleaned_lines)
 
 
-def _extract_cfg_assignment_body(cfg_text: str, name: str) -> str | None:
-    pattern = re.compile(rf"(?ms)^\s*{re.escape(name)}\s*=\s*\{{(?P<body>.*?)\}}")
+def _extract_braced_body(text: str, brace_index: int) -> str | None:
+    depth = 0
+    in_quotes = False
+    escaped = False
+    for index in range(brace_index, len(text)):
+        char = text[index]
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == '"':
+            in_quotes = not in_quotes
+            continue
+        if in_quotes:
+            continue
+        if char == "{":
+            depth += 1
+            continue
+        if char == "}":
+            depth -= 1
+            if depth == 0:
+                return text[brace_index + 1 : index]
+    return None
+
+
+def _extract_cfg_block_body(cfg_text: str, name: str) -> str | None:
+    pattern = re.compile(rf"\b{re.escape(name)}\b\s*[:=]\s*\{{")
     match = pattern.search(cfg_text)
     if match is None:
         return None
-    return match.group("body")
+    brace_index = cfg_text.find("{", match.start())
+    if brace_index < 0:
+        return None
+    return _extract_braced_body(cfg_text, brace_index)
 
 
 def _extract_cfg_string(body: str, *keys: str) -> str | None:
@@ -113,17 +143,20 @@ def _sink_targets_match(cfg_text: str, streams: OdasStreamConfig) -> str | None:
     cleaned_cfg = _strip_cfg_comments(cfg_text)
     validate_host = streams.sst.host not in {"", "0.0.0.0", "::"}
     sink_specs = (
-        ("tracks", "tracks", streams.sst.host, streams.sst.port),
-        ("hops", "hops", streams.ssl.host, streams.ssl.port),
-        ("audio_sep", "audio sep", streams.sss_sep.host, streams.sss_sep.port),
-        ("audio_pf", "audio pf", streams.sss_pf.host, streams.sss_pf.port),
+        ("tracked", "tracked", streams.sst.host, streams.sst.port),
+        ("potential", "potential", streams.ssl.host, streams.ssl.port),
+        ("separated", "separated", streams.sss_sep.host, streams.sss_sep.port),
+        ("postfiltered", "postfiltered", streams.sss_pf.host, streams.sss_pf.port),
     )
     for sink_name, label, expected_host, expected_port in sink_specs:
-        body = _extract_cfg_assignment_body(cleaned_cfg, sink_name)
+        body = _extract_cfg_block_body(cleaned_cfg, sink_name)
         if body is None:
             return f"preflight: {label} sink missing"
-        actual_host = _extract_cfg_string(body, "ip", "host")
-        actual_port = _extract_cfg_port(body)
+        interface_body = _extract_cfg_block_body(body, "interface")
+        if interface_body is None:
+            return f"preflight: {label} sink missing"
+        actual_host = _extract_cfg_string(interface_body, "ip", "host")
+        actual_port = _extract_cfg_port(interface_body)
         if validate_host and actual_host != expected_host:
             return "preflight: sink host mismatch"
         if actual_port != expected_port:
