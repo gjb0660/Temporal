@@ -6,9 +6,7 @@ agent: "agent"
 ---
 # Push
 
-Continue the workflow; otherwise start the work for the next feature.
-
-Remember `Explore -> Spec -> Plan -> Code` workflow.
-Remember update the relevant [specs/](../specs/).
+Follow the `Explore -> Spec -> Plan -> Code` flow. Just do it.
+Remember update the relevant [specs/](../../specs/).
 Remember `Red -> Green -> Refactor` in coding.
 Remember `Commit` at the end.

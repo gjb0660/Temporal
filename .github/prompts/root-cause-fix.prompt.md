@@ -5,12 +5,9 @@ argument-hint: "bug, failure mode, or target area"
 ---
 # Root Cause Fix
 
-Ask questions first. Fill every missing requirement.
-State first principles. Define goals and constraints.
-Dig to the root cause. Fix the underlying design.
-Document the specs, Test closed-loop.
+Using first principles, start from the root cause to fix this problem,
+without considering historical compatibility.
 
-No proceed with assumptions.
-No stop at symptoms.
-No patch.
-No preserve broken behavior.
+Ask one focused clarification round, at least 3 specific questions for targets.
+Fix the underlying design, not just the symptom.
+Document the specs. Close the loop with tests.
