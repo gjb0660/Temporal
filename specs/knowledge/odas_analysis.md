@@ -1,156 +1,245 @@
-# ODAS 配置分析 - 详细总结
+# ODAS Source Analysis
 
-## 1. SSL/SST/SSS 输出通道与字段
+## Core Architecture
 
-### SSL (Sound Source Localization)
+Source level: direct source fact
 
-- **输出端口**: 9001 (TCP Socket)
-- **IP 地址**: 172.21.16.139
-- **输出格式**: JSON
-- **配置路径**: `ssl.potential`
-- **字段类型**: POTs (Point of Targets) - 包含定位候选源点
+ODAS 的 authoritative 参考来自 `Y:\workspace\ODAS\odas` 源码快照。
+`CMakeLists.txt` 定义了一个共享库 `odas`，以及两个 demo
+可执行：`odaslive` 和 `odasserver`。
 
-### SST (Sound Source Tracking)
+- `odaslive` 入口位于 `demo/odaslive/main.c`
+- 配置装配位于 `demo/odaslive/configs.c`
+- 配置解析位于 `demo/odaslive/parameters.c`
+- 处理对象与线程装配位于 `demo/odaslive/objects.c`
+  和 `demo/odaslive/threads.c`
 
-- **输出端口**: 9000 (TCP Socket)
-- **IP 地址**: 172.21.16.139
-- **输出格式**: JSON
-- **配置路径**: `sst.tracked`
-- **字段类型**: Tracks - 包含追踪的声源轨迹
-- **跟踪模式**: Kalman滤波器（可选粒子滤波器）
-- **关键参数**:
-  - `Ptrack = 0.8`: 追踪概率
-  - `N_inactive = (150, 200, 250, 250)`: 非活跃追踪帧数阈值
-  - `theta_inactive = 0.9`: 非活跃追踪得分阈值
+Source level: direct source fact
 
-### SSS (Sound Source Separation & Post-filtering)
+构建依赖由 `CMakeLists.txt` 明确声明：
 
-- **分离输出**:
-  - 端口: 10000 (TCP Socket)
-  - IP: 172.21.16.139
-  - 采样率: 16000 Hz
-  - HopSize: 128
-  - 分离模式: DDS (Delay and Sum)
-  - 增益: 25.0 (提升分离音量)
+- `fftw3f`
+- `alsa`
+- `libconfig`
+- `libpulse-simple`
+- `pthread`
+- `m`
 
-- **后滤波输出**:
-  - 端口: 10010 (TCP Socket)
-  - IP: 172.21.16.139
-  - 采样率: 16000 Hz
-  - HopSize: 128
-  - 后滤波模式: SS (Spectral Subtraction)
-  - 增益: 35.0 (提升后验滤波音量)
+Source level: direct source fact
 
-## 2. odaslive 启动参数与依赖
+`odaslive` 命令行参数来自 `demo/odaslive/main.c`：
 
-### 启动参数
+- `-c <cfg_file>`: 必填配置文件路径
+- `-h`: 打印帮助
+- `-s`: 单线程模式
+- `-v`: verbose 输出
 
-```bash
-odaslive [OPTIONS]
+Source level: inference from source
 
-OPTIONS:
-  -c <cfg_file>    配置文件路径（必须）- 例如: odas.cfg
-  -h               显示帮助信息
-  -s               单线程处理（默认为多线程）
-  -v               详细输出模式
+从 `configs.c` 的装配顺序可以看出，`odaslive` 的主链路是：
+`raw -> mapping -> resample -> STFT -> noise -> SSL -> target injector
+-> SST -> SSS -> ISTFT -> resample -> volume -> sinks/classify`。
+这不是 README 级摘要，而是当前 demo runtime 的实际拼装顺序。
+
+## Runtime Direction
+
+Source level: direct source fact
+
+当配置里的 `interface.type = "socket"` 时，ODAS 侧不是监听端，
+而是 TCP client。这个结论来自两类源码：
+
+- `src/source/src_hops.c` 的 `src_hops_open_interface_socket`
+  调用 `connect(...)`
+- `src/sink/snk_pots.c`、`src/sink/snk_tracks.c`、
+  `src/sink/snk_hops.c` 的 socket open 逻辑也都调用 `connect(...)`
+
+Source level: inference from source
+
+因此，只要 ODAS 配置把 raw 输入、JSON 输出、或 SSS/PF 输出
+设成 socket，外部系统就必须先启动 server。
+这直接解释了为什么 `odas_web` 要先监听 9000/9001/10000/10010，
+再等待 ODAS 连接进来。
+
+## Wire Contracts
+
+### SSL Potential JSON
+
+Source level: direct source fact
+
+`src/sink/snk_pots.c` 的 `snk_pots_process_format_text_json`
+定义了 SSL potential 的 JSON 形状：
+
+```json
+{
+  "timeStamp": 123,
+  "src": [
+    { "x": 0.123, "y": -0.456, "z": 0.789, "E": 0.321 }
+  ]
+}
 ```
 
-### 编译依赖
+Source level: direct source fact
 
-从 CMakeLists.txt：
+字段层面只有以下确定项：
 
-- libfftw3f: FFT运算库
-- libconfig: 配置文件解析
-- libalsa: 音频驱动（ALSA）
-- libpulse-simple: PulseAudio支持
-- pthread: 多线程支持
-- libm: 数学库
+- `timeStamp`: `unsigned long long`
+- `src[*].x`: `float`
+- `src[*].y`: `float`
+- `src[*].z`: `float`
+- `src[*].E`: `float`
 
-### odaslive 源文件组成
+文档里不应再写 `id`、`confidence`、`activity` 等未在该 sink
+中输出的字段。
 
-- main.c: 主程序入口、命令行参数解析、信号处理
-- configs.c: 配置文件加载和初始化
-- objects.c: ODAS处理对象构造
-- parameters.c: 配置参数查询函数
-- threads.c: 多线程/单线程处理
-- profiler.c: 性能分析
+### SST Tracked JSON
 
-### 处理流程
+Source level: direct source fact
 
-1. 信号采集 (Raw audio from soundcard)
-2. 映射 (Mapping)
-3. 重采样 (Resample)
-4. STFT (频率域转换)
-5. 噪声估计 (Noise Estimation)
-6. SSL (声源定位)
-7. SST (声源追踪)
-8. SSS (声源分离)
-9. ISTFT + 重采样 (音频域转换)
-10. 音量调整 (Volume)
-11. 分类 (Classification)
+`src/sink/snk_tracks.c` 的 `snk_tracks_process_format_text_json`
+定义了 tracked JSON 形状：
 
-## 3. Temporal 客户端最小数据契约建议
-
-### 3.1 核心接收端口
-
-```text
-SSL:  172.21.16.139:9001 (JSON)
-SST:  172.21.16.139:9000 (JSON)
-SEP:  172.21.16.139:10000 (Raw audio PCM)
-PF:   172.21.16.139:10010 (Raw audio PCM)
+```json
+{
+  "timeStamp": 123,
+  "src": [
+    {
+      "id": 7,
+      "tag": "",
+      "x": 0.123,
+      "y": -0.456,
+      "z": 0.789,
+      "activity": 0.912
+    }
+  ]
+}
 ```
 
-### 3.2 JSON 数据格式预期（基于 ODAS 代码）
+Source level: direct source fact
 
-**SSL POTs 格式** (来自 snk_pots_ssl):
+字段层面只有以下确定项：
 
-- ID: 唯一源标识符
-- x, y, z: 3D空间位置坐标（米）
-- 可能还有：energy, confidence, activity等
+- `timeStamp`: `unsigned long long`
+- `src[*].id`: `unsigned long long`
+- `src[*].tag`: `char[256]` 语义上的字符串
+- `src[*].x`: `float`
+- `src[*].y`: `float`
+- `src[*].z`: `float`
+- `src[*].activity`: `float`
 
-**SST Tracks 格式** (来自 snk_tracks_sst):
+文档里不应继续把 `vx`、`vy`、`vz` 或独立 `energy` 写成
+tracked JSON 固定字段，因为当前 sink 实现没有输出这些值。
 
-- TrackID: 追踪ID
-- x, y, z: 当前位置
-- vx, vy, vz: 速度向量
-- energy: 能量/强度
-- activity: 活跃程度（0-1）
-- 状态: 活跃/非活跃/新增/消失
+### SSS And PF PCM Framing
 
-### 3.3 音频数据格式预期
+Source level: direct source fact
 
-**分离音频** (port 10000):
+`src/sink/snk_hops.c` 对二进制音频的写法是：
+外层按 sample 遍历，内层按 channel 遍历，然后把每个 sample
+编码成整数 PCM 写入 buffer。
 
-- 采样率: 16000 Hz
-- 格式: 16-bit PCM
-- HopSize: 128 samples
-- 多声道: 分离后的单声道音频（按源标识）
+Source level: inference from source
 
-**后滤波音频** (port 10010):
+因此 SSS separated 和 PF postfiltered 的 socket/file 输出都是：
 
-- 采样率: 16000 Hz
-- 格式: 16-bit PCM
-- HopSize: 128 samples
-- 单声道: 后滤波后的干净语音
+- 二进制整型 PCM，不是 JSON
+- sample-major
+- channel-interleaved
+- 每帧字节数为 `hopSize * nChannels * bytes_per_sample`
 
-### 3.4 最小客户端实现检查清单
+Source level: direct source fact
 
-[] 创建 TCP 连接池 (4个socket: SSL, SST, SEP, PF)
-[] 实现 JSON 解析器 (目标是解析 POTs和Tracks消息)
-[] 实现音频接收缓冲 (环形缓冲处理HopSize=128)
-[] 实现错误处理 (连接断开、心跳检测)
-[] 记录接收配置 (IP/端口/格式) 用于Temporal workflow
+位深允许 `int08/int16/int24/int32`。
+当前本地配置样例普遍使用 `16-bit`。
 
-### 3.5 推荐的监听顺序
+### Track Count And Audio Channel Count
 
-1. **优先级1**: SST 9000 (追踪数据 - 最有价值)
-2. **优先级2**: SSL 9001 (定位数据 - 补充SST)
-3. **优先级3**: PF 10010 (后滤波音频 - 用于验证)
-4. **可选**: SEP 10000 (分离音频 - 实验用)
+Source level: direct source fact
 
-### 3.6 数据流时序注意事项
+`demo/odaslive/parameters.c` 明确把多个 runtime 容量都绑定到
+`sst.N_inactive` 的数组长度：
 
-- SSL/SST: 实时JSON事件流
-- 音频(SEP/PF): 连续音频流，需要缓冲和同步
-- 建议: 用timestamp关联 JSON事件和音频片段
-- 考虑网络延迟（本地网络应 <10ms）
+- `parameters_msg_tracks_sst_config`:
+  `nTracks = parameters_count(fileConfig, "sst.N_inactive")`
+- `parameters_msg_hops_seps_rs_config`:
+  `nChannels = parameters_count(fileConfig, "sst.N_inactive")`
+- `parameters_msg_hops_pfs_rs_config`:
+  `nChannels = parameters_count(fileConfig, "sst.N_inactive")`
+
+Source level: inference from source
+
+这意味着：
+
+- tracked source 最大槽位数由配置驱动
+- separated/postfiltered 输出通道数也由同一配置驱动
+- “4 路 source / 4 路音频”只是某些配置实例的结果，
+  不是 ODAS 协议本身的固定常量
+
+## Local Config Profiles
+
+### `config/odas.cfg`
+
+Source level: config-specific fact
+
+这是当前仓库内的一个本地配置实例，不应上升为 ODAS 通用常量。
+它展示的组合为：
+
+- `ssl.potential`: socket JSON -> `172.21.16.139:9001`
+- `sst.tracked`: socket JSON -> `172.21.16.139:9000`
+- `sss.separated`: socket PCM -> `172.21.16.139:10000`
+- `sss.postfiltered`: socket PCM -> `172.21.16.139:10010`
+- `sss.separated.fS = 16000`
+- `sss.separated.hopSize = 128`
+- `sss.postfiltered.fS = 16000`
+- `sss.postfiltered.hopSize = 128`
+- `sss.mode_sep = "dds"`
+- `sss.mode_pf = "ss"`
+- `sst.N_inactive = (150, 200, 250, 250)`，对应 4 track slot
+
+### `re6_sockets.cfg`
+
+Source level: config-specific fact
+
+这个样例展示的是 raw 输入和 JSON 输出走 socket 的配置：
+
+- raw input: socket -> `192.168.0.243:12346`
+- `ssl.potential`: socket JSON -> `172.25.112.1:9001`
+- `sst.tracked`: socket JSON -> `172.25.112.1:9000`
+
+同一文件中的 `sss.separated` 与 `sss.postfiltered` 仍然是 file sink，
+不是 socket sink。
+
+### `re6_vr.cfg`
+
+Source level: config-specific fact
+
+这个样例展示的是 SSS separated 走 socket 的变体：
+
+- `sss.separated`: socket PCM -> `172.24.48.1:10000`
+
+从仓库内可检索内容看，它不是当前知识库里
+`172.21.16.139:10000/10010` 这组地址的来源。
+
+## Temporal Impact
+
+Source level: inference from source
+
+对 Temporal 最重要的上游约束有四项：
+
+- JSON 协议只应按 `timeStamp` 和 `src` 数组解析，
+  并严格使用 ODAS 当前 sink 实现中的字段集合
+- socket 模式下，Temporal 必须把自己当成 server，
+  由 ODAS 主动连入
+- SSS/PF 音频必须按交错 PCM 读取，不能假设单路独占 socket
+- 可视化和录音的 source/channel 槽位数应来自配置，
+  不能把 `4` 写死成协议常量
+
+Source level: inference from source
+
+因此，知识库应把 `IP:port`、`hopSize`、`fS`、`nChannels`
+分成两层记录：
+
+- ODAS 通用协议形状
+- 当前本地配置实例
+
+只有这样，后续对接新阵列或新配置时，
+Temporal 才不会把本地样例误当成上游不变量。
