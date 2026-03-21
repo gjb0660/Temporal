@@ -2,7 +2,9 @@
 
 ## Goal
 
-定义 `src/temporal/qml/RightSidebar.qml` 的右侧信息面板需求。该区域负责展示声源列表、筛选器和录音会话，并在预览模式下与活动预览场景保持一致。
+定义 `src/temporal/qml/RightSidebar.qml` 的右侧信息面板需求。
+该区域负责展示声源列表、筛选器和录音会话，
+并在 preview 模式下与活动预览场景保持一致。
 
 ## Component Responsibility
 
@@ -31,7 +33,11 @@
 - 右栏不在本地拼接 preview/runtime 占位行。
 - 右栏 row 集合来自当前场景经过全局筛选后的 `sources` 元数据。
 - 用户取消勾选后，对应 row 必须继续保留，只修改 `checked` 状态。
-- 右栏 `暂无活动声源` 只在全局筛选后 row 数为零时出现，不因最后一个勾选被取消而触发。
+- 右栏 `暂无活动声源` 只在全局筛选后 row 数为零时出现，
+  不因最后一个勾选被取消而触发。
+- 右栏每一行右侧展示的动态数值
+  必须跟随当前 frame 的 `energy` 变化，
+  不能长期停留在静态 metadata。
 
 ## Visual Requirements
 
@@ -48,7 +54,8 @@
 
 ## Interaction Requirements
 
-- 声源勾选框切换后调用 `appBridge.setSourceSelected(sourceId, checked)`。
+- 声源勾选框切换后调用
+  `appBridge.setSourceSelected(sourceId, checked)`。
 - 取消勾选后，对应 row 继续保留，仅勾选状态变化。
 - 筛选器开关和能量滑杆继续绑定现有 `appBridge` 接口。
 - 录音会话为空时仅显示空状态文案，不额外伪造列表项。
@@ -67,11 +74,17 @@
 
 ## Acceptance Criteria
 
-1. Preview 模式下右栏声源列表来自当前场景的全局筛选结果，而不是静态占位。
-2. 取消最后一个勾选 source 后，右栏 row 继续保留，图表和 3D 同时变空。
-3. `emptyState` 下右栏不显示伪造声源行，并显示 `暂无活动声源`。
-4. 右栏筛选器与录音会话区文案保持中文正式态，不出现英文开发提示。
-5. `RightSidebar.qml` 不再包含本地 preview/runtime 拼接逻辑。
+1. Preview 模式下右栏声源列表来自当前场景的全局筛选结果，
+   而不是静态占位。
+2. 取消最后一个勾选 source 后，右栏 row 继续保留，
+   图表和 3D 同时变空。
+3. `emptyState` 下右栏不显示伪造声源行，
+   并显示 `暂无活动声源`。
+4. 右栏动态数值会随当前 frame 变化，
+   可用于验证界面刷新逻辑。
+5. 右栏筛选器与录音会话区文案保持中文正式态，
+   不出现英文开发提示。
+6. `RightSidebar.qml` 不再包含本地 preview/runtime 拼接逻辑。
 
 ## Validation
 

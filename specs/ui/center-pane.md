@@ -2,9 +2,10 @@
 
 ## Goal
 
-定义 `src/temporal/qml/CenterPane.qml` 的中央内容区需求。
-该区域是实时数据页面的视觉核心，负责承载俯仰角图、方位角图和
-3D 声源球，并只消费 bridge 已整理好的图表 ticks、series 与点位数据。
+定义 `src/temporal/qml/CenterPane.qml` 的中部内容区需求。
+该区域是实时数据页面的视觉核心，
+负责承载俯仰角图、方位角图和 3D 声源球，
+并只消费 bridge 已整理好的图表 ticks、series 与点位数据。
 
 ## Component Responsibility
 
@@ -29,7 +30,8 @@
 - preview 模式下，两张图表与 3D 点位必须共享同一
   `trackingFrames` 时间窗。
 - 两张图表与 3D 点位必须共享同一当前可见声源集合。
-- 右栏保留当前场景声源行及其勾选状态，中栏只消费勾选后的可见子集。
+- 右栏保留当前场景声源 row 及其勾选状态，
+  中栏只消费勾选后的可见子集。
 - 中栏不再从本地 QML fixture 脚本中读取预览数据。
 - 中栏不负责决定哪些声源被选中，只负责消费 bridge 已裁剪后的数据。
 - 中栏不在本地维护 preview 横轴 ticks 或运行态 ticks。
@@ -47,6 +49,9 @@
 - 中栏本身不提供场景切换控件。
 - 当右栏切换声源勾选状态时，中栏显示内容同步变化。
 - 当监听开启或关闭时，中栏中的横轴、曲线和 3D 点位同步推进或同步暂停。
+- preview 的时间轴滚动方式是：
+  在固定的 `trackingFrames` 序列上移动 sample window，
+  而不是临时生成新数据。
 
 ## Technical Constraints
 

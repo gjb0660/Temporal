@@ -3,7 +3,8 @@
 ## Goal
 
 定义 `src/temporal/qml/LeftSidebar.qml` 的左侧栏需求。
-该区域承载 ODAS 日志区和 ODAS 控制区，是操作员观察连接状态和执行远端控制的主入口。
+该区域承载 ODAS 日志区和 ODAS 控制区，
+是操作员观察连接状态和执行远端控制的主入口。
 
 ## Component Responsibility
 
@@ -28,9 +29,13 @@
 - 控制区只提供两个按钮，不再暴露旧版复杂按钮矩阵。
 - 主按钮 `启动/停止` 直接绑定 `appBridge.toggleRemoteOdas()`。
 - 监听按钮 `监听/停止监听` 直接绑定 `appBridge.toggleStreams()`。
-- 主按钮启动时，若本地未监听，bridge 必须先补开监听，再启动远端 `odaslive`。
-- 主按钮停止时，bridge 必须先停监听，再停远端，且不主动断开 SSH。
+- 主按钮启动时，若本地未监听，bridge 必须先补开监听，
+  再启动远端 `odaslive`。
+- 主按钮停止时，bridge 必须先停监听，再停远端，
+  且不主动断开 SSH。
 - 监听按钮允许在远端未运行时单独开启本地 listener。
+- preview 的动画推进只能由监听状态触发，
+  左栏控制语义必须与运行时状态机一致。
 
 ## Visual Requirements
 
@@ -54,7 +59,8 @@
 
 ## Technical Constraints
 
-- 业务动作必须调用 `appBridge.toggleRemoteOdas()` 和 `appBridge.toggleStreams()`。
+- 业务动作必须调用 `appBridge.toggleRemoteOdas()` 和
+  `appBridge.toggleStreams()`。
 - QML 不自行拼接远端状态机逻辑。
 - QML 不限制监听按钮必须依赖远端运行态。
 
@@ -68,7 +74,8 @@
 2. 控制区只剩两个按钮。
 3. 监听按钮可独立启停本地 listener。
 4. 主按钮启动会自动补开监听，主按钮停止顺序正确。
-5. 日志文本和状态文本在默认窗口下都具有可读高度，且不出现乱码。
+5. 日志文本和状态文本在默认窗口下都具有可读高度，
+   且不出现乱码。
 
 ## Validation
 
