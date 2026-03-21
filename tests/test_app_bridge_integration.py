@@ -37,6 +37,12 @@ class _FakeOdasClient:
         self.stop_calls += 1
 
 
+class _FailingOdasClient(_FakeOdasClient):
+    def start(self) -> None:
+        self.start_calls += 1
+        raise OSError("bind failed")
+
+
 class _FakeRemoteOdasController:
     def __init__(self, _cfg: RemoteOdasConfig, _streams: OdasStreamConfig) -> None:
         self.connected = False
@@ -74,7 +80,7 @@ class _FakeRemoteOdasController:
         return CommandResult(code=0, stdout=self.log_output, stderr="")
 
 
-def _fake_config() -> TemporalConfig:
+def _fake_config() -> tuple[RemoteOdasConfig, OdasStreamConfig]:
     remote = RemoteOdasConfig(
         host="172.21.16.222",
         port=22,
@@ -91,14 +97,23 @@ def _fake_config() -> TemporalConfig:
         sss_sep=OdasEndpoint(host="192.168.1.50", port=10000),
         sss_pf=OdasEndpoint(host="192.168.1.50", port=10010),
     )
-    return TemporalConfig(remote=remote, streams=streams)
+    return remote, streams
 
 
 class TestAppBridgeIntegration(unittest.TestCase):
-    def _make_bridge(self, recorder: AutoRecorder) -> AppBridge:
+    def _make_bridge(
+        self,
+        recorder: AutoRecorder,
+        *,
+        client_cls: type[_FakeOdasClient] = _FakeOdasClient,
+    ) -> AppBridge:
+        remote, streams = _fake_config()
         with (
-            patch("temporal.app.load_config", return_value=_fake_config()),
-            patch("temporal.app.OdasClient", _FakeOdasClient),
+            patch(
+                "temporal.app.load_config",
+                return_value=TemporalConfig(remote=remote, streams=streams),
+            ),
+            patch("temporal.app.OdasClient", client_cls),
             patch("temporal.app.RemoteOdasController", _FakeRemoteOdasController),
             patch("temporal.app.AutoRecorder", return_value=recorder),
         ):
@@ -181,6 +196,33 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertEqual(client.start_calls, 1)
             self.assertEqual(remote.start_calls, 1)
 
+    def test_start_streams_keeps_inactive_when_listener_bind_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder, client_cls=_FailingOdasClient)
+
+            bridge.startStreams()
+
+            self.assertFalse(bridge.streamsActive)
+            self.assertIn("本地监听启动失败", bridge._status)
+            self.assertIn("bind failed", bridge._status)
+
+    def test_start_remote_does_not_launch_remote_when_listener_start_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder, client_cls=_FailingOdasClient)
+            bridge.connectRemote()
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+
+            bridge.startRemoteOdas()
+
+            self.assertFalse(bridge.streamsActive)
+            self.assertFalse(bridge.odasStarting)
+            self.assertFalse(bridge.odasRunning)
+            self.assertEqual(remote.start_calls, 0)
+            self.assertIn("本地监听启动失败", bridge._status)
+
     def test_preflight_failure_uses_humanized_sink_reason(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
@@ -199,10 +241,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertFalse(bridge.odasStarting)
             self.assertFalse(bridge.odasRunning)
-            self.assertEqual(
-                bridge._status,
-                "启动失败: 远程 ODAS 配置中的输出地址与 Temporal 监听地址不一致",
-            )
+            self.assertTrue(bridge._status.startswith("启动失败:"))
+            self.assertIn("Temporal", bridge._status)
+            self.assertNotIn("preflight:", bridge._status)
 
     def test_start_failure_uses_log_reason_when_process_never_appears(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

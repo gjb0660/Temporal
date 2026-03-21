@@ -86,7 +86,10 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
   the resolved working directory exists,
   the configured command is executable,
   the referenced ODAS cfg file exists,
-  and the cfg sink targets point at `streams.listen_host` and the configured ports.
+  and the active cfg sink targets point at `streams.listen_host`
+  and the configured ports.
+- Do not validate cfg sinks by grepping the whole cfg text;
+  ignore comments, examples, disabled blocks, and unrelated numbers.
 - Treat preflight failure as a startup failure.
 - If local listeners are not active when remote odaslive starts,
   Temporal must start them before launching odaslive.
@@ -95,6 +98,10 @@ Enable remote odaslive control and baseline ODAS stream client plumbing.
 
 - Temporal listens locally for SST/SSL JSON streams and SSS PCM streams.
 - Remote odaslive actively connects to those listeners.
+- Treat `streamsActive=True` as proof that all configured local listeners
+  have already completed `bind + listen`.
+- `OdasClient.start()` must fail synchronously when any listener cannot bind,
+  and it must roll back listeners that were already started in the same call.
 - Listener sockets must accept a connection, read until disconnect,
   and then continue accepting later reconnects.
 

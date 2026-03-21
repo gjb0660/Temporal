@@ -31,6 +31,16 @@ class _TcpListenerBase:
     def start(self) -> None:
         if self._running:
             return
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            server.bind((self._endpoint.host, self._endpoint.port))
+            server.listen(1)
+            server.settimeout(self._ACCEPT_TIMEOUT_SEC)
+        except OSError:
+            server.close()
+            raise
+        self._server = server
         self._running = True
         self._thread = threading.Thread(target=self._run, daemon=True, name=self._name)
         self._thread.start()
@@ -48,27 +58,29 @@ class _TcpListenerBase:
             self._thread = None
 
     def _run(self) -> None:
+        server = self._server
+        if server is None:
+            return
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
-                server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                server.bind((self._endpoint.host, self._endpoint.port))
-                server.listen(1)
-                server.settimeout(self._ACCEPT_TIMEOUT_SEC)
-                self._server = server
-                while self._running:
-                    try:
-                        client, _ = server.accept()
-                    except socket.timeout:
+            while self._running:
+                try:
+                    client, _ = server.accept()
+                except socket.timeout:
+                    continue
+                except OSError:
+                    if self._running:
                         continue
-                    except OSError:
-                        if self._running:
-                            continue
-                        break
-                    with client:
-                        client.settimeout(self._READ_TIMEOUT_SEC)
-                        self._handle_client(client)
+                    break
+                with client:
+                    client.settimeout(self._READ_TIMEOUT_SEC)
+                    self._handle_client(client)
         finally:
-            self._server = None
+            try:
+                server.close()
+            except OSError:
+                pass
+            if self._server is server:
+                self._server = None
 
     def _handle_client(self, client: socket.socket) -> None:
         raise NotImplementedError

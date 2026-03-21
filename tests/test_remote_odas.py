@@ -3,7 +3,12 @@ from typing import cast
 from unittest.mock import MagicMock, patch
 
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
-from temporal.core.ssh.remote_odas import CommandResult, RemoteOdasController
+from temporal.core.ssh.remote_odas import (
+    CommandResult,
+    RemoteOdasController,
+    _extract_wrapper_cfg_path,
+    _sink_targets_match,
+)
 
 
 def _make_streams(listen_host: str = "192.168.1.50") -> OdasStreamConfig:
@@ -13,17 +18,6 @@ def _make_streams(listen_host: str = "192.168.1.50") -> OdasStreamConfig:
         sss_sep=OdasEndpoint(host=listen_host, port=10000),
         sss_pf=OdasEndpoint(host=listen_host, port=10010),
     )
-
-
-class RecordingRemoteOdasController(RemoteOdasController):
-    def __init__(self, config: RemoteOdasConfig, streams: OdasStreamConfig) -> None:
-        super().__init__(config, streams)
-        self.commands: list[str] = []
-        self.result = CommandResult(code=0, stdout="4242\n", stderr="")
-
-    def _exec(self, cmd: str) -> CommandResult:
-        self.commands.append(cmd)
-        return self.result
 
 
 def _make_config(**overrides: object) -> RemoteOdasConfig:
@@ -47,9 +41,56 @@ def _make_config(**overrides: object) -> RemoteOdasConfig:
     )
 
 
+def _runtime_metadata_result(
+    *,
+    home_dir: str = "/home/tester",
+    working_dir: str = "/home/tester/workspace/ODAS/odas",
+    resolved_command: str = "/home/tester/workspace/ODAS/odas/odas_loop.sh",
+) -> CommandResult:
+    return CommandResult(
+        code=0,
+        stdout="\n".join(
+            [
+                f"home={home_dir}",
+                f"working_dir={working_dir}",
+                f"resolved_command={resolved_command}",
+            ]
+        )
+        + "\n",
+        stderr="",
+    )
+
+
+def _valid_cfg(host: str = "10.10.0.8") -> str:
+    return "\n".join(
+        [
+            f'tracks = {{ ip = "{host}", port = 9000 }}',
+            f'hops = {{ ip = "{host}", port = 9001 }}',
+            f'audio_sep = {{ ip = "{host}", port = 10000 }}',
+            f'audio_pf = {{ ip = "{host}", port = 10010 }}',
+        ]
+    )
+
+
+class SequencedRemoteOdasController(RemoteOdasController):
+    def __init__(self, config: RemoteOdasConfig, streams: OdasStreamConfig) -> None:
+        super().__init__(config, streams)
+        self.commands: list[str] = []
+        self.results: list[CommandResult] = []
+
+    def queue_results(self, *results: CommandResult) -> None:
+        self.results.extend(results)
+
+    def _exec(self, cmd: str) -> CommandResult:
+        self.commands.append(cmd)
+        if self.results:
+            return self.results.pop(0)
+        return CommandResult(code=0, stdout="", stderr="")
+
+
 class TestRemoteOdasController(unittest.TestCase):
     def test_should_validate_sink_host_is_false_for_wildcard(self) -> None:
-        controller = RecordingRemoteOdasController(
+        controller = SequencedRemoteOdasController(
             _make_config(),
             _make_streams(listen_host="0.0.0.0"),
         )
@@ -57,7 +98,7 @@ class TestRemoteOdasController(unittest.TestCase):
         self.assertFalse(controller._should_validate_sink_host())
 
     def test_should_validate_sink_host_is_true_for_specific_host(self) -> None:
-        controller = RecordingRemoteOdasController(
+        controller = SequencedRemoteOdasController(
             _make_config(),
             _make_streams(listen_host="192.168.1.50"),
         )
@@ -81,62 +122,96 @@ class TestRemoteOdasController(unittest.TestCase):
             self.assertIsNone(kwargs["username"])
             self.assertIsNone(kwargs["key_filename"])
 
-    def test_start_odaslive_resolves_relative_cwd_from_home_and_derives_pid_path(self) -> None:
-        controller = RecordingRemoteOdasController(_make_config(), _make_streams())
+    def test_sink_targets_reject_comment_only_port_matches(self) -> None:
+        cfg_text = "\n".join(
+            [
+                "# tracks port 9000",
+                "# hops port 9001",
+                "# audio sep port 10000",
+                "# audio pf port 10010",
+                'tracks = { ip = "10.10.0.8", port = 9100 }',
+                'hops = { ip = "10.10.0.8", port = 9101 }',
+                'audio_sep = { ip = "10.10.0.8", port = 10100 }',
+                'audio_pf = { ip = "10.10.0.8", port = 10110 }',
+            ]
+        )
 
-        controller.start_odaslive()
+        self.assertEqual(
+            _sink_targets_match(cfg_text, _make_streams(listen_host="10.10.0.8")),
+            "preflight: tracks sink port mismatch",
+        )
 
-        command = controller.commands[-1]
-        self.assertIn("cfg_cwd=workspace/ODAS/odas", command)
-        self.assertIn("$HOME/$path_input", command)
-        self.assertIn('pid_file="${log_file%.*}.pid"', command)
-        self.assertIn('./odas_loop.sh >> "$resolved_log" 2>&1 < /dev/null &', command)
+    def test_sink_targets_skip_host_match_for_wildcard_but_keep_port_checks(self) -> None:
+        cfg_text = _valid_cfg(host="127.0.0.1")
 
-    def test_start_odaslive_validates_sink_host_and_ports_before_launch(self) -> None:
-        controller = RecordingRemoteOdasController(
+        self.assertIsNone(_sink_targets_match(cfg_text, _make_streams(listen_host="0.0.0.0")))
+
+    def test_sink_targets_require_matching_ports_for_wildcard_bind(self) -> None:
+        cfg_text = "\n".join(
+            [
+                'tracks = { ip = "127.0.0.1", port = 9100 }',
+                'hops = { ip = "127.0.0.1", port = 9001 }',
+                'audio_sep = { ip = "127.0.0.1", port = 10000 }',
+                'audio_pf = { ip = "127.0.0.1", port = 10010 }',
+            ]
+        )
+
+        self.assertEqual(
+            _sink_targets_match(cfg_text, _make_streams(listen_host="0.0.0.0")),
+            "preflight: tracks sink port mismatch",
+        )
+
+    def test_extract_wrapper_cfg_path(self) -> None:
+        wrapper_text = '#!/bin/sh\nexec odaslive -v -c "./configs/odas.cfg"\n'
+
+        self.assertEqual(_extract_wrapper_cfg_path(wrapper_text), "./configs/odas.cfg")
+
+    def test_start_odaslive_returns_preflight_failure_without_launch(self) -> None:
+        controller = SequencedRemoteOdasController(
             _make_config(odas_command="odaslive", odas_args=["-c", "odas.cfg"]),
             _make_streams(listen_host="10.10.0.8"),
         )
-
-        controller.start_odaslive()
-
-        command = controller.commands[-1]
-        self.assertIn("preflight_or_exit || exit 1", command)
-        self.assertIn("listen_host=10.10.0.8", command)
-        self.assertIn("validate_sink_host=1", command)
-        self.assertIn("expected_sst_port=9000", command)
-        self.assertIn("expected_ssl_port=9001", command)
-        self.assertIn("expected_sep_port=10000", command)
-        self.assertIn("expected_pf_port=10010", command)
-        self.assertIn("preflight: sink host mismatch", command)
-        self.assertIn("preflight: %s sink port mismatch", command)
-        self.assertIn("cfg_arg_path=odas.cfg", command)
-
-    def test_start_odaslive_skips_sink_host_match_when_listen_host_is_wildcard(self) -> None:
-        controller = RecordingRemoteOdasController(
-            _make_config(odas_command="odaslive", odas_args=["-c", "odas.cfg"]),
-            _make_streams(listen_host="0.0.0.0"),
+        controller.queue_results(
+            _runtime_metadata_result(resolved_command="/usr/bin/odaslive"),
+            CommandResult(
+                code=0,
+                stdout=_valid_cfg(host="10.10.0.8").replace("9000", "9100", 1),
+                stderr="",
+            ),
         )
 
-        controller.start_odaslive()
+        result = controller.start_odaslive()
 
-        command = controller.commands[-1]
-        self.assertIn("validate_sink_host=0", command)
-        self.assertIn("expected_sst_port=9000", command)
-        self.assertIn("expected_ssl_port=9001", command)
+        self.assertEqual(result.code, 1)
+        self.assertEqual(result.stderr, "preflight: tracks sink port mismatch")
+        self.assertEqual(len(controller.commands), 2)
 
-    def test_start_odaslive_extracts_cfg_path_from_wrapper_when_args_are_empty(self) -> None:
-        controller = RecordingRemoteOdasController(_make_config(), _make_streams())
+    def test_start_odaslive_uses_wrapper_cfg_when_args_are_empty(self) -> None:
+        controller = SequencedRemoteOdasController(
+            _make_config(), _make_streams(listen_host="10.10.0.8")
+        )
+        controller.queue_results(
+            _runtime_metadata_result(),
+            CommandResult(
+                code=0,
+                stdout='#!/bin/sh\nexec odaslive -c "./configs/odas.cfg"\n',
+                stderr="",
+            ),
+            CommandResult(code=0, stdout=_valid_cfg(host="10.10.0.8"), stderr=""),
+            CommandResult(code=0, stdout="4242\n", stderr=""),
+        )
 
-        controller.start_odaslive()
+        result = controller.start_odaslive()
 
-        command = controller.commands[-1]
-        self.assertIn("grep -Eo", command)
-        self.assertIn("preflight: odas config path missing", command)
-        self.assertIn("preflight: odas config file missing", command)
+        self.assertEqual(result.code, 0)
+        self.assertEqual(len(controller.commands), 4)
+        self.assertIn("cfg_cwd=workspace/ODAS/odas", controller.commands[-1])
+        self.assertIn(
+            './odas_loop.sh >> "$resolved_log" 2>&1 < /dev/null &', controller.commands[-1]
+        )
 
     def test_status_validates_pid_file_instead_of_name_matching(self) -> None:
-        controller = RecordingRemoteOdasController(
+        controller = SequencedRemoteOdasController(
             _make_config(odas_command="odaslive", odas_args=["-c", "/opt/odas/odas.cfg"]),
             _make_streams(),
         )
@@ -151,7 +226,7 @@ class TestRemoteOdasController(unittest.TestCase):
         self.assertIn('grep -Fxq -- "$cfg_command"', command)
 
     def test_stop_odaslive_targets_pid_file_identity_only(self) -> None:
-        controller = RecordingRemoteOdasController(_make_config(), _make_streams())
+        controller = SequencedRemoteOdasController(_make_config(), _make_streams())
 
         controller.stop_odaslive()
 
@@ -161,7 +236,7 @@ class TestRemoteOdasController(unittest.TestCase):
         self.assertIn("cleanup_pid", command)
 
     def test_read_log_tail_uses_resolved_log_path_and_clamps_lines(self) -> None:
-        controller = RecordingRemoteOdasController(_make_config(), _make_streams())
+        controller = SequencedRemoteOdasController(_make_config(), _make_streams())
         controller.read_log_tail(999)
 
         command = controller.commands[-1]

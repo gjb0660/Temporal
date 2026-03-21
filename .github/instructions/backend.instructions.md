@@ -13,6 +13,10 @@ applyTo: "src/temporal/{core/**,app.py,main.py}"
   use explicit control state such as a pid file and verify the real process.
 - Remote stream direction must be explicit in spec and code;
   never reuse `remote.host` as the implicit SST/SSL/SSS listener address.
+- Listener readiness must be synchronous and observable from `start()`;
+  do not report streams active before bind/listen succeeds.
+- Static cfg validation must parse active sink targets;
+  do not rely on whole-file string presence checks.
 - JSON TCP parser must tolerate chunk boundaries and junk lines.
 - Audio consumers must avoid blocking socket threads.
 - Prefer pure functions for message normalization to ease testing.
