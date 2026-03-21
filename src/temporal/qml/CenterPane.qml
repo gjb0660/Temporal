@@ -39,8 +39,8 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
                 yTicks: ["90", "60", "30", "0", "-30", "-60", "-90"]
-                xTicks: root.appBridge.chartXTicks
-                seriesList: root.appBridge.elevationSeries
+                xTickModel: root.appBridge.chartXTicksModel
+                seriesModel: root.appBridge.elevationSeriesModel
             }
         }
 
@@ -61,8 +61,8 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
                 yTicks: ["180", "120", "60", "0", "-60", "-120", "-180"]
-                xTicks: root.appBridge.chartXTicks
-                seriesList: root.appBridge.azimuthSeries
+                xTickModel: root.appBridge.chartXTicksModel
+                seriesModel: root.appBridge.azimuthSeriesModel
             }
         }
 
@@ -74,7 +74,7 @@ Rectangle {
 
         SourceSphereView {
             theme: root.theme
-            sourcePositions: root.appBridge.sourcePositions
+            sourcePositionsModel: root.appBridge.sourcePositionsModel
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.minimumHeight: theme.sphereHeight

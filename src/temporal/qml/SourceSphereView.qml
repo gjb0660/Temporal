@@ -5,7 +5,8 @@ Rectangle {
     id: root
 
     required property QtObject theme
-    property var sourcePositions: []
+    property var sourcePositionsModel: null
+    property int sourceModelRevision: 0
 
     color: "#ffffff"
     border.color: "transparent"
@@ -27,10 +28,12 @@ Rectangle {
     }
 
     function normalizedSourceEntries() {
-        const raw = Array.isArray(sourcePositions) ? sourcePositions : []
+        const revision = sourceModelRevision
         const entries = []
-        for (let index = 0; index < raw.length; index += 1) {
-            const item = raw[index]
+        const model = sourcePositionsModel
+        const count = model && typeof model.count === "number" ? model.count : 0
+        for (let index = 0; index < count; index += 1) {
+            const item = model.get(index)
             if (!item) {
                 continue
             }
@@ -50,7 +53,8 @@ Rectangle {
                 color: item.color || colorForSource(sourceId),
                 x: x * scale,
                 y: y * scale,
-                z: z * scale
+                z: z * scale,
+                revision: revision
             })
         }
 
@@ -86,6 +90,30 @@ Rectangle {
         const rawX = point.x + (point.x >= axisOverlay.originX ? 6 : -12)
         const rawY = point.y + (point.y <= axisOverlay.originY ? -6 : 16)
         return Qt.point(Math.max(10, Math.min(axisOverlay.width - 10, rawX)), Math.max(10, Math.min(axisOverlay.height - 10, rawY)))
+    }
+
+    Connections {
+        target: root.sourcePositionsModel
+
+        function onModelReset() {
+            root.sourceModelRevision += 1
+            axisOverlay.requestPaint()
+        }
+
+        function onRowsInserted() {
+            root.sourceModelRevision += 1
+            axisOverlay.requestPaint()
+        }
+
+        function onRowsRemoved() {
+            root.sourceModelRevision += 1
+            axisOverlay.requestPaint()
+        }
+
+        function onDataChanged() {
+            root.sourceModelRevision += 1
+            axisOverlay.requestPaint()
+        }
     }
 
     onSphereYawChanged: axisOverlay.requestPaint()

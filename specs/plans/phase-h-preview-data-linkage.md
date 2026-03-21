@@ -47,9 +47,10 @@ Baseline scenarios:
 
 1. Preview scenario data is stored in one shared Python model consumed by the
    preview bridge.
-2. `PreviewBridge` derives `sourceRows`, `sourceIds`, `sourcePositions`,
-   `elevationSeries`, `azimuthSeries`, `chartXTicks`, `headerNavLabels`, and
-   `showPreviewScenarioSelector` from the active scenario and preview mode.
+2. `PreviewBridge` derives sidebar rows from the active scenario after global
+   filters and derives `sourceIds`, `sourcePositions`, `elevationSeries`,
+   `azimuthSeries`, `chartXTicks`, `headerNavLabels`, and
+   `showPreviewScenarioSelector` from the checked subset of those rows.
 3. `AppBridge` exposes matching runtime-safe defaults for the same UI-facing
    properties.
 4. The green header bar shows the scenario switcher only when
@@ -61,13 +62,17 @@ Baseline scenarios:
 7. After switching scenarios, all source ids in the new scenario are selected
    by default.
 8. `setSourceSelected()` updates sidebar checked state, visible source ids,
-   chart series, and 3D source positions together.
+   chart series, and 3D source positions together without removing the row
+   itself.
 9. `SourceSphereView.qml` renders only bridge-provided source points and does
    not synthesize preview fallback points locally.
 
 ## Rules
 
 - A source id keeps the same visual color across list badge, charts, and 3D.
+- Sidebar rows represent the current scenario after global filters.
+- Chart series and 3D points must be derived from the checked subset of the
+  sidebar rows.
 - `emptyState` must render a valid empty UI state and must not fake live source
   ids or preview fallback points.
 - Empty source lists render an explicit empty-state message rather than QML
@@ -81,6 +86,8 @@ Baseline scenarios:
 ## Interface Additions
 
 - `sourceRows: list[{sourceId, label, checked, enabled, badge, badgeColor}]`
+  where rows represent the current scenario after global filters and preserve
+  unchecked rows for reversible selection.
 - `previewScenarioOptions: list[{key, label}]`
 - `showPreviewScenarioSelector: bool`
 - `headerNavLabels: list[str]`
@@ -103,11 +110,13 @@ Production `AppBridge` must expose safe defaults:
 
 ## Acceptance Criteria
 
-1. The right sidebar source list is derived from the active preview scenario.
+1. The right sidebar source list is derived from the current scenario after
+   global filters, while chart series and 3D points are derived from the
+   checked subset of those rows.
 2. Scenario switching updates header selection, sidebar rows, chart series, and
    3D data together.
-3. Source badge colors, checked state, and rendered series correspond to the
-   same source ids.
+3. Source badge colors stay stable across sidebar rows, chart series, and 3D
+   points for the same source id.
 4. `emptyState` shows a stable empty layout without fake source rows or fake 3D
    points.
 5. QML no longer contains local preview/runtime branch logic for header
@@ -128,5 +137,6 @@ Production `AppBridge` must expose safe defaults:
     `showPreviewScenarioSelector == true`
   - the scenario switcher replaces static navigation in preview mode
   - switching scenarios updates sidebar, charts, and 3D together
-  - source checkbox toggles remove and restore the same source across all views
+  - source checkbox toggles keep the row visible but remove the same source
+    from charts and 3D
   - `emptyState` shows a stable empty UI without fake source rows

@@ -9,9 +9,11 @@ Column {
     required property QtObject appBridge
 
     function currentScenarioIndex() {
-        const options = Array.isArray(root.appBridge.previewScenarioOptions) ? root.appBridge.previewScenarioOptions : []
-        for (let index = 0; index < options.length; index += 1) {
-            if (options[index].key === root.appBridge.previewScenarioKey) {
+        const model = root.appBridge.previewScenarioOptionsModel
+        const count = model && typeof model.count === "number" ? model.count : 0
+        for (let index = 0; index < count; index += 1) {
+            const option = model.get(index)
+            if (option.key === root.appBridge.previewScenarioKey) {
                 return index
             }
         }
@@ -112,29 +114,32 @@ Column {
                     id: previewScenarioSelector
                     Layout.preferredWidth: 190
                     Layout.alignment: Qt.AlignVCenter
-                    model: root.appBridge.previewScenarioOptions
+                    model: root.appBridge.previewScenarioOptionsModel
                     textRole: "label"
                     currentIndex: currentScenarioIndex()
 
-                    onActivated: function(index) {
-                        const options = root.appBridge.previewScenarioOptions
-                        if (Array.isArray(options) && index >= 0 && index < options.length) {
-                            root.appBridge.setPreviewScenario(options[index].key)
+                    onActivated: function (index) {
+                        const model = root.appBridge.previewScenarioOptionsModel
+                        if (!model || index < 0 || index >= model.count) {
+                            return
                         }
+                        root.appBridge.setPreviewScenario(model.get(index).key)
                     }
 
                     delegate: ItemDelegate {
+                        required property string label
                         width: previewScenarioSelector.width
-                        text: modelData.label
+                        text: label
                     }
                 }
             }
 
             Repeater {
-                model: root.appBridge.headerNavLabels
+                model: root.appBridge.headerNavLabelsModel
 
                 delegate: Label {
-                    text: modelData
+                    required property string value
+                    text: value
                     color: "white"
                     font.pixelSize: theme.bodyFont
                     Layout.leftMargin: Math.max(10, theme.columnGap - 2)

@@ -29,10 +29,17 @@ Rectangle {
         }
 
         Repeater {
-            model: root.appBridge.sourceRows
+            model: root.appBridge.sourceRowsModel
 
             delegate: ColumnLayout {
-                required property var modelData
+                id: sourceRow
+                required property int sourceId
+                required property string label
+                required property bool checked
+                required property bool enabled
+                required property string badge
+                required property string badgeColor
+
                 Layout.fillWidth: true
                 spacing: 8
 
@@ -42,21 +49,21 @@ Rectangle {
 
                     AppSideCheckBox {
                         theme: root.theme
-                        checked: modelData.checked
-                        enabled: modelData.enabled
-                        text: modelData.label
+                        checked: sourceRow.checked
+                        enabled: sourceRow.enabled
+                        text: sourceRow.label
                         Layout.alignment: Qt.AlignVCenter
                         onToggled: {
-                            if (modelData.enabled) {
-                                root.appBridge.setSourceSelected(modelData.sourceId, checked)
+                            if (sourceRow.enabled) {
+                                root.appBridge.setSourceSelected(sourceRow.sourceId, checked)
                             }
                         }
                     }
 
                     Rectangle {
-                        visible: modelData.badge !== ""
+                        visible: sourceRow.badge !== ""
                         radius: height / 2
-                        color: modelData.badgeColor || theme.accentPurple
+                        color: sourceRow.badgeColor || theme.accentPurple
                         Layout.preferredHeight: 20
                         Layout.preferredWidth: Math.max(24, badgeText.implicitWidth + 12)
                         Layout.alignment: Qt.AlignVCenter
@@ -64,7 +71,7 @@ Rectangle {
                         Label {
                             id: badgeText
                             anchors.centerIn: parent
-                            text: modelData.badge
+                            text: sourceRow.badge
                             color: "white"
                             font.pixelSize: theme.smallFont
                             font.bold: true
@@ -85,7 +92,7 @@ Rectangle {
         }
 
         Label {
-            visible: root.appBridge.sourceRows.length === 0
+            visible: root.appBridge.sourceRowsModel.count === 0
             text: "暂无活动声源"
             color: theme.mutedText
             font.pixelSize: theme.bodyFont
@@ -93,7 +100,7 @@ Rectangle {
         }
 
         Rectangle {
-            visible: root.appBridge.sourceRows.length === 0
+            visible: root.appBridge.sourceRowsModel.count === 0
             Layout.fillWidth: true
             Layout.preferredHeight: 1
             color: "#c9d9d2"
@@ -134,7 +141,7 @@ Rectangle {
         }
 
         Label {
-            text: "候选声源能量范围:"
+            text: "候选声源能量范围"
             color: "#55635d"
             font.pixelSize: theme.bodyFont
         }
@@ -228,12 +235,12 @@ Rectangle {
         }
 
         Repeater {
-            model: root.appBridge.recordingSessions
+            model: root.appBridge.recordingSessionsModel
 
             delegate: Label {
-                required property string modelData
+                required property string value
                 Layout.fillWidth: true
-                text: modelData
+                text: value
                 color: theme.mutedText
                 font.pixelSize: theme.codeFont
                 wrapMode: Text.WordWrap
@@ -241,7 +248,7 @@ Rectangle {
         }
 
         Label {
-            visible: root.appBridge.recordingSessions.length === 0
+            visible: root.appBridge.recordingSessionsModel.count === 0
             text: "暂无活跃录音会话"
             color: theme.mutedText
             font.pixelSize: theme.bodyFont

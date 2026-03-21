@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # pyright: reportMissingImports=false, reportUntypedFunctionDecorator=false
 
+import json
 from typing import Any
 
 from PySide6.QtCore import Property, QObject, Signal, Slot
@@ -12,29 +13,35 @@ from temporal.preview_data import (
     preview_scenario_keys,
     preview_scenario_options,
 )
+from temporal.qml_list_model import QmlListModel
 
 
 class PreviewBridge(QObject):
-    _PREVIEW_CHART_X_TICKS = ["1512", "1600", "1800", "2000", "2200", "2400", "2600", "2800", "3000", "3112"]
+    _PREVIEW_CHART_X_TICKS = [
+        "1512",
+        "1600",
+        "1800",
+        "2000",
+        "2200",
+        "2400",
+        "2600",
+        "2800",
+        "3000",
+        "3112",
+    ]
 
     statusChanged = Signal()
     remoteConnectedChanged = Signal()
     odasRunningChanged = Signal()
     streamsActiveChanged = Signal()
     sourceIdsChanged = Signal()
-    sourcePositionsChanged = Signal()
-    sourceRowsChanged = Signal()
-    remoteLogLinesChanged = Signal()
-    recordingSessionsChanged = Signal()
     sourcesEnabledChanged = Signal()
     potentialsEnabledChanged = Signal()
     potentialRangeChanged = Signal()
     previewModeChanged = Signal()
     previewScenarioKeyChanged = Signal()
     previewScenarioKeysChanged = Signal()
-    previewScenarioOptionsChanged = Signal()
-    elevationSeriesChanged = Signal()
-    azimuthSeriesChanged = Signal()
+    remoteLogTextChanged = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -43,17 +50,33 @@ class PreviewBridge(QObject):
         self._odas_running = False
         self._streams_active = False
         self._remote_log_lines = ["等待连接远程 odaslive...", "当前处于预览模式"]
-        self._recording_sessions: list[str] = []
         self._sources_enabled = True
         self._potentials_enabled = False
         self._potential_min = 0.0
         self._potential_max = 1.0
         self._preview_scenario_keys = preview_scenario_keys()
-        self._preview_scenario_options = preview_scenario_options()
         self._preview_scenario_key = DEFAULT_PREVIEW_SCENARIO_KEY
         self._selected_source_ids: set[int] = set()
+
+        self._source_rows_model = QmlListModel(
+            ["sourceId", "label", "checked", "enabled", "badge", "badgeColor"], self
+        )
+        self._source_positions_model = QmlListModel(["id", "color", "x", "y", "z"], self)
+        self._elevation_series_model = QmlListModel(["sourceId", "color", "valuesJson"], self)
+        self._azimuth_series_model = QmlListModel(["sourceId", "color", "valuesJson"], self)
+        self._preview_scenario_options_model = QmlListModel(["key", "label"], self)
+        self._chart_x_ticks_model = QmlListModel(["value"], self)
+        self._header_nav_labels_model = QmlListModel(["value"], self)
+        self._recording_sessions_model = QmlListModel(["value"], self)
+
+        self._preview_scenario_options_model.replace(preview_scenario_options())
+        self._chart_x_ticks_model.replace(self._PREVIEW_CHART_X_TICKS)
+        self._header_nav_labels_model.replace([])
+        self._recording_sessions_model.replace([])
+
         self._reset_selected_sources()
         self._apply_scenario_metadata()
+        self._refresh_preview_models()
 
     @Property(str, notify=statusChanged)  # type: ignore[reportCallIssue]
     def status(self) -> str:
@@ -73,42 +96,43 @@ class PreviewBridge(QObject):
 
     @Property(list, notify=sourceIdsChanged)  # type: ignore[reportCallIssue]
     def sourceIds(self) -> list[int]:
-        return [int(source["id"]) for source in self._selected_sources()]
+        return self._visible_source_ids()
 
-    @Property(list, notify=sourcePositionsChanged)  # type: ignore[reportCallIssue]
-    def sourcePositions(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "id": int(source["id"]),
-                "color": source["color"],
-                "x": source["x"],
-                "y": source["y"],
-                "z": source["z"],
-            }
-            for source in self._selected_sources()
-        ]
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def sourceRowsModel(self) -> QmlListModel:
+        return self._source_rows_model
 
-    @Property(list, notify=sourceRowsChanged)  # type: ignore[reportCallIssue]
-    def sourceRows(self) -> list[dict[str, Any]]:
-        return [
-            {
-                "sourceId": int(source["id"]),
-                "label": "声源",
-                "checked": int(source["id"]) in self._selected_source_ids,
-                "enabled": True,
-                "badge": str(int(source["id"])),
-                "badgeColor": source["color"],
-            }
-            for source in self._scenario_sources()
-        ]
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def sourcePositionsModel(self) -> QmlListModel:
+        return self._source_positions_model
 
-    @Property(list, notify=remoteLogLinesChanged)  # type: ignore[reportCallIssue]
-    def remoteLogLines(self) -> list[str]:
-        return self._remote_log_lines
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def elevationSeriesModel(self) -> QmlListModel:
+        return self._elevation_series_model
 
-    @Property(list, notify=recordingSessionsChanged)  # type: ignore[reportCallIssue]
-    def recordingSessions(self) -> list[str]:
-        return self._recording_sessions
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def azimuthSeriesModel(self) -> QmlListModel:
+        return self._azimuth_series_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def previewScenarioOptionsModel(self) -> QmlListModel:
+        return self._preview_scenario_options_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def chartXTicksModel(self) -> QmlListModel:
+        return self._chart_x_ticks_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def headerNavLabelsModel(self) -> QmlListModel:
+        return self._header_nav_labels_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def recordingSessionsModel(self) -> QmlListModel:
+        return self._recording_sessions_model
+
+    @Property(str, notify=remoteLogTextChanged)  # type: ignore[reportCallIssue]
+    def remoteLogText(self) -> str:
+        return "\n".join(self._remote_log_lines)
 
     @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
     def sourcesEnabled(self) -> bool:
@@ -138,39 +162,9 @@ class PreviewBridge(QObject):
     def previewScenarioKeys(self) -> list[str]:
         return list(self._preview_scenario_keys)
 
-    @Property(list, notify=previewScenarioOptionsChanged)  # type: ignore[reportCallIssue]
-    def previewScenarioOptions(self) -> list[dict[str, str]]:
-        return list(self._preview_scenario_options)
-
-    @Property(list, notify=elevationSeriesChanged)  # type: ignore[reportCallIssue]
-    def elevationSeries(self) -> list[dict[str, Any]]:
-        selected_ids = set(self.sourceIds)
-        return [
-            series
-            for series in self._active_scenario()["elevationSeries"]
-            if int(series["sourceId"]) in selected_ids
-        ]
-
-    @Property(list, notify=azimuthSeriesChanged)  # type: ignore[reportCallIssue]
-    def azimuthSeries(self) -> list[dict[str, Any]]:
-        selected_ids = set(self.sourceIds)
-        return [
-            series
-            for series in self._active_scenario()["azimuthSeries"]
-            if int(series["sourceId"]) in selected_ids
-        ]
-
     @Property(bool, notify=previewModeChanged)  # type: ignore[reportCallIssue]
     def showPreviewScenarioSelector(self) -> bool:
         return True
-
-    @Property(list, notify=previewModeChanged)  # type: ignore[reportCallIssue]
-    def headerNavLabels(self) -> list[str]:
-        return []
-
-    @Property(list, notify=previewModeChanged)  # type: ignore[reportCallIssue]
-    def chartXTicks(self) -> list[str]:
-        return list(self._PREVIEW_CHART_X_TICKS)
 
     @Slot()
     def toggleRemoteOdas(self) -> None:
@@ -225,7 +219,7 @@ class PreviewBridge(QObject):
                 return
             self._selected_source_ids.remove(source_id)
 
-        self._emit_preview_data_changed()
+        self._refresh_preview_models()
 
     @Slot(int, result=bool)
     def isSourceSelected(self, source_id: int) -> bool:
@@ -238,6 +232,7 @@ class PreviewBridge(QObject):
         self._sources_enabled = enabled
         self.sourcesEnabledChanged.emit()
         self._set_status("声源筛选已更新")
+        self._refresh_preview_models()
 
     @Slot(bool)
     def setPotentialsEnabled(self, enabled: bool) -> None:
@@ -246,6 +241,7 @@ class PreviewBridge(QObject):
         self._potentials_enabled = enabled
         self.potentialsEnabledChanged.emit()
         self._set_status("候选点筛选已更新")
+        self._refresh_preview_models()
 
     @Slot(float, float)
     def setPotentialEnergyRange(self, minimum: float, maximum: float) -> None:
@@ -257,6 +253,7 @@ class PreviewBridge(QObject):
         self._potential_max = high
         self.potentialRangeChanged.emit()
         self._set_status("候选声源能量范围已更新")
+        self._refresh_preview_models()
 
     @Slot(str)
     def setPreviewScenario(self, key: str) -> None:
@@ -266,7 +263,7 @@ class PreviewBridge(QObject):
         self._reset_selected_sources()
         self._apply_scenario_metadata()
         self.previewScenarioKeyChanged.emit()
-        self._emit_preview_data_changed()
+        self._refresh_preview_models()
 
     def _active_scenario(self) -> dict[str, Any]:
         return get_preview_scenario(self._preview_scenario_key)
@@ -275,12 +272,28 @@ class PreviewBridge(QObject):
         scenario = self._active_scenario()
         return list(scenario.get("sources", []))
 
-    def _selected_sources(self) -> list[dict[str, Any]]:
+    def _sidebar_sources(self) -> list[dict[str, Any]]:
+        if not self._sources_enabled:
+            return []
+
+        if not self._potentials_enabled:
+            return self._scenario_sources()
+
         return [
             source
             for source in self._scenario_sources()
+            if self._potential_min <= float(source.get("energy", 0.0)) <= self._potential_max
+        ]
+
+    def _visible_sources(self) -> list[dict[str, Any]]:
+        return [
+            source
+            for source in self._sidebar_sources()
             if int(source["id"]) in self._selected_source_ids
         ]
+
+    def _visible_source_ids(self) -> list[int]:
+        return [int(source["id"]) for source in self._visible_sources()]
 
     def _reset_selected_sources(self) -> None:
         self._selected_source_ids = {int(source["id"]) for source in self._scenario_sources()}
@@ -288,14 +301,67 @@ class PreviewBridge(QObject):
     def _apply_scenario_metadata(self) -> None:
         scenario = self._active_scenario()
         self._set_status(str(scenario.get("status", "Temporal 就绪")))
-        self._set_remote_log_lines(list(scenario.get("remoteLogLines", ["等待连接远程 odaslive..."])))
+        self._set_remote_log_lines(
+            list(scenario.get("remoteLogLines", ["等待连接远程 odaslive..."]))
+        )
 
-    def _emit_preview_data_changed(self) -> None:
+    def _refresh_preview_models(self) -> None:
+        sidebar_sources = self._sidebar_sources()
+        visible_sources = self._visible_sources()
+        visible_source_ids = {int(source["id"]) for source in visible_sources}
+        scenario = self._active_scenario()
+
+        self._source_rows_model.replace(
+            [
+                {
+                    "sourceId": int(source["id"]),
+                    "label": "声源",
+                    "checked": int(source["id"]) in self._selected_source_ids,
+                    "enabled": True,
+                    "badge": str(int(source["id"])),
+                    "badgeColor": source["color"],
+                }
+                for source in sidebar_sources
+            ]
+        )
+        self._source_positions_model.replace(
+            [
+                {
+                    "id": int(source["id"]),
+                    "color": source["color"],
+                    "x": source["x"],
+                    "y": source["y"],
+                    "z": source["z"],
+                }
+                for source in visible_sources
+            ]
+        )
+        self._elevation_series_model.replace(
+            self._series_items(scenario.get("elevationSeries", []), visible_source_ids)
+        )
+        self._azimuth_series_model.replace(
+            self._series_items(scenario.get("azimuthSeries", []), visible_source_ids)
+        )
+        self._recording_sessions_model.replace([])
         self.sourceIdsChanged.emit()
-        self.sourcePositionsChanged.emit()
-        self.sourceRowsChanged.emit()
-        self.elevationSeriesChanged.emit()
-        self.azimuthSeriesChanged.emit()
+
+    def _series_items(
+        self, series_list: list[dict[str, Any]], visible_source_ids: set[int]
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for series in series_list:
+            source_id = int(series["sourceId"])
+            if source_id not in visible_source_ids:
+                continue
+            values = [float(value) for value in series.get("values", [])]
+            items.append(
+                {
+                    "sourceId": source_id,
+                    "color": series["color"],
+                    "valuesJson": json.dumps(values),
+                }
+            )
+        return items
 
     def _set_status(self, status: str) -> None:
         if self._status == status:
@@ -307,4 +373,4 @@ class PreviewBridge(QObject):
         if self._remote_log_lines == lines:
             return
         self._remote_log_lines = lines
-        self.remoteLogLinesChanged.emit()
+        self.remoteLogTextChanged.emit()

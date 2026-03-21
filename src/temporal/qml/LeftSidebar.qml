@@ -71,7 +71,7 @@ Rectangle {
                                     readOnly: true
                                     wrapMode: TextArea.NoWrap
                                     selectByMouse: true
-                                    text: root.appBridge.remoteLogLines.join("\n")
+                                    text: root.appBridge.remoteLogText
                                     color: "#24303a"
                                     font.family: "Consolas"
                                     font.pixelSize: theme.codeFont

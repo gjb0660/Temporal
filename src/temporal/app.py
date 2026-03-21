@@ -19,6 +19,7 @@ from temporal.core.network.odas_message_view import (
 )
 from temporal.core.recording.auto_recorder import AutoRecorder
 from temporal.core.ssh.remote_odas import RemoteOdasController
+from temporal.qml_list_model import QmlListModel
 
 
 class AppBridge(QObject):
@@ -37,16 +38,13 @@ class AppBridge(QObject):
     sourceItemsChanged = Signal()
     sourceIdsChanged = Signal()
     sourceCountChanged = Signal()
-    sourcePositionsChanged = Signal()
-    remoteLogLinesChanged = Signal()
     potentialCountChanged = Signal()
     recordingSourceCountChanged = Signal()
-    recordingSessionsChanged = Signal()
-    sourceRowsChanged = Signal()
     sourcesEnabledChanged = Signal()
     potentialsEnabledChanged = Signal()
     potentialRangeChanged = Signal()
     previewStateChanged = Signal()
+    remoteLogTextChanged = Signal()
 
     def __init__(self) -> None:
         super().__init__()
@@ -92,6 +90,26 @@ class AppBridge(QObject):
             on_pf_audio=self._on_pf_audio,
         )
 
+        self._source_rows_model = QmlListModel(
+            ["sourceId", "label", "checked", "enabled", "badge", "badgeColor"], self
+        )
+        self._source_positions_model = QmlListModel(["id", "color", "x", "y", "z"], self)
+        self._elevation_series_model = QmlListModel(["sourceId", "color", "valuesJson"], self)
+        self._azimuth_series_model = QmlListModel(["sourceId", "color", "valuesJson"], self)
+        self._preview_scenario_options_model = QmlListModel(["key", "label"], self)
+        self._chart_x_ticks_model = QmlListModel(["value"], self)
+        self._header_nav_labels_model = QmlListModel(["value"], self)
+        self._recording_sessions_model = QmlListModel(["value"], self)
+
+        self._preview_scenario_options_model.replace([])
+        self._chart_x_ticks_model.replace(self._RUNTIME_CHART_X_TICKS)
+        self._header_nav_labels_model.replace(self._HEADER_NAV_LABELS)
+        self._recording_sessions_model.replace([])
+        self._source_rows_model.replace([])
+        self._source_positions_model.replace([])
+        self._elevation_series_model.replace([])
+        self._azimuth_series_model.replace([])
+
     @Property(str, notify=statusChanged)  # type: ignore[reportCallIssue]
     def status(self) -> str:
         return self._status
@@ -120,13 +138,41 @@ class AppBridge(QObject):
     def sourceIds(self) -> list[int]:
         return self._source_ids
 
-    @Property(list, notify=sourcePositionsChanged)  # type: ignore[reportCallIssue]
-    def sourcePositions(self) -> list[dict[str, float | int]]:
-        return self._source_positions
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def sourceRowsModel(self) -> QmlListModel:
+        return self._source_rows_model
 
-    @Property(list, notify=remoteLogLinesChanged)  # type: ignore[reportCallIssue]
-    def remoteLogLines(self) -> list[str]:
-        return self._remote_log_lines
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def sourcePositionsModel(self) -> QmlListModel:
+        return self._source_positions_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def elevationSeriesModel(self) -> QmlListModel:
+        return self._elevation_series_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def azimuthSeriesModel(self) -> QmlListModel:
+        return self._azimuth_series_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def previewScenarioOptionsModel(self) -> QmlListModel:
+        return self._preview_scenario_options_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def chartXTicksModel(self) -> QmlListModel:
+        return self._chart_x_ticks_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def headerNavLabelsModel(self) -> QmlListModel:
+        return self._header_nav_labels_model
+
+    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    def recordingSessionsModel(self) -> QmlListModel:
+        return self._recording_sessions_model
+
+    @Property(str, notify=remoteLogTextChanged)  # type: ignore[reportCallIssue]
+    def remoteLogText(self) -> str:
+        return "\n".join(self._remote_log_lines)
 
     @Property(int, notify=sourceCountChanged)  # type: ignore[reportCallIssue]
     def sourceCount(self) -> int:
@@ -139,24 +185,6 @@ class AppBridge(QObject):
     @Property(int, notify=recordingSourceCountChanged)  # type: ignore[reportCallIssue]
     def recordingSourceCount(self) -> int:
         return self._recording_source_count
-
-    @Property(list, notify=recordingSessionsChanged)  # type: ignore[reportCallIssue]
-    def recordingSessions(self) -> list[str]:
-        return self._recording_sessions
-
-    @Property(list, notify=sourceRowsChanged)  # type: ignore[reportCallIssue]
-    def sourceRows(self) -> list[dict[str, str | int | bool]]:
-        return [
-            {
-                "sourceId": source_id,
-                "label": "声源",
-                "checked": source_id in self._selected_source_ids,
-                "enabled": True,
-                "badge": str(source_id),
-                "badgeColor": "#cf54ea",
-            }
-            for source_id in self._source_ids
-        ]
 
     @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
     def sourcesEnabled(self) -> bool:
@@ -186,29 +214,9 @@ class AppBridge(QObject):
     def previewScenarioKeys(self) -> list[str]:
         return []
 
-    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
-    def previewScenarioOptions(self) -> list[dict]:
-        return []
-
-    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
-    def elevationSeries(self) -> list[dict]:
-        return []
-
-    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
-    def azimuthSeries(self) -> list[dict]:
-        return []
-
     @Property(bool, notify=previewStateChanged)  # type: ignore[reportCallIssue]
     def showPreviewScenarioSelector(self) -> bool:
         return False
-
-    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
-    def headerNavLabels(self) -> list[str]:
-        return list(self._HEADER_NAV_LABELS)
-
-    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
-    def chartXTicks(self) -> list[str]:
-        return list(self._RUNTIME_CHART_X_TICKS)
 
     @Slot(str)
     def setStatus(self, status: str) -> None:
@@ -385,7 +393,7 @@ class AppBridge(QObject):
         self._potentials_enabled = enabled
         self.potentialsEnabledChanged.emit()
         self._refresh_potentials()
-        self._update_stream_status("候选筛选已更新")
+        self._update_stream_status("候选点筛选已更新")
 
     @Slot(float, float)
     def setPotentialEnergyRange(self, minimum: float, maximum: float) -> None:
@@ -487,8 +495,7 @@ class AppBridge(QObject):
 
     def _update_stream_status(self, prefix: str) -> None:
         self.setStatus(
-            f"{prefix} | 声源={self.sourceCount} 候选={self._potential_count} "
-            f"录制中={self._recording_source_count}"
+            f"{prefix} | 声源={self.sourceCount} 候选={self._potential_count} 录制中={self._recording_source_count}"
         )
 
     def _set_remote_connected(self, connected: bool) -> None:
@@ -526,7 +533,7 @@ class AppBridge(QObject):
         if clean_lines == self._remote_log_lines:
             return
         self._remote_log_lines = clean_lines
-        self.remoteLogLinesChanged.emit()
+        self.remoteLogTextChanged.emit()
 
     def _sync_remote_odas_state(self, update_status: bool = False) -> None:
         previous_running = self._odas_running
@@ -722,7 +729,7 @@ class AppBridge(QObject):
         if self._recording_sessions == sessions:
             return
         self._recording_sessions = sessions
-        self.recordingSessionsChanged.emit()
+        self._recording_sessions_model.replace(sessions)
 
     def _refresh_recording_sessions(self) -> None:
         snapshot_fn = getattr(self._recorder, "sessions_snapshot", None)
@@ -749,7 +756,6 @@ class AppBridge(QObject):
                     self._selected_source_ids.add(source_id)
             self._source_ids = source_ids
             self.sourceIdsChanged.emit()
-            self.sourceRowsChanged.emit()
 
         items = build_source_items(
             self._last_sst,
@@ -766,10 +772,33 @@ class AppBridge(QObject):
             enabled=self._sources_enabled,
             selected_ids=self._selected_source_ids,
         )
-        if positions != self._source_positions:
-            self._source_positions = positions
-            self.sourcePositionsChanged.emit()
-        self.sourceRowsChanged.emit()
+        self._source_positions = positions
+        self._source_positions_model.replace(
+            [
+                {
+                    "id": int(item["id"]),
+                    "color": item.get("color", "#cf54ea"),
+                    "x": float(item["x"]),
+                    "y": float(item["y"]),
+                    "z": float(item["z"]),
+                }
+                for item in positions
+            ]
+        )
+        self._source_rows_model.replace(
+            [
+                {
+                    "sourceId": source_id,
+                    "label": "声源",
+                    "checked": source_id in self._selected_source_ids,
+                    "enabled": True,
+                    "badge": str(source_id),
+                    "badgeColor": "#cf54ea",
+                }
+                for source_id in self._source_ids
+                if self._sources_enabled
+            ]
+        )
 
     def _refresh_potentials(self) -> None:
         count = count_potentials(
@@ -781,7 +810,6 @@ class AppBridge(QObject):
         if count != self._potential_count:
             self._potential_count = count
             self.potentialCountChanged.emit()
-
 
     @Slot(str)
     def setPreviewScenario(self, _key: str) -> None:

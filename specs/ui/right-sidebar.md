@@ -30,6 +30,8 @@
 - `appBridge.sourceRows` 为空时，统一显示空态提示文案。
 - 行 badge 颜色必须使用数据中的 `badgeColor`。
 - 右栏不在本地拼接预览/正式模式占位行。
+- `appBridge.sourceRows` 表示当前场景在全局筛选后的声源行，并保留
+  可逆的勾选状态。
 
 ## Visual Requirements
 
@@ -47,6 +49,7 @@
 ## Interaction Requirements
 
 - 声源勾选框切换后调用 `appBridge.setSourceSelected(sourceId, checked)`。
+- 取消勾选后，对应 row 继续保留，仅勾选状态变化。
 - 筛选器开关和能量滑杆继续绑定现有 `appBridge` 接口。
 - 录音会话为空时仅显示空状态文案，不额外伪造列表项。
 
@@ -64,7 +67,7 @@
 
 ## Acceptance Criteria
 
-1. 预览模式下右栏声源列表来自当前场景，而不是静态占位。
+1. 预览模式下右栏声源列表来自当前场景的筛选结果，而不是静态占位。
 2. 勾选单个声源后，右栏状态与图表、3D 数据保持一致。
 3. `emptyState` 下右栏不显示伪造的声源行，并显示 `暂无活动声源`。
 4. 右栏筛选器与录音会话区文案保持中文正式态，不出现英文开发提示。

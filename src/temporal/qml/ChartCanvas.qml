@@ -1,31 +1,92 @@
 import QtQuick
 
 Canvas {
+    id: root
+
     required property QtObject theme
     property var yTicks: []
-    property var xTicks: []
-    property var seriesList: []
+    property var xTickModel: null
+    property var seriesModel: null
     property string xAxisLabel: "样本"
 
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
     onYTicksChanged: requestPaint()
-    onXTicksChanged: requestPaint()
-    onSeriesListChanged: requestPaint()
+    onXTickModelChanged: requestPaint()
+    onSeriesModelChanged: requestPaint()
     onXAxisLabelChanged: requestPaint()
 
-    function normalizedSeries() {
-        if (!Array.isArray(seriesList)) {
-            return []
+    Connections {
+        target: root.xTickModel
+
+        function onModelReset() {
+            root.requestPaint()
         }
 
+        function onRowsInserted() {
+            root.requestPaint()
+        }
+
+        function onRowsRemoved() {
+            root.requestPaint()
+        }
+
+        function onDataChanged() {
+            root.requestPaint()
+        }
+    }
+
+    Connections {
+        target: root.seriesModel
+
+        function onModelReset() {
+            root.requestPaint()
+        }
+
+        function onRowsInserted() {
+            root.requestPaint()
+        }
+
+        function onRowsRemoved() {
+            root.requestPaint()
+        }
+
+        function onDataChanged() {
+            root.requestPaint()
+        }
+    }
+
+    function modelCount(model) {
+        return model && typeof model.count === "number" ? model.count : 0
+    }
+
+    function readTicks() {
+        const ticks = []
+        const count = modelCount(xTickModel)
+        for (let index = 0; index < count; index += 1) {
+            ticks.push(String(xTickModel.get(index).value))
+        }
+        return ticks
+    }
+
+    function normalizedSeries() {
         const normalized = []
-        for (let index = 0; index < seriesList.length; index += 1) {
-            const item = seriesList[index]
-            if (!item || !Array.isArray(item.values) || item.values.length === 0) {
+        const count = modelCount(seriesModel)
+        for (let index = 0; index < count; index += 1) {
+            const item = seriesModel.get(index)
+            let values = []
+            try {
+                values = JSON.parse(String(item.valuesJson || "[]"))
+            } catch (error) {
+                values = []
+            }
+            if (!Array.isArray(values) || values.length === 0) {
                 continue
             }
-            normalized.push(item)
+            normalized.push({
+                color: item.color,
+                values: values
+            })
         }
         return normalized
     }
@@ -40,6 +101,7 @@ Canvas {
         const bottomPad = 34
         const plotW = w - leftPad - rightPad
         const plotH = h - topPad - bottomPad
+        const xTicks = readTicks()
         const visibleSeries = normalizedSeries()
 
         ctx.reset()
