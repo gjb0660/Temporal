@@ -48,6 +48,11 @@ agent workflow rules.
 - Repository text files must use UTF-8 without BOM and LF.
 - Retained English historical specs, docs, or handoffs may be reported as
     audit observations only.
+- During implementation, existing `#` and `##` headings in `specs/**/*.md`,
+    `docs/**/*.md`, `.github/**/*.md`, and `AGENTS.md` must not change.
+- Exceptions to Markdown heading freeze are limited to `rules-governance`
+    work, newly created Markdown files, or explicit user-requested document
+    restructuring.
 
 ## Prompt Scope
 

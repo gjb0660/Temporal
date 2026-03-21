@@ -39,6 +39,11 @@
 - Start new features by checking specs/in-progress.md first.
 - Execute in order: Explore -> Spec -> Plan -> Code.
 - Update specs/in-progress.md only in handoff stage.
+- During implementation, do not change existing `#` or `##` headings in
+  `specs/**/*.md`, `docs/**/*.md`, `.github/**/*.md`, or `AGENTS.md`.
+- Exceptions are limited to `rules-governance` work, newly created Markdown
+  files, or explicit user-requested document restructuring.
+- When localizing existing Markdown, keep existing `#` and `##` headings.
 
 ### Code Entry
 
