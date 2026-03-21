@@ -1,4 +1,4 @@
-﻿import unittest
+import unittest
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -27,8 +27,9 @@ def _fake_config() -> TemporalConfig:
     )
     return TemporalConfig(remote=remote, streams=streams)
 
+
 def _status_text(bridge: AppBridge) -> str:
-    return cast(str, getattr(bridge, 'status'))
+    return cast(str, getattr(bridge, "status"))
 
 
 @dataclass
@@ -99,7 +100,7 @@ class _FakeClient:
 class _FakeRemote:
     event_log: list[str] | None = None
 
-    def __init__(self, _config) -> None:
+    def __init__(self, _config, _streams) -> None:
         self.connected = False
         self.running = False
         self.connect_calls = 0
@@ -280,7 +281,3 @@ class TestAppBridgeRecording(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-
-

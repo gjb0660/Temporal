@@ -35,6 +35,8 @@
 - 中栏不再从本地 QML fixture 脚本中读取预览数据。
 - 中栏不负责决定哪些声源被选中，只负责消费 bridge 已裁剪后的数据。
 - 中栏不在本地维护 preview 横轴 ticks 或运行态 ticks。
+- production `AppBridge` 默认提供稳定空 model 和 runtime ticks，
+  以保证非 preview 页面契约稳定。
 - 俯仰角归一化规则为 `(deg + 90) / 180`。
 - 方位角归一化规则为 `(deg + 180) / 360`。
 

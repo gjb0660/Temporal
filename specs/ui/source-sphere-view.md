@@ -37,6 +37,8 @@
   `trackingFrames[*].sources` 派生结果。
 - 右栏取消勾选后，对应点位必须消失，但右栏 row 不因此被删除。
 - 3D 点位与中栏图表必须共享同一当前 frame 和同一可见 source 集合。
+- production `AppBridge` 在非 preview 下允许输出空点位 model，
+  但不得输出伪造 preview 点位。
 
 ## Visual Requirements
 

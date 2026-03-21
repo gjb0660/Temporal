@@ -63,7 +63,7 @@ class _FakeClient:
 
 
 class _FakeRemote:
-    def __init__(self, _config) -> None:
+    def __init__(self, _config, _streams) -> None:
         pass
 
 

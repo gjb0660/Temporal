@@ -19,6 +19,7 @@
 
 - `appBridge.status`
 - `appBridge.remoteConnected`
+- `appBridge.odasStarting`
 - `appBridge.odasRunning`
 - `appBridge.streamsActive`
 - `appBridge.remoteLogText`
@@ -36,6 +37,8 @@
 - 监听按钮允许在远端未运行时单独开启本地 listener。
 - preview 的动画推进只能由监听状态触发，
   左栏控制语义必须与运行时状态机一致。
+- 主按钮在 `odasStarting=true` 时显示 `启动中`，
+  并处于禁用状态，避免重复触发启动。
 
 ## Visual Requirements
 
@@ -53,6 +56,8 @@
 - 日志文案应清晰区分以下状态：
   - 等待远端连接
   - 本地 listener 已开启，等待远端接入
+  - 本地 listener 启动失败
+  - 远程 `odaslive` 启动中
   - 正在监听 `SST/SSL/SSS` 数据流
   - 远程 `odaslive` 已启动
   - 远程 `odaslive` 已停止
@@ -63,6 +68,8 @@
   `appBridge.toggleStreams()`。
 - QML 不自行拼接远端状态机逻辑。
 - QML 不限制监听按钮必须依赖远端运行态。
+- QML 直接消费 `odasStarting`，
+  不本地推导“启动中”状态。
 
 ## Non-Goals
 
@@ -76,6 +83,7 @@
 4. 主按钮启动会自动补开监听，主按钮停止顺序正确。
 5. 日志文本和状态文本在默认窗口下都具有可读高度，
    且不出现乱码。
+6. 主按钮在启动验证窗口内显示 `启动中` 且不可重复点击。
 
 ## Validation
 

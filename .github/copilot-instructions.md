@@ -64,6 +64,9 @@ Run these checks before commit:
 - Keep Python modules under src layout (src/temporal/**).
 - Keep QML files under flat layout (src/temporal/qml/**).
 - Keep Pyright enabled and aligned with pyproject.toml settings.
+- `AppBridge` and `PreviewBridge` must each keep one internal
+  state source of truth; do not separately maintain raw list state
+  and `QmlListModel` state for the same UI contract.
 
 ## Collaboration Rules
 

@@ -62,7 +62,12 @@
 
 1. Preview 场景数据存放在共享 Python 模型中，
    由 `PreviewBridge` 统一消费。
-2. `PreviewBridge`
+2. 生产态 `AppBridge` 与 `PreviewBridge`
+   必须共享页面契约名，但不能共享 preview 场景数据真源。
+3. 生产态 `AppBridge` 只负责 runtime 状态机、日志、录音和
+   source 投影；preview 的场景切换、tracking timeline 和
+   sample window 仅由 `PreviewBridge` 管理。
+4. `PreviewBridge`
    在不改变现有 QML 属性名的前提下，继续输出：
    - `sourceRowsModel`
    - `sourcePositionsModel`
@@ -71,23 +76,23 @@
    - `chartXTicksModel`
    - `odasRunning`
    - `streamsActive`
-3. `sourceRowsModel` 从 `sources` 派生，
+5. `sourceRowsModel` 从 `sources` 派生，
    表示当前场景经全局筛选后的稳定 row 集合。
-4. `sourceRowsModel` 中 row 的右侧动态数值
+6. `sourceRowsModel` 中 row 的右侧动态数值
    必须从当前 frame 对应 source 的 `energy` 刷新，
    而不是长期停留在静态 metadata。
-5. `sourcePositionsModel`
+7. `sourcePositionsModel`
    从当前 frame 的 `trackingFrames[*].sources` 派生。
-6. `elevationSeriesModel` 与 `azimuthSeriesModel`
+8. `elevationSeriesModel` 与 `azimuthSeriesModel`
    从当前 sample window 内的 xyz 序列派生，
    不再维护独立假数据数组。
-7. 场景切换后，右栏、图表、3D 和横轴标签
+9. 场景切换后，右栏、图表、3D 和横轴标签
    必须在同一 bridge 刷新周期内同步更新。
-8. 新场景切换后，默认重置为
+10. 新场景切换后，默认重置为
    “该场景的全部 source 已勾选，sample window 回到起点”。
-9. preview 默认只渲染首帧静态结果，不自动滚动；
+11. preview 默认只渲染首帧静态结果，不自动滚动；
    只有监听开启后才推进。
-10. 监听关闭后，preview 停在当前结果；
+12. 监听关闭后，preview 停在当前结果；
     再次开启时从场景起点重新开始。
 
 ## Rules
@@ -128,11 +133,21 @@
   不要求远端已运行。
 - 主按钮停止时保持“先停监听，再停远端，不断 SSH”的顺序。
 
+生产态 runtime 观测接口继续保留为公开只读属性：
+
+- `remoteConnected`
+- `odasStarting`
+- `odasRunning`
+- `streamsActive`
+- `remoteLogLines`
+- `remoteLogText`
+
 生产态 `AppBridge` 继续提供安全默认值：
 
 - preview 相关选项模型为空
 - header 导航标签保持 runtime 默认值
 - chart x 轴 ticks 保持 runtime 默认值
+- `setPreviewScenario()` 在生产态 bridge 中保持 no-op
 
 ## Quality Requirements
 
@@ -140,6 +155,9 @@
 - 场景切换和勾选变化必须是无副作用的纯 bridge 状态变更。
 - preview 现在优先保证 UI 和状态机一致性，
   不追求模拟异常链路。
+- runtime `AppBridge`
+  必须只有一套状态真源，禁止并行维护独立 list 状态与
+  `QmlListModel` 状态。
 - 图表、3D、右栏和日志文案必须避免再次引入乱码。
 - 同一 source id 在右栏 badge、图表曲线和 3D
   点位中的颜色必须保持稳定。

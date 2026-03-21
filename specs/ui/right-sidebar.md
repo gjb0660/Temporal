@@ -38,6 +38,8 @@
 - 右栏每一行右侧展示的动态数值
   必须跟随当前 frame 的 `energy` 变化，
   不能长期停留在静态 metadata。
+- production `AppBridge` 默认必须输出稳定空 row/model，
+  不能因为 runtime 回归产生未定义 model 或占位脏数据。
 
 ## Visual Requirements
 
