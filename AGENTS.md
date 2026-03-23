@@ -1,78 +1,114 @@
 # AGENTS
 
-## Ownership
+## Purpose
 
-- This file defines agent roles and execution workflow.
-- Keep repository-wide technical constraints in .github/copilot-instructions.md.
+- This file defines the global decision model and execution protocol for agents.
+- The spec is the single source of truth for delivery.
+- Repository-specific technical constraints belong in `.github/copilot-instructions.md`.
+- Specs structure and navigation belong in `specs/index.md`.
 
-## Roles
+## Operating Principle
 
-### Explore Agent
+- Operate under Minimal ESPC: Explore -> Spec -> Plan -> Code.
+- Treat the spec as the only authoritative source of execution truth.
+- Derive all decisions from Goal, Facts, and Acceptance.
+- Do not introduce external objectives unless explicitly stated in Goal.
+- Think in first principles.
+- Reject heuristics, guesswork, and unverified assumptions.
+- Apply Occam’s Razor: keep only what is necessary.
+- Do not preserve backward compatibility unless explicitly required.
+- Use Socratic questioning to expose missing, weak, or conflicting assumptions.
+- If Goal, Facts, or Acceptance are missing, unclear,
+  or inconsistent, do not proceed to Code.
 
-- Purpose: read-only protocol and reference discovery.
-- Output: file paths, concrete data contracts, and open risks.
+## Agent Modes
 
-### Implement Agent
+### Explore
 
-- Purpose: code delivery under repository constraints.
-- Output: minimal diffs, updated tests, and no unrelated changes.
+- Purpose: discover facts, constraints, interfaces, and risks.
+- Output: verified facts and open questions only.
+- Do not propose execution before the relevant facts are established.
 
-### Review Agent
+### Spec
 
-- Purpose: pre-merge risk review.
-- Focus: regressions, data-loss risks, reconnect edge cases,
-  missing tests, and refactor quality.
+- Purpose: define the intended change.
+- Output: Goal, Non-Goals, Facts, Decision, and Acceptance.
+- Do not encode guesses as Facts.
+- Do not move forward without a clear stopping condition.
 
-## Collaboration Workflow
+### Plan
 
-- Use `vscode_askQuestions` only for true blocking decisions
-  or missing required inputs.
-- Do not pause for approval when the task is implementable
-  from current context.
-- Follow technical boundaries and touched-scope quality gates
-  in .github/copilot-instructions.md.
-- Use specs/index.md for static structure and collaboration contract.
-- Use specs/in-progress.md for active routing and duplicate-demand checks.
-- Keep project decisions under specs/decisions/.
-- Keep phase implementation specs under specs/plans/
-  until absorbed into feature Execution sections.
-- Start new features by checking specs/in-progress.md first.
-- Execute in order: Explore -> Spec -> Plan -> Code.
-- Update specs/in-progress.md only in handoff stage.
-- During implementation, do not change existing `#` or `##` headings in
-  `specs/**/*.md`, `docs/**/*.md`, `.github/**/*.md`, or `AGENTS.md`.
-- Exceptions are limited to `rules-governance` work, newly created Markdown
-  files, or explicit user-requested document restructuring.
-- When localizing existing Markdown, keep existing `#` and `##` headings.
+- Purpose: define the minimal execution path.
+- Output: ordered critical steps only.
+- Keep the plan short, concrete, and scoped to current Acceptance.
+- Do not treat Todo as part of the execution path.
 
-### Code Entry
+### Code
 
-- Enter Code only after Definition exists.
-- Enter Code only after Execution exists,
-  unless the target feature declares `Exception: small-change`.
-- Treat blocked features as not directly codable.
+- Purpose: implement the current spec and nothing beyond it.
+- Output: minimal diffs, relevant tests, and required spec updates.
+- Do not code against implied scope.
+- Do not bypass the spec.
 
-### Code Exit
+### Review
 
-- Follow Red -> Green -> Refactor -> Commit.
+- Purpose: verify correctness, boundary discipline, and regression safety.
+- Focus: acceptance coverage, unintended scope expansion, regressions,
+  missing tests, and spec-code drift.
+
+## Execution Protocol
+
+### Entry Rules
+
+- Enter Explore when facts are insufficient.
+- Enter Spec when the problem is understood well enough to define Goal and Acceptance.
+- Enter Plan when the decision is clear enough to produce a minimal execution path.
+- Enter Code only when Decision, Acceptance, and Plan already exist.
+- Treat blocked work as not directly codable.
+
+### Exit Rules
+
+- Explore exits when the necessary facts are established.
+- Spec exits when Acceptance is testable and scope is bounded.
+- Plan exits when the critical path is explicit and minimal.
+- Code exits only when implementation, tests, and spec updates are consistent.
+- Review exits only when no unresolved high-risk issue remains.
+
+## Code Protocol
+
+- When in Code mode, the agent MUST operate as a continuous loop:
+  Red -> Green -> Refactor -> Commit
+- The loop continues until Exit conditions are satisfied.
+- Each iteration must produce a verifiable improvement.
 - Green is an intermediate state, not a completion condition.
-- Before commit: touched-scope tests are green,
-  touched-scope lint and format gates pass,
-  and behavior changes sync required Spec updates.
-- Code is not complete until the commit is recorded in git.
-- Commit implementation, related tests, and required Spec updates
-  together in one atomic commit.
-- Run the existing Review Agent before considering Code complete
-  for high-risk or test-driven behavior changes.
-- If risk is unclear, treat the change as high-risk.
+- Refactor must preserve passing behavior.
+- Do not accumulate large uncommitted changes across multiple uncertain steps.
+- If the current change cannot be validated, do not continue expanding it.
+- Code is not complete until the current stable change is recorded in git.
+- A behavior change is not complete until code, tests, and required spec updates
+  are committed together in one atomic commit.
 
-- Keep rule and handoff docs terse; remove duplicated guidance.
-- After a bug fix, add one preventive rule to the nearest applicable
-  repository rule file.
+## Change Discipline
 
-## Forbidden
+- Keep changes minimal and scoped.
+- Do not mix exploration, design changes, and unrelated refactors in one change.
+- Update spec and code together whenever behavior changes.
+- Keep Progress aligned with reality, not intention.
+- If new facts invalidate the current decision, update the spec first.
 
-- No cross-layer shortcut (QML direct socket access).
-- No destructive git cleanup (`git reset --hard`, `git clean -fd`).
-- No git history rewrite or deletion.
-- No modification outside workspace scope.
+## Collaboration Rules
+
+- Ask questions only for true blocking ambiguity or missing required input.
+- Do not pause for approval when the current spec is sufficient to proceed.
+- Prefer explicit facts over inferred intent.
+- Surface contradictions instead of silently resolving them.
+
+## Global Prohibitions
+
+- Do not bypass the spec.
+- Do not treat assumptions as facts.
+- Do not expand scope without updating the spec.
+- Do not create parallel execution truth outside the spec.
+- Do not make destructive git changes.
+- Do not rewrite or delete git history.
+- Do not modify files outside the workspace scope.

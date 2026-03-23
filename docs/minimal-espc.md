@@ -265,7 +265,7 @@ When new information appears:
 2. **Facts vs Decision**
 
     * Facts = realities we must accept (what the world is)
-    * Decision = choices we make based on those realities (how we act within that world)
+    * Decision = choices we make based on those realities (how act within world)
 
     Agents MUST ensure that Decisions are dependent on Facts, not assumptions.
 
