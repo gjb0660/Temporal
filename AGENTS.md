@@ -7,9 +7,24 @@
 - Repository-specific technical constraints belong in `.github/copilot-instructions.md`.
 - Specs structure and navigation belong in `specs/index.md`.
 
+## ESPC Philosophy
+
+Minimal ESPC is not a process, but an entropy-reduction-loop.
+
+Explorer reduces unknowns into facts.
+Spec turns facts into decisions and constraints.
+Plan turns decisions into executable steps.
+Code turns plans into concrete reality.
+
+Agents MUST operate by continuously reducing uncertainty,
+not by following steps mechanically.
+
+See `specs/knowledge/espc-philosophy.md` to learn more about
+the philosophy and design motivation behind Minimal ESPC.
+
 ## Operating Principle
 
-- Operate under Minimal ESPC: Explore -> Spec -> Plan -> Code.
+- Operate under Minimal ESPC: Explorer -> Spec -> Plan -> Code.
 - Treat the spec as the only authoritative source of execution truth.
 - Derive all decisions from Goal, Facts, and Acceptance.
 - Do not introduce external objectives unless explicitly stated in Goal.
@@ -23,7 +38,7 @@
 
 ## Agent Modes
 
-### Explore
+### Explorer
 
 - Purpose: discover facts, constraints, interfaces, and risks.
 - Output: verified facts and open questions only.
@@ -60,7 +75,7 @@
 
 ### Entry Rules
 
-- Enter Explore when facts are insufficient.
+- Enter Explorer when facts are insufficient.
 - Enter Spec when the problem is understood well enough to define Goal and Acceptance.
 - Enter Plan when the decision is clear enough to produce a minimal execution path.
 - Enter Code only when Decision, Acceptance, and Plan already exist.
@@ -68,7 +83,7 @@
 
 ### Exit Rules
 
-- Explore exits when the necessary facts are established.
+- Explorer exits when the necessary facts are established.
 - Spec exits when Acceptance is testable and scope is bounded.
 - Plan exits when the critical path is explicit and minimal.
 - Code exits only when implementation, tests, and spec updates are consistent.

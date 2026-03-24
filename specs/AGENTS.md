@@ -11,7 +11,8 @@ not external metrics or assumptions.
 
 ## Purpose
 
-Defines the minimal ESPC operational rules for agents working inside `specs/`.
+Defines the minimal ESPC `specs/`-scoped operational rules for agents working
+inside `specs/`.
 
 All semantics MUST be derived from referenced index files.
 
@@ -98,6 +99,19 @@ Agents MUST NOT start execution unless:
 - **Todo**:
   - MUST contain non-critical or deferred work
   - MUST NOT replace Plan
+
+## Clarification Rules
+
+During the Explorer phase, if required information is
+missing, ambiguous, conflicting, or cannot be verified,
+Agents MUST use an available built-in question tool
+(for example, `vscode_askQuestions`, `request_user_input`, etc.)
+to clarify before proceeding.
+
+Agents MUST ask during exploration, not after partial execution.
+
+Agents MUST NOT continue implementation based on guesswork
+when clarification is required.
 
 ## Update Rules
 

@@ -1,110 +1,126 @@
 ---
 name: session-handoff
-description: "Use when: preparing end-of-session handoff, updating progress docs, recording validation status, and drafting a practical next-session checklist. Keywords: handoff, session summary, 会话交接, 阶段进度, next steps."
-argument-hint: "handoff date and scope"
+description: "Use when ending a work session to ensure spec is synchronized, perform self-audit against ESPC principles, and optionally produce a minimal handoff artifact. Keywords: session handoff, closeout, self-audit, progress sync, 会话交接."
+argument-hint: "active work item or session scope"
 ---
 
 # Session Handoff Skill
 
 ## When To Use
 
-Use this skill when ending a work session and handing off to a new chat/session.
+Use this skill when a work session is ending and continuity
+or correctness must be ensured.
 
-Typical triggers:
+## Goal
 
-- "整理会话纪要"
-- "写交接文档"
-- "总结本次进展并给下次任务"
-- "更新阶段进度"
+Ensure the system state is consistent, auditable, and resumable
+WITHOUT introducing a parallel execution source.
 
-## Inputs
+## Core Principle
 
-- Handoff date (for filename)
-- Current objective and phase
-- Workspace status and validation evidence
+- The active feature spec MUST remain the single source of execution truth.
+- Any handoff artifact MUST be treated as a derived, non-authoritative summary.
+
+## Required Identification
+
+The skill MUST identify:
+
+- the active execution source (feature spec)
+- work completed in this session (verified only)
+- validation actually performed
+- unresolved risks or blockers
+- the next concrete continuation point
 
 ## Procedure
 
-1. Collect status context.
-2. Capture validation evidence.
-3. Update progress documentation.
-4. Create/update handoff document.
-5. Produce concise chat summary for next session.
+1. Locate the active execution source.
+2. Update the source BEFORE any summary is produced.
+3. Perform a self-audit against ESPC principles.
+4. Capture only verified session facts.
+5. Optionally generate a handoff artifact if required.
+6. Return a minimal continuation summary.
 
-## Step Details
+## Self-Audit (Mandatory)
 
-### 1) Collect Status Context
+The following checks MUST be performed:
 
-- Read `specs/index.md` first for repository routing and export rules.
-- Inspect workspace status and current delivery scope. Example commands:
-  - `git status --short --untracked-files=all`
-  - `git log --oneline -n 20`
-- Identify completed scope, in-progress scope, and pending items.
+### Spec Consistency
 
-### 2) Capture Validation Evidence
+- The active feature spec MUST be updated if execution changed.
+- `Progress` MUST reflect only completed work.
+- `Todo` MUST NOT duplicate `Plan`.
+- `Facts` MUST NOT contain assumptions.
+- `Decision` MUST be consistent with `Facts`.
 
-- Record checks that were actually executed in this session.
-- If the repository uses uv, prefer uv-based commands;
-  otherwise use the local standard toolchain.
-- Temporal example commands:
-  - `uv run pyside6-qmllint src/temporal/qml/Main.qml`
-  - `uv run pyside6-qmlformat -i src/temporal/qml/Main.qml`
-  - `uv run ruff check src tests`
-  - `uv run python -m unittest discover -s tests -p "test_*.py" -v`
+### Boundary Discipline
 
-### 3) Update Progress Documentation
+- Work MUST NOT exceed `Goal`.
+- `Non-Goals` MUST NOT be violated.
+- Applicable contracts MUST NOT be violated.
 
-- Update the project progress document
-  (for Temporal: `specs/in-progress.md`) with:
-  - Completed phases and deltas
-  - Key commits for this session
-  - Next actionable items
-  - Session lessons confirmed with user
+### Source Integrity
 
-### 4) Create/Update Handoff Document
+- No parallel execution source MUST be created.
+- No execution state MUST be written outside the spec.
+- Knowledge files MUST remain non-executable.
 
-- Use repository convention for handoff path and date naming.
-- Temporal default: `specs/handoffs/session-YYYY-MM-DD.md`.
-- Use [handoff template](./references/handoff-template.md).
-- Follow the handoff contract in `specs/index.md`
-  for language and required fields.
-- Include handoff contract fields when available
-  (for example from AGENTS workflow):
-  - changed files list
-  - assumptions
-  - validation performed
-  - unresolved risks
+### Validation Integrity
 
-### 5) Produce Chat Summary
+- Validation MUST be recorded ONLY if actually executed.
+- If validation was not executed, it MUST be explicitly stated as "not run".
 
-- Return a short summary with:
-  - What is done
-  - What remains
-  - Suggested first 3 commands or actions for next session
+## Handoff Artifact (Optional)
 
-## Decision Points
+A handoff file MAY be created ONLY IF:
 
-- If no dedicated progress doc exists,
-  write a short progress section in the handoff doc.
-- If no tests/lints were run, explicitly state "not run" and explain the reason.
-- If the workspace is dirty with unrelated changes,
-  record this risk in handoff notes.
+- repository rules require it, OR
+- session continuity would otherwise be degraded
 
-## Quality Checklist
+If created:
 
-- Documentation is concise and audience-appropriate
-  (Temporal handoff docs keep the current language convention and follow
-  `specs/index.md`).
-- Validation facts are consistent with actual git/test outputs.
-- Content does not conflict with active repository rules
-  (for Temporal: `.github/copilot-instructions.md` and `AGENTS.md`).
-- If code changes are included in the same session,
-  keep implementation and tests aligned in the same delivery unit.
+- It MUST be written under `.tmp/handoffs/`
+- It MUST be treated as a derived artifact
+- It MUST NOT act as an execution source
+- It SHOULD remain concise and directly actionable
+- It MAY be deleted after recovery
+
+## Handoff Content Requirements
+
+If a handoff file is created, it MUST include:
+
+- active execution source
+- completed work (verified only)
+- validation status (executed or not run)
+- unresolved risks or blockers
+- next continuation step
+
+It MUST NOT:
+
+- duplicate full spec content
+- introduce new plans or decisions
+- contradict the active spec
+
+## Output
+
+The skill MUST return:
+
+- `active-source`
+- `spec-updated` (yes/no)
+- `validation-status`
+- `open-risks`
+- `next-step`
 
 ## Exit Criteria
 
-- Progress information reflects current session state
-  in the repository's preferred location.
-- A dated handoff note is available
-  in the repository's chosen handoff location.
-- Next-session checklist is specific enough to execute directly.
+- The active spec reflects the true session state
+- All self-audit checks pass
+- No parallel state source has been introduced
+- The next session has a clear starting point
+
+## Constraints
+
+- The skill MUST NOT introduce new rules.
+- The skill MUST NOT modify contracts or governance structure.
+- The skill MUST prioritize spec correctness over summary completeness.
+- The skill SHOULD minimize output size.
+- The skill MAY skip artifact creation if unnecessary.

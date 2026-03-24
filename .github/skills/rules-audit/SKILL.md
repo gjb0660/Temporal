@@ -1,78 +1,68 @@
 ---
 name: rules-audit
-description: "Use when: auditing repository rules for redundancy, missing workflow constraints, weak instruction coverage, discoverability gaps, and conflicting customization sources. Keywords: rules audit, governance review, instruction overlap, 冗余扫描, 漏项扫描, 治理审计."
-argument-hint: "audit scope or governance concern"
+description: "Detect governance rule violations, conflicts, gaps, overlap, and weak normative wording. Keywords: rules audit, governance audit, rule conflict, missing rule, RFC2119, 规则审计."
+argument-hint: "audit scope or rule concern"
 ---
 
 # Rules Audit Skill
 
 ## When To Use
 
-Use this skill when auditing repository governance files for rule drift,
-redundancy, missing workflow constraints,
-or weak wording that cannot be enforced reliably.
-
-Typical triggers:
-
-- "跑一轮 rules audit"
-- "扫描规则冗余和遗漏"
-- "检查治理文件有没有冲突"
-- "审计 instructions、skills、AGENTS 是否一致"
-
-## Scope
-
-Audit repository governance files under `.github/**`, `AGENTS.md`,
-and `specs/**` only when they define or repeat agent workflow rules.
+Use when validating that governance rules are consistent, complete,
+and mechanically enforceable.
 
 ## Goal
 
-- find redundant rules
-- find missing rules
-- find conflicting rules
-- keep guidance short and enforceable
+Detect violations in the rule system that can change agent behavior.
 
-## Procedure
+## Rule Model
 
-1. Read the active governance baseline.
-2. Check every required workflow contract in
-   [workflow-contracts](./references/workflow-contracts.md).
-3. Record findings by severity and file.
-4. Produce a minimal consolidation plan.
-5. Produce a validation checklist.
+A rule is valid only if it:
 
-## Audit Reference
+- uses RFC 2119 / RFC 8174 normative keywords (MUST, SHOULD, MAY)
+- has a clear owning layer
+- is mechanically testable
 
-- Use [workflow-contracts](./references/workflow-contracts.md)
-  as the canonical audit checklist.
-- Keep the main SKILL focused on scope, process,
-  output structure, and constraints.
+## Findings
 
-## Output Format
+Each finding MUST be classified as one of:
 
-Return findings in this order:
+- `conflict` — two rules produce incompatible behavior
+- `missing` — required rule is absent
+- `overlap` — same rule defined in multiple layers
+- `weak-normative` — missing or incorrect RFC2119 keyword
+- `unscoped` — no clear ownership layer
+- `unverifiable` — cannot be tested or audited
 
-1. Critical conflicts.
-2. Missing coverage.
-3. Redundant or repeated guidance.
-4. Weak wording that should become explicit requirements.
+## Output
 
-For each finding, include:
+Return findings ordered by severity:
 
-- file path
-- why it matters
-- minimal edit direction
+1. `critical` — behavior divergence or contract violation
+2. `major` — incomplete or ambiguous governance
+3. `minor` — clarity or redundancy issues
 
-Then return:
+Each finding MUST include:
 
-1. A consolidation plan that removes duplication without losing
-   necessary file-specific instructions.
-2. A minimal patch plan grouped by file.
-3. A validation checklist with exact commands to run after edits.
+- `severity`
+- `type`
+- `file`
+- `rule` (normative sentence)
+- `violation` (what breaks)
+- `impact`
+- `minimal-fix`
 
 ## Constraints
 
-- Prefer the smallest rule change that fixes the gap.
-- Do not propose broad rewrites when a local edit is enough.
-- Prefer imperative bullets over paragraphs.
-- Flag `applyTo: "**"` unless it is truly required.
-- Flag skill descriptions that are too vague to be discoverable.
+- Audit MUST NOT introduce new rules.
+- Audit MUST NOT modify files.
+- Audit MUST rely only on existing rule sources:
+  - AGENTS.md
+  - specs/** (features + contracts)
+  - .github/**
+- Audit SHOULD ignore non-governance content.
+- Audit MUST flag any rule that does not use RFC 2119 keywords.
+
+## References
+
+[RFC 2119 - Key words for use in RFCs to Indicate Requirement Levels](./references/rfc2119.md)

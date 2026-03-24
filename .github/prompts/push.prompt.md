@@ -6,7 +6,7 @@ agent: "agent"
 ---
 # Push
 
-Follow the `Explore -> Spec -> Plan -> Code` flow. Just do it.
+Follow the minimal ESPC flow. Just do it.
 Remember update the relevant [specs/](../../specs/).
 Remember `Red -> Green -> Refactor` in coding.
 Remember `Commit` at the end.

@@ -1,41 +1,37 @@
-# Temporal Session Handoff (YYYY-MM-DD)
+# Session Handoff
 
-可按仓库实际情况调整下列章节。
+## Active Source
 
-## Scope Completed
+- <feature spec path>
 
-- 待补充
+## Spec Sync Check
 
-## Key Commits
+- [ ] Active spec updated
+- [ ] Facts updated when new verified facts appeared
+- [ ] Decision updated when the chosen approach changed
+- [ ] Progress reflects only real work
+- [ ] Todo does not duplicate Plan
 
-- `<hash>` 提交摘要
+## ESPC Compliance Check
 
-## Validation Performed
+- [ ] No work executed outside spec boundary
+- [ ] No assumption written as Fact
+- [ ] No contract violation introduced
+- [ ] No parallel execution source created
 
-- 待补充
+## Completed This Session
 
-## Changed Files
+- <verified completed work>
 
-- 待补充
+## Validation
 
-## Assumptions
+- <checks actually run>
+- or: not run
 
-- 待补充
+## Next Start
 
-## Unresolved Risks
+1. <first concrete next action>
 
-- 待补充
+## Risks
 
-## Next Session First Commands
-
-命令应与仓库工具链保持一致。Temporal 示例：
-
-1. `git status --short --untracked-files=all`
-2. `uv run ruff check src tests`
-3. `uv run python -m unittest discover -s tests -p "test_*.py" -v`
-
-## Suggested First Tasks
-
-1.
-2.
-3.
+- <open risk / blocker>
