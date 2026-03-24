@@ -36,7 +36,8 @@ Feature MAY 在以下位置引用 Contract：
 
 - Contract MUST NOT 驱动执行
 - Contract MUST NOT 感知 feature
-- Contract MUST ONLY 定义约束
+- Contract MUST NOT 枚举行为
+- Contract MUST ONLY 定义约束空间
 
 ## Format
 
@@ -51,9 +52,9 @@ Contract spec MUST 遵循标准结构：
 **Metadata**:
 
 - `scope`:
-  - `ui`: user interface constraints
-  - `api`: interface and protocol constraints
-  - `data`: schema and data-model constraints
+  - `ui`: used for user-visible visual and interaction constraints
+  - `api`: used for behavior, invocation, and boundary interaction constraints
+  - `data`: used for field, schema, type, and state constraints
 - `stability`:
   - `strict`: must not change casually
   - `semi`: change allowed with explicit review
@@ -72,23 +73,24 @@ version: <version-number>
 
 ## Role
 
-<what this contract is for>
+<what this contract is responsible for (semantic anchor)>
 
 ## Invariants
 
 - <must always hold>
 
-## Allowed Changes
+## Variation Space
 
-- <safe changes>
+- <allowed dimensions of change (NOT enumerating cases)>
 
-## Forbidden Changes
+## Rationale (Optional)
 
-- <forbidden changes>
+- <why these invariants exist>
+- <design intent that constrains how variation space should be used>
 
-## Notes
+## Anti-Patterns (Optional)
 
-<extra rationale or migration notes>
+- <commonly misused or harmful patterns>
 ```
 
 **Notes**:

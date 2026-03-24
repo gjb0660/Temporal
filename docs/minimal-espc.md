@@ -135,13 +135,11 @@ updated: YYYY-MM-DD
 
 * `title`: stable identifier (function/domain-based, not time-based)
 * `tracker`:
-
   * `feature`: deliver new capability
   * `bugfix`: fix incorrect behavior
   * `refactor`: improve existing structure
   * `research`: clarify unknowns
 * `status`:
-
   * `exploring`: not ready to execute
   * `active`: in progress
   * `blocked`: cannot proceed
@@ -392,38 +390,72 @@ version: <version-number>
 
 ## Role
 
-<what this contract is for>
+<what this contract is responsible for (semantic anchor)>
 
 ## Invariants
 
 - <must always hold>
 
-## Allowed Changes
+## Variation Space
 
-- <safe changes>
+- <allowed dimensions of change (NOT enumerating cases)>
 
-## Forbidden Changes
+## Rationale (Optional)
 
-- <forbidden changes>
+- <why these invariants exist>
+- <design intent that constrains how variation space should be used>
 
-## Notes
+## Anti-Patterns (Optional)
 
-<extra rationale or migration notes>
+- <commonly misused or harmful patterns>
 ```
 
 ### Contract Metadata
 
 * `scope`:
-
-  * `ui`: user interface constraints
-  * `api`: interface and protocol constraints
-  * `data`: schema and data-model constraints
+  * `ui`: used for user-visible visual and interaction constraints
+  * `api`: used for behavior, invocation, and boundary interaction constraints
+  * `data`: used for field, schema, type, and state constraints
 * `stability`:
-
   * `strict`: must not change casually
   * `semi`: change allowed with explicit review
   * `flexible`: low-cost constraint, can evolve
 * `version`: contract revision
+
+### Contract Semantics
+
+* Role defines **semantic responsibility**
+
+  * MUST describe what the contract is and what it is responsible for
+  * MUST NOT include constraints (use Invariants)
+  * MUST NOT include explanations (use Rationale)
+  * MUST NOT include allowed variations (use Variation Space)
+  * SHOULD be concise (1–3 sentences)
+
+* Invariants define **non-negotiable constraints**
+
+  * MUST be minimal and stable
+  * MUST NOT encode implementation details
+
+* Variation Space defines **degrees of freedom**
+
+  * MUST describe dimensions, NOT enumerate variants
+  * MUST stay within boundaries implied by Invariants
+  * SHOULD be minimal but sufficient for design exploration
+
+* Rationale defines **causal explanation of Invariants**
+
+  * MUST explain why Invariants exist
+  * MUST NOT restate Variation Space
+  * SHOULD provide design intent to guide use of Variation Space
+
+* Anti-Patterns define **commonly incorrect solutions**
+
+  * MUST be optional
+  * MUST describe patterns that violate Invariants or Rationale
+  * MUST NOT act as primary constraints
+  * SHOULD help agents avoid incorrect implementations,
+    not enumerate all invalid cases
 
 ### Feature–Contract Boundary
 
@@ -458,9 +490,7 @@ version: <version-number>
 
 Key Points
 
-## 2. Details
-
-...
+## 2. ...
 
 ## N. Summary
 
@@ -480,6 +510,9 @@ Conclusions
 * ❌ Writing assumptions as Facts
 * ❌ Expanding scope without updating Goal
 * ❌ Using Todo as a second Plan
+* ❌ Enumerating valid behaviors instead of defining Variation Space
+* ❌ Using Notes as an unstructured container
+* ❌ Using Anti-Patterns as hard constraints
 * ❌ Writing execution state into knowledge/
 * ❌ Writing feature-specific delivery logic into contracts/
 * ❌ Using index.md as a dashboard

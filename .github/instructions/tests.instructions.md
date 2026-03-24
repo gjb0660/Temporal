@@ -1,14 +1,26 @@
 ---
-description: "Use when: writing unit or integration tests for protocol parsing, reconnect behavior, and recording correctness."
+description: "Use when: writing tests."
 applyTo: "tests/**"
 ---
 
 # Test Instructions
 
-- Use unittest for unit and integration tests.
-- Use TDD as Red -> Green -> Refactor.
-- Refactor after Green; remove duplication and keep test helpers intent-revealing.
-- Unit tests first for protocol parsing and recorder transitions.
-- Avoid real network in unit tests; use fake sockets and deterministic fixtures.
-- Include reconnect and malformed message cases.
-- Verify filename contract and timestamp presence for recording outputs.
+## Scope
+
+Applies to unit and integration tests.
+
+## Source of Truth
+
+- [specs/contracts/recording.md](../../specs/contracts/recording.md)
+- [specs/knowledge/unittest.md](../../specs/knowledge/unittest.md)
+
+## Local Rules
+
+- Use unittest.
+- Avoid real network in unit tests.
+- Prefer deterministic inputs and fake IO.
+- Keep test helpers minimal.
+
+## Local Checks
+
+- `uv run python -m unittest discover -s tests -p "test_*.py" -v`

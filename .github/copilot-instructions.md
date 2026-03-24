@@ -1,86 +1,45 @@
-# Temporal Repository Instructions
+# Repository Instructions
 
-## Ownership
+## Scope
 
-- This file defines repository-wide technical constraints and quality gates.
-- Keep agent workflow, role handoff, and execution process in AGENTS.md.
+Defines repository-wide facts, engineering constraints, and quality gates.
 
-## Project Intent
+- Agent workflow MUST follow AGENTS.md.
+- Specs are the single source of truth.
+- Docs are human-readable export from specs.
 
-Temporal is a Python + QML ODAS upper-computer client focused on:
+## Source of Truth
 
-- SSH private-key based remote odaslive lifecycle control.
-- Real-time SSL/SST/SSS visualization.
-- Source-driven automatic recording.
+- [specs/knowledge/architecture.md](../specs/knowledge/architecture.md)
 
-## Technical Stack
+## Repository Rules
 
-- Python 3.10
-- PySide6 + QML
-- uv + venv
+- Python code MUST stay under src/temporal/**
+- QML code MUST stay under src/temporal/qml/**
+- Tests case MUST stay under tests/**
+- Python MUST NOT __init__.py in namespace packages
 
-## Architecture Boundaries
+### 1. Writing Rules
 
-- Python backend layer: src/temporal/core
-  - network: ODAS stream clients and parsing
-  - ssh: remote odaslive lifecycle control
-  - recording: source-driven recorder state and file writing
-- Bridge and startup: src/temporal/app.py, src/temporal/main.py
-- QML presentation: src/temporal/qml (flat QML layout)
+- MUST ONLY be UTF-8 + LF
+- SHOULD English for code/github, bilingual for docs
 
-Prefer src layout with PEP 420 namespace packages for Python source tree.
+### 2. Git Rules
 
-QML must not open sockets directly. All service actions go through appBridge slots/signals.
+- MUST NOT rewrite or delete history
+- MUST NOT modify files outside workspace
 
-## ODAS Protocol Constraints
+## Repository Checks
 
-- SST tracked JSON stream: port 9000
-- SSL potential JSON stream: port 9001
-- SSS separated PCM stream: port 10000
-- SSS post-filtered PCM stream: port 10010
+Before commit, MUST pass:
 
-Keep stream handlers tolerant to chunk boundaries, malformed lines,
-and reconnect scenarios.
-
-## Recording Contract
-
-- Filename format: ODAS_{source_id}_{timestamp}_{sp|pf}.wav
-- Recording lifecycle: source appears -> start;
-  source disappears/inactive timeout -> stop
-
-## Quality Gates
-
-Run these checks before commit:
-
-- `uv run pyright`
-- `uv run pyside6-qmllint src/temporal/qml/Main.qml`
-- `npx markdownlint AGENTS.md docs/**/*.md .github/**/*.md specs/**/*.md`
+- `uv run pyright --project pyproject.toml`
 - `uv run ruff check src tests`
+- `uv run ruff format src tests`
+
+- `uv run pyside6-qmllint <qml-files>`
+- `uv run pyside6-qmlformat -i <qml-files>`
+
+- `npx markdownlint **/*.md .github/**/*.md`
+
 - `uv run python -m unittest discover -s tests -p "test_*.py" -v`
-
-## Additional Rules
-
-- Python source tree uses PEP 420 namespace packages; do not add __init__.py files.
-- Keep Python modules under src layout (src/temporal/**).
-- Keep QML files under flat layout (src/temporal/qml/**).
-- Keep Pyright enabled and aligned with pyproject.toml settings.
-- `AppBridge` and `PreviewBridge` must each keep one internal
-  state source of truth; do not separately maintain raw list state
-  and `QmlListModel` state for the same UI contract.
-
-## Collaboration Rules
-
-- Keep agent workflow rules in `AGENTS.md`; do not duplicate them here.
-- Run markdownlint for touched Markdown files and fix all violations
-  before commit.
-- Keep AI execution content under `specs/` and export human-facing
-  manuals under `docs/`.
-- Keep `.github/**` instruction files, `AGENTS.md`, source code comments,
-  and git commit messages in concise English.
-- Write new `docs/**/*.md` with English headings and concise Chinese body
-  text; keep tables and explanatory comment examples in Chinese and preserve
-  stable technical terms in English.
-- Enforce UTF-8 without BOM and LF line endings for repository text files
-  through repo config in `.editorconfig` and `.gitattributes`.
-- Only use git add and git commit; never rewrite or delete git history.
-- Never modify or delete files outside the current workspace.

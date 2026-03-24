@@ -62,9 +62,7 @@ Knowledge spec MUST 遵循标准结构：
 
 Key Points
 
-## 2. Details
-
-...
+## 2. ...
 
 ## N. Summary
 
