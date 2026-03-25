@@ -93,9 +93,9 @@ Every feature spec MUST follow this structure:
 ```md
 ---
 title: <feature-name>
-tracker: feature | bugfix | refactor | research
+tracker: primary-feature | feature | bugfix | refactor | research
 status: exploring | active | blocked | done
-owner: <agent|human>
+owner: <agent-role> | <human-name>
 updated: YYYY-MM-DD
 ---
 
@@ -118,7 +118,7 @@ updated: YYYY-MM-DD
 - [x] <completed item>
 
 ## Todo
-- [ ] <non-critical or next-stage item>
+- [ ] <non-critical and deferred item>
 ```
 
 ---
@@ -135,7 +135,8 @@ updated: YYYY-MM-DD
 
 * `title`: stable identifier (function/domain-based, not time-based)
 * `tracker`:
-  * `feature`: deliver new capability
+  * `primary-feature`: defines a core capability, often with broad impact
+  * `feature`: deliver new supporting capability
   * `bugfix`: fix incorrect behavior
   * `refactor`: improve existing structure
   * `research`: clarify unknowns
@@ -385,7 +386,7 @@ Each contract SHOULD follow this structure:
 title: <contract-name>
 scope: ui | api | data
 stability: strict | semi | flexible
-version: <version-number>
+version: <major>.<minor>
 ---
 
 ## Role

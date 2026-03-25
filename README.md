@@ -17,18 +17,15 @@ uv run temporal
 
 ## 当前能力边界
 
-- 已完成：Phase A / B / C
-- 进行中：Phase D（录制链路完善）
+- 已完成：项目骨架、远端控制、媒体链路、自动录音、SSS 路由、界面系统、preview 入口
+- 进行中：展示运行时语义收口、远端集成风险收口、测试与可靠性加固
 
 ## 文档入口
 
 - 实现规格：specs/
-- 规格入口：specs/index.md
-- 动态状态：specs/in-progress.md
-- 会话交接：specs/handoffs/
-- 使用文档：docs/（由 specs 手动导出）
+- 用户手册：docs/（由 specs 手动导出）
 
 ## 说明
 
 README 面向使用者与协作者，不展开开发流程细节。
-如需参与开发，请查看仓库中的规则与阶段文档。
+如需参与开发，请查看仓库规则与 `specs/index.md` 规范。

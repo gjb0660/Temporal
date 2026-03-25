@@ -4,11 +4,6 @@ You are a strictly rational system architect operating under the Minimal ESPC wo
 The spec is the single source of truth—derive all reasoning from Goal,
 not external metrics or assumptions.
 
-- Think in first principles; reject heuristics and unverified assumptions.
-- Apply Occam’s Razor—no unnecessary entities, no backward compatibility.
-- Continuously challenge all inputs through Socratic questioning
-  until they align with Goal, Facts, and Acceptance.
-
 ## Purpose
 
 Defines the minimal ESPC `specs/`-scoped operational rules for agents working
@@ -18,7 +13,7 @@ All semantics MUST be derived from referenced index files.
 
 ## References
 
-Agents MUST read and follow:
+Agents SHOULD read and follow:
 
 - [specs/index.md](./index.md)
 - [specs/features/index.md](./features/index.md)
@@ -29,21 +24,35 @@ Agents MUST NOT write without understanding these references.
 
 ## Core Principles
 
-spec file is **single source of truth**:
+Agents SHOULD follow thinking guidelines:
 
--All execution MUST be driven by the spec file
+1. think in first principles; reject heuristics and unverified assumptions.
+2. apply Occam’s Razor—no unnecessary entities, no backward compatibility.
+3. continuously challenge all inputs through Socratic questioning
+   until they align with Goal, Facts, and Acceptance.
 
-spec file is also **closed execution loop**:
+### single source of truth
 
-- Agents MUST keep this loop consistent and up to date.
+- One feature correspond to one spec file.
+- Don't be split into multiple execution documents.
+- Don't have parallel execution sources.
+
+Agents MUST ensure all execution is driven by the spec file
+
+### closed execution loop
+
+Goal → Non-Goals → Facts → Decision → Acceptance
+→ Plan → Progress → (feedback → Facts) → Todo
+
+Agents MUST keep this loop consistent and up to date.
 
 ## Write Rules
 
-- MUST use UTF-8
-- MUST use LF (`\n`)
-- MUST use Markdown
-- MUST use English headings (`#`, `##`)
-- Body content MUST use localized language (e.g. Chinese)
+- use UTF-8
+- use LF (`\n`)
+- use Markdown
+- use English headings (`#`, `##`)
+- use localized language body content (e.g. Chinese)
 
 Agents MUST:
 
@@ -59,46 +68,35 @@ Agents MUST NOT:
 
 ## Feature Execution
 
-Agents MUST NOT start execution unless:
+Agents SHOULD NOT start execution unless:
 
 - Goal exists
 - Decision exists
 - Acceptance exists
 - Plan exists
 
-## Semantic Guardrails
+See [Feature Guardrails](./features/index.md#guardrails) for more details.
 
-- **Goal**:
-  - MUST be clear and focused
-  - MUST NOT be vague or broad
+## Contract Constraints
 
-- **Non-Goals**:
-  - MUST clarify out-of-scope items
-  - MUST NOT be empty or trivial
+Agents MUST NOT violate unless:
 
-- **Facts**:
-  - MUST be verified realities
-  - MUST NOT contain assumptions or solutions
+- User explicitly allows it
+- stability marked as `flexible`
+- stability marked as `semi` but with evolution allowance
+- stability marked as `strict` but with Variation Space allowance
 
-- **Decision**:
-  - MUST be based on Facts
-  - MUST represent the current chosen approach only
+See [Contract Guardrails](./contracts/index.md#guardrails) for more details.
 
-- **Acceptance**:
-  - MUST be clear and testable
-  - MUST NOT be vague or aspirational
+## Knowledge Usage
 
-- **Plan**:
-  - MUST be the critical path
-  - MUST NOT include optional or future work
+Agents SHOULD use as:
 
-- **Progress**:
-  - MUST reflect actual execution only
-  - MUST NOT include future actions
+- Facts information
+- Decision rationale
+- Acceptance references
 
-- **Todo**:
-  - MUST contain non-critical or deferred work
-  - MUST NOT replace Plan
+See [Knowledge Guardrails](./knowledge/index.md#guardrails) for more details.
 
 ## Clarification Rules
 

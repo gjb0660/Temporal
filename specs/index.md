@@ -6,13 +6,20 @@
 
 所有执行、决策与状态必须源自此目录。
 
+## Index Rules
+
+- 本文件仅定义结构与语义
+- 本文件不包含执行状态
+- 本文件不作为 dashboard 或控制面
+
 ## Structure
 
-specs/ MUST 仅包含以下结构：
+`specs/` 当前按以下语义组织：
 
 - features/
 - contracts/
 - knowledge/
+- legacy/
 - ideas.md
 - index.md
 
@@ -37,27 +44,33 @@ specs/ MUST 仅包含以下结构：
 - MUST 为只读材料
 - MUST NOT 包含执行状态（Plan / Progress / Todo）
 
+### legacy/
+
+- 历史归档（Archive）
+- 仅保留过渡期历史材料
+- MUST NOT 作为执行真源
+
 ### ideas.md
 
 - 输入池（Inputs）
 - MUST NOT 直接执行
 - MUST 先转化为 feature
 
-## Rules
+## Formats
 
-- index.md MUST NOT 包含执行状态
-- index.md MUST NOT 作为 dashboard 或控制面
-- index.md MUST 仅定义结构与语义
+所有 specs 内文件 MUST:
 
-## Format
+- 使用 UTF-8 编码
+- 使用 LF 换行
+- 使用 Markdown 格式
+- 使用英文标题（# / ##）
+- 正文使用本地语言（如中文）
 
-所有 specs 内文件 MUST 遵循以下格式约束：
+所有 specs 内文件 MUST NOT:
 
-- MUST 使用 UTF-8 编码
-- MUST 使用 LF 换行
-- MUST 使用 Markdown
-- MUST 使用英文标题（# / ##）
-- 正文 MUST 使用本地语言（如中文）
+- 混用中英文标题
+- 使用非标准标题层级替代结构语义
+- 滥用 MUST / SHOULD / MAY 等 RFC 2119 标记
 
 **Template**:
 
@@ -68,8 +81,3 @@ specs/ MUST 仅包含以下结构：
 
 正文说明（中文）
 ```
-
-**Notes**:
-
-- MUST NOT 使用非标准标题层级替代结构语义
-- MUST NOT 混用中英文标题
