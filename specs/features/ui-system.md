@@ -3,7 +3,7 @@ title: ui-system
 tracker: primary-feature
 status: active
 owner: codex/ui
-updated: 2026-03-26
+updated: 2026-03-27
 ---
 
 ## Goal
@@ -21,15 +21,22 @@ updated: 2026-03-26
 - 左侧控制区需要围绕远端控制与监听控制呈现明确按钮语义。
 - 3D 声源区域与整体视觉主题需要单独收口。
 - `preview-mode` 与主界面共享同名 bridge 契约与状态投影接口。
-- `sourceRowsModel`、`sourcePositionsModel`、图表序列与 ticks 需要共享同一时序语义。
-- source 勾选、energy 过滤、空态判定与 3D/图表可见性存在共享规则。
+- runtime `AppBridge` 目前已经稳定投影 `sourceRowsModel`、
+  `sourcePositionsModel` 与筛选状态，但尚未在运行时生成图表序列模型。
+- `PreviewBridge` 已具备 sidebar、positions、chart series 与 sample window
+  的本地投影实现，因此“共享展示语义”当前仍停留在 owner 目标，
+  而非单一实现层。
+- source 勾选、空态判定与 3D 可见性在 runtime 与 preview 中都已有显式行为，
+  但图表 parity 仍未在 production bridge 中收口。
 
 ## Decision
 
 - 将界面布局、视觉比重、按钮呈现与视觉风格作为独立 UI feature 收口。
-- 将共享 bridge 契约、数据投影、过滤、空态与时序推进语义并入本文件统一承接。
+- 将共享 bridge 契约、数据投影、过滤、空态与时序推进语义继续视为
+  `ui-system` owner，但按当前代码事实记录为“目标边界已明确、实现仍分置”。
 - 继续通过共享 `appBridge` 契约消费状态，不在 QML 内复制业务逻辑。
-- 让右栏、图表与 3D 都从统一的当前 frame 与过滤语义派生。
+- 当前先冻结 row 与 3D 的过滤/空态契约；图表与 runtime parity
+  在代码补齐前不再作为已完成事实表述。
 
 ## Acceptance
 
@@ -44,7 +51,8 @@ updated: 2026-03-26
 1. 收敛页面结构、卡片比例与视觉层级。
 2. 收敛控制区的按钮布局与文案。
 3. 收敛 3D 视图强调与整体主题风格。
-4. 收敛共享 bridge 契约、tracking 投影、过滤与空态语义。
+4. 补齐 production bridge 的图表序列投影，使其与 row/3D 的过滤语义一致。
+5. 为 runtime 与 preview 的展示 parity 建立可重复验证入口。
 
 ## Progress
 
@@ -52,9 +60,12 @@ updated: 2026-03-26
 - [x] 已收敛左侧按钮区与日志区比例。
 - [x] 已完成 3D 区域强调与整体主题方向收口。
 - [x] 已识别共享 bridge 契约与数据投影属于 ui-system owner。
-- [x] 已收敛首批 trackingFrames 与过滤语义规则。
-- [ ] 仍需完成共享展示语义的最终验收与稳定文档化。
+- [x] 已冻结 row 稳定、3D 过滤与空态判定的首批行为语义。
+- [ ] runtime `AppBridge` 仍未生成 elevation/azimuth chart series。
+- [ ] 共享展示语义仍由 runtime 与 preview 两套 bridge 分别实现，
+  尚未收敛为单一 projection layer。
 
 ## Todo
 
-- [ ] `preview-mode` 只消费本文件定义的共享展示语义，未来如新增入口职责应单独立新 feature。
+- [ ] 补齐 production 图表模型后，再恢复“图表与 3D 已共享同一套语义”的强表述。
+- [ ] `preview-mode` 后续若改为真实消费共享 projection layer，再从本文件移除实现分置说明。

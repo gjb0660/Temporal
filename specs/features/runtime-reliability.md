@@ -3,7 +3,7 @@ title: runtime-reliability
 tracker: feature
 status: exploring
 owner: copilot
-updated: 2026-03-26
+updated: 2026-03-27
 ---
 
 ## Goal
@@ -20,12 +20,16 @@ updated: 2026-03-26
 - 纯解析与基础录音测试相对充分，但关键状态机与负路径覆盖仍不完整。
 - listener 启动、远端启动校验、过滤联动与 shell 语义属于高风险边界。
 - 本地质量门禁与运行文档仍需持续对齐当前系统事实。
+- `routing-session` 与 `recording` 当前已有路由、容量约束与会话可见性的行为级测试覆盖。
+- production `AppBridge` 仍缺少 chart series 投影，preview/runtime 展示 parity 也尚未冻结为共享实现契约。
 
 ## Decision
 
 - 以行为级测试优先，冻结异步、shell、生命周期与 UI 可见状态的真实契约。
 - 优先补齐 public slot、listener startup、remote startup、config 负路径与音频边界测试。
 - 让 targeted unittest、静态检查与运行验证共同构成 reliability 收口路径，而不是再维持独立 delivery feature。
+- 将 runtime chart parity 与 preview/runtime projection parity 明确纳入当前 reliability owner，
+  而不是继续留在 UI 文档层隐含存在。
 
 ## Acceptance
 
@@ -38,14 +42,17 @@ updated: 2026-03-26
 
 1. 为高风险契约补 red tests。
 2. 以最小修复收敛失败路径与状态机缺口。
-3. 运行 targeted unittest 与本地质量门禁，并确认行为回归受控。
+3. 为 production chart projection 与 preview/runtime parity 建立可失败的行为级测试。
+4. 运行 targeted unittest 与本地质量门禁，并确认行为回归受控。
 
 ## Progress
 
 - [x] 已明确高风险测试缺口与目标覆盖面。
-- [ ] 仍需补齐 AppBridge、listener、remote shell 与 filtering 的行为级测试。
+- [x] 已确认 routing、capacity limit、preview filtering 等关键行为已有测试保护。
+- [ ] 仍需补齐 production chart projection 与 preview/runtime parity 的行为级测试。
 - [ ] 仍需完成 targeted unittest、静态检查与残余风险记录。
 
 ## Todo
 
 - [ ] 若发现无法在本轮关闭的缺口，必须显式登记为 deferred risk，而不是继续隐含存在。
+- [ ] 若共享 projection layer 最终拆出，应把跨 bridge parity 用单独测试固定，而不是只依赖 preview tests。
