@@ -1,13 +1,13 @@
 ---
-title: odas
-scope: api
+title: odas-integration
+status: active
 stability: strict
 version: 0.1
 ---
 
 ## Role
 
-本契约定义 ODAS 作为外部音频感知子系统时的**不可破坏集成边界约束**。
+本契约定义 ODAS 作为外部音频感知子系统时的不可破坏集成边界约束。
 
 该契约约束 ODAS 输出与系统下游解释之间的边界关系，
 不定义产品工作流、UI 行为或具体功能交付步骤。

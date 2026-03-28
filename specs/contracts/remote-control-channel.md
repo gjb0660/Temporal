@@ -1,6 +1,6 @@
 ---
-title: remote-control
-scope: api
+title: remote-control-channel
+status: active
 stability: semi
 version: 0.1
 ---

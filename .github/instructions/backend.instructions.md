@@ -11,9 +11,12 @@ Applies to Python backend services and runtime logic.
 
 ## Source of Truth
 
-- [specs/contracts/recording.md](../../specs/contracts/recording.md)
-- [specs/contracts/remote-control.md](../../specs/contracts/remote-control.md)
+- [specs/contracts/recording-filename.md](../../specs/contracts/recording-filename.md)
+- [specs/contracts/recording-lifecycle.md](../../specs/contracts/recording-lifecycle.md)
+- [specs/contracts/remote-control-channel.md](../../specs/contracts/remote-control-channel.md)
 - [specs/knowledge/odas-protocol.md](../../specs/knowledge/odas-protocol.md)
+
+A python backend file SHOULD be guided by the associated features and contracts.
 
 ## Local Rules
 

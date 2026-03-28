@@ -11,8 +11,11 @@ Applies to unit and integration tests.
 
 ## Source of Truth
 
-- [specs/contracts/recording.md](../../specs/contracts/recording.md)
+- [specs/contracts/recording-filename.md](../../specs/contracts/recording-filename.md)
+- [specs/contracts/recording-lifecycle.md](../../specs/contracts/recording-lifecycle.md)
 - [specs/knowledge/unittest.md](../../specs/knowledge/unittest.md)
+
+A test file SHOULD be generated from a feature's Acceptance Criteria.
 
 ## Local Rules
 
