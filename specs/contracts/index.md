@@ -32,7 +32,7 @@ Contract MUST NOT:
 
 Contract SHOULD：
 
-- 按领域组织（ui / api / data）
+- Filename、Role 与 Invariants 共同承担分类语义
 - 感知设计意图
 - 定义约束空间
 
@@ -100,6 +100,33 @@ Contract MAY 在以下位置被引用：
 - Workspace Skills
 - Feature Facts, Decision, Non-Goals
 
+## File Naming
+
+- MUST 使用 kebab-case，且与 `title` 字段一致
+- MUST 表达约束语义（constraint/invariant），而不是领域或功能
+- SHOULD 应长期成立，不包含阶段、版本或实现细节
+- SHOULD 只对应一个稳定语义，不混合多个关注点
+- SHOULD NOT 使用泛化容器词（如 `system`, `module`, `presentation`）
+
+### Generic
+
+文件命名应遵循 `<domain>-<constraint>.md` 模式，其中：
+
+- `<domain>` 表示约束所属的系统领域，如 `recording`
+- `<constraint>` 表示约束的核心语义，如 `lifecycle`
+
+扁平化存储在 `contracts/` 目录下
+
+### UI Specific
+
+文件命名应与**页面中的稳定元素一一对应**，例如：
+
+- `MainWindow` → `ui/main-window.md`
+- `LeftSidebar` → `ui/left-sidebar.md`
+- `SourceSphereView` → `ui/source-sphere-view.md`
+
+归类在 `contracts/ui/` 子目录下，stability 通常为 flexible
+
 ## Frontmatter
 
 ### `title`
@@ -107,11 +134,11 @@ Contract MAY 在以下位置被引用：
 - contract 的唯一标识符，与文件名一致
 - 应与功能或领域相关，不随时间变化
 
-### `scope`
+### `status`
 
-- `ui`: 用于用户可见的视觉与交互约束
-- `api`: 用于行为、调用与边界交互约束
-- `data`: 用于字段、模式、类型与状态约束
+- `draft`: 语义还在收敛，不能作为强约束大面积引用
+- `active`: 已经是有效约束，可作为稳定引用目标
+- `deprecated`: 不再建议新增依赖，但历史上仍存在
 
 ### `stability`
 
@@ -138,7 +165,7 @@ Contract spec 须遵循标准结构：
 ```md
 ---
 title: <contract-name>
-scope: ui | api | data
+status: draft | active | deprecated
 stability: strict | semi | flexible
 version: <major>.<minor>
 ---

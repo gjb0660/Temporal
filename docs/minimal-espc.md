@@ -384,7 +384,7 @@ Each contract SHOULD follow this structure:
 ```md
 ---
 title: <contract-name>
-scope: ui | api | data
+status: draft | active | deprecated
 stability: strict | semi | flexible
 version: <major>.<minor>
 ---
@@ -413,10 +413,10 @@ version: <major>.<minor>
 
 ### Contract Metadata
 
-* `scope`:
-  * `ui`: used for user-visible visual and interaction constraints
-  * `api`: used for behavior, invocation, and boundary interaction constraints
-  * `data`: used for field, schema, type, and state constraints
+* `status`:
+  * `draft`: not yet stable enough for normal references
+  * `active`: current valid contract for normal references
+  * `deprecated`: replaced contract that must not receive new references
 * `stability`:
   * `strict`: must not change casually
   * `semi`: change allowed with explicit review

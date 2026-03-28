@@ -59,6 +59,59 @@ Knowledge MAY 在以下位置被引用：
 - Feature Facts, Decision 与 Acceptance
 - Contract Rationale
 
+## File Naming
+
+- MUST 使用 kebab-case（小写 + 连字符）
+- SHOULD 表示一个稳定的知识领域，长期有效，无需重命名
+- SHOULD 基于概念，而非基于任务
+- SHOULD NOT 包含流程、笔记或时间语义
+- SHOULD 优先保持单文件聚合（避免过度拆分）
+
+```text
+<domain>.md
+<domain>-<concept>.md
+```
+
+### `domain`
+
+一个稳定的知识领域（knowledge domain）
+表达**一类可长期复用的认知模型或知识集合**
+典型包括：
+
+1. 系统级认知：表达 **系统如何运作的认知模型**， 例如：
+    - architecture, execution-model, consistency, lifecycle
+2. 外部知识域：表达 **外部系统/库的稳定知识集合**，例如：
+    - odas, ffmpeg, webrtc
+3. 工程方法论：表达 **跨 feature 的通用规律**，例如：
+    - testing, performance, reliability
+
+### `concept`
+
+一个可独立引用的稳定子概念（sub-concept）
+表达domain 内**一个相对独立的知识切面**
+典型包括：
+
+1. 结构性切面（Structure）：描述系统或领域的组成方式，例如：
+    - overview, protocol, layering
+2. 行为/机制（Mechanism）：描述运行方式或机制，例如：
+    - model, state-machine
+3. 约束/特性（Constraint / Property）：描述不可忽略的关键约束或特性，例如：
+    - bottleneck, pattern
+4. 集成语义（Integration Semantics）：描述系统之间的交互方式，例如：
+    - integration, pipeline
+
+> 如果无法明确 concept 的边界，则应当合并回 `<domain>.md`
+
+### References Layer
+
+- SHOULD 加工成可直接引用的 markdown 文件
+- SHOULD NOT 直接构成知识内容
+- MAY 参考源码的分析记录
+- MAY 调查研究的结论报告
+- MAY 知识来源的原始材料（如文献、数据集、图表等）
+
+存储在 `references/` 目录下，并通过相对路径引用
+
 ## Format
 
 Knowledge spec 建议遵循标准结构：
