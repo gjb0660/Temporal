@@ -22,6 +22,11 @@ version: 0.1
 - 空模型或缺失模型 MUST 仍能安全渲染空球体，MUST NOT 产生运行时警告
   或伪造数据。
 - 鼠标左键拖拽旋转 MUST 保持可用，且缩略坐标框 MUST 随当前朝向同步更新。
+- 在转到背面后，上下拖拽语义 MUST 继续稳定，MUST NOT 出现 pitch
+  方向反转。
+- 水平盘 MUST 与赤道大圆重合，MUST NOT 明显缩小一圈。
+- 默认窗口尺寸下，球体与缩略坐标框 MUST 保持在组件边界内，MUST NOT
+  从底边溢出。
 
 ## Variation Space
 

@@ -13,6 +13,7 @@ Rectangle {
     radius: theme.cardRadius
     color: "#ffffff"
     border.color: theme.borderColor
+    clip: true
 
     ColumnLayout {
         anchors.fill: parent
@@ -77,6 +78,7 @@ Rectangle {
             sourcePositionsModel: root.appBridge.sourcePositionsModel
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.preferredHeight: theme.sphereHeight
             Layout.minimumHeight: theme.sphereHeight
         }
     }

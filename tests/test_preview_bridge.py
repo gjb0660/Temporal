@@ -21,6 +21,10 @@ from temporal.preview_data import DEFAULT_PREVIEW_SCENARIO_KEY, PREVIEW_SCENARIO
 from temporal.preview_main import main as preview_main
 
 
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_QML_DIR = os.path.join(_REPO_ROOT, "src", "temporal", "qml")
+
+
 def _ensure_app() -> QGuiApplication:
     app = QGuiApplication.instance()
     if app is not None:
@@ -356,6 +360,88 @@ QtObject {
         self.assertEqual(obj.property("firstPointId"), 7)
         self.assertEqual(obj.property("firstSeriesValueCount"), 10)
         self.assertTrue(obj.property("hasRemoteLog"))
+        obj.deleteLater()
+        engine.deleteLater()
+        self._app.processEvents()
+
+
+class TestSourceSphereViewContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._app = _ensure_app()
+
+    def test_source_sphere_exposes_equator_radius_drag_and_mapping_contract(self) -> None:
+        engine = QQmlEngine()
+        component = QQmlComponent(engine)
+        component.setData(
+            """
+import QtQuick
+
+Item {
+    width: 420
+    height: 260
+
+    QtObject {
+        id: theme
+        property color accentPurple: "#cf54ea"
+        property color accentCyan: "#4dc6d8"
+        property color axisOrange: "#ff7a29"
+        property color axisGreen: "#35b56f"
+        property color axisBlue: "#4168ff"
+    }
+
+    QtObject {
+        id: positionsModel
+        property int count: 1
+
+        function get(index) {
+            if (index !== 0) {
+                return null
+            }
+            return {
+                id: 7,
+                x: 0.3,
+                y: 0.4,
+                z: 0.5,
+                color: "#123456"
+            }
+        }
+    }
+
+    SourceSphereView {
+        id: sphere
+        anchors.fill: parent
+        theme: theme
+        sourcePositionsModel: positionsModel
+    }
+
+    property bool clipped: sphere.clip
+    property real equatorRadius: sphere.equatorRadius
+    property real normalizedX: sphere.visibleSources[0].x
+    property real normalizedY: sphere.visibleSources[0].y
+    property real normalizedZ: sphere.visibleSources[0].z
+    property real mappedX: sphere.sourcePositionVector(sphere.visibleSources[0]).x
+    property real mappedY: sphere.sourcePositionVector(sphere.visibleSources[0]).y
+    property real mappedZ: sphere.sourcePositionVector(sphere.visibleSources[0]).z
+    property real pitchAfterFront: sphere.previewPitchAfterDrag(0, 0, -10)
+    property real pitchAfterBack: sphere.previewPitchAfterDrag(180, 0, -10)
+}
+""".encode(),
+            QUrl.fromLocalFile(os.path.join(_QML_DIR, "SourceSphereViewContract.qml")),
+        )
+        obj = component.create()
+
+        self.assertFalse(component.isError(), [error.toString() for error in component.errors()])
+        self.assertTrue(obj.property("clipped"))
+        self.assertEqual(obj.property("equatorRadius"), 150.0)
+        self.assertAlmostEqual(obj.property("normalizedX"), 0.3, places=4)
+        self.assertAlmostEqual(obj.property("normalizedY"), 0.4, places=4)
+        self.assertAlmostEqual(obj.property("normalizedZ"), 0.5, places=4)
+        self.assertAlmostEqual(obj.property("mappedX"), 45.0, places=3)
+        self.assertAlmostEqual(obj.property("mappedY"), 75.0, places=3)
+        self.assertAlmostEqual(obj.property("mappedZ"), 60.0, places=3)
+        self.assertLess(obj.property("pitchAfterFront"), 0.0)
+        self.assertEqual(obj.property("pitchAfterFront"), obj.property("pitchAfterBack"))
         obj.deleteLater()
         engine.deleteLater()
         self._app.processEvents()

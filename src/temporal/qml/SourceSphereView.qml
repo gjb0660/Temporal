@@ -10,15 +10,33 @@ Rectangle {
 
     color: "#ffffff"
     border.color: "transparent"
+    clip: true
 
     property real sphereYaw: 0
     property real spherePitch: 0
     property real sphereRadius: 150
-    property var latitudeAngles: [-60, -36, -18, 18, 36, 60]
+    property var latitudeAngles: [-60, -36, -18, 0, 18, 36, 60]
     property var meridianAngles: [0, 30, 60, 90, 120, 150]
     property var diagonalAngles: [0, 40, 80, 120, 160]
     property int ringSegments: 44
     property real diagonalTilt: 52
+    readonly property real primitiveRadius: 50
+    readonly property real primitiveHeight: 100
+    readonly property real equatorRadius: sphereRadius
+    readonly property real equatorDiskScale: equatorRadius / primitiveRadius
+    readonly property real equatorDiskThicknessScale: 0.040
+    readonly property real coreCylinderRadiusScale: (sphereRadius * 0.115) / primitiveRadius
+    readonly property real coreCylinderHeightScale: (sphereRadius * 0.22) / primitiveHeight
+    readonly property real coreCubeWidthScale: (sphereRadius * 0.36) / primitiveHeight
+    readonly property real coreCubeHeightScale: (sphereRadius * 0.18) / primitiveHeight
+    readonly property real coreCubeDepthScale: (sphereRadius * 0.24) / primitiveHeight
+    readonly property real axisRadiusScale: 0.016
+    readonly property real axisLengthScale: (sphereRadius * 2.22) / primitiveHeight
+    readonly property real sourceMarkerScale: sphereRadius / 1425
+    readonly property real sourceHighlightScale: sphereRadius / 3570
+    readonly property real sourceHighlightOffset: sphereRadius / 500
+    readonly property real cameraDistance: Math.max(sphereRadius * 4.35, sphereRadius * 3.95 + Math.max(0, 280 - sphereView.height) * 0.35)
+    readonly property real sceneCenterYOffset: -Math.min(16, Math.max(6, sphereRadius * 0.07))
     readonly property var visibleSources: normalizedSourceEntries()
 
     function colorForSource(sourceId) {
@@ -69,16 +87,42 @@ Rectangle {
         const cosYaw = Math.cos(yawRad)
         const sinYaw = Math.sin(yawRad)
 
-        const pitchedY = vector.y * cosPitch - vector.z * sinPitch
-        const pitchedZ = vector.y * sinPitch + vector.z * cosPitch
-        const yawedX = vector.x * cosYaw + pitchedZ * sinYaw
-        const yawedZ = -vector.x * sinYaw + pitchedZ * cosYaw
+        const yawedX = vector.x * cosYaw + vector.z * sinYaw
+        const yawedZ = -vector.x * sinYaw + vector.z * cosYaw
+        const pitchedY = vector.y * cosPitch - yawedZ * sinPitch
+        const pitchedZ = vector.y * sinPitch + yawedZ * cosPitch
 
         return {
             x: yawedX,
             y: pitchedY,
-            z: yawedZ
+            z: pitchedZ
         }
+    }
+
+    function sourcePositionVector(entry) {
+        return Qt.vector3d(entry.x * sphereRadius, entry.z * sphereRadius, entry.y * sphereRadius)
+    }
+
+    function clampPitch(value) {
+        return Math.max(-70, Math.min(70, value))
+    }
+
+    function applyDragDelta(deltaX, deltaY) {
+        root.sphereYaw += deltaX * 0.42
+        root.spherePitch = clampPitch(root.spherePitch + deltaY * 0.30)
+    }
+
+    function previewPitchAfterDrag(startYaw, startPitch, deltaY) {
+        const previousYaw = root.sphereYaw
+        const previousPitch = root.spherePitch
+        root.sphereYaw = startYaw
+        root.spherePitch = startPitch
+        applyDragDelta(0, deltaY)
+        const result = root.spherePitch
+        root.sphereYaw = previousYaw
+        root.spherePitch = previousPitch
+
+        return result
     }
 
     function axisEndpoint(vector, scale) {
@@ -121,11 +165,12 @@ Rectangle {
     onVisibleSourcesChanged: axisOverlay.requestPaint()
 
     View3D {
+        id: sphereView
         anchors.fill: parent
         anchors.leftMargin: 8
         anchors.rightMargin: 8
-        anchors.topMargin: 4
-        anchors.bottomMargin: 6
+        anchors.topMargin: 6
+        anchors.bottomMargin: 10
         renderMode: View3D.Offscreen
         camera: sphereCamera
 
@@ -138,7 +183,7 @@ Rectangle {
 
         PerspectiveCamera {
             id: sphereCamera
-            position: Qt.vector3d(0, 18, 520)
+            position: Qt.vector3d(0, 12, root.cameraDistance)
             clipFar: 2400
             fieldOfView: 32
         }
@@ -154,187 +199,196 @@ Rectangle {
         }
 
         Node {
-            id: sceneRoot
-            y: 4
-            eulerRotation: Qt.vector3d(root.spherePitch, root.sphereYaw, 0)
+            id: sceneFrame
+            y: root.sceneCenterYOffset
 
-            Model {
-                source: "#Cylinder"
-                scale: Qt.vector3d(1.92, 0.048, 1.92)
-                materials: DefaultMaterial {
-                    diffuseColor: Qt.rgba(0.52, 0.69, 0.42, 0.56)
-                    lighting: DefaultMaterial.NoLighting
-                }
-            }
+            Node {
+                id: pitchRoot
+                eulerRotation.x: root.spherePitch
 
-            Model {
-                source: "#Cylinder"
-                scale: Qt.vector3d(0.34, 0.30, 0.34)
-                materials: DefaultMaterial {
-                    diffuseColor: "#111111"
-                    lighting: DefaultMaterial.NoLighting
-                }
-            }
-
-            Model {
-                source: "#Cube"
-                scale: Qt.vector3d(0.56, 0.28, 0.38)
-                materials: DefaultMaterial {
-                    diffuseColor: "#111111"
-                    lighting: DefaultMaterial.NoLighting
-                }
-            }
-
-            Model {
-                source: "#Cylinder"
-                scale: Qt.vector3d(0.016, 3.40, 0.016)
-                eulerRotation: Qt.vector3d(0, 0, 90)
-                materials: DefaultMaterial {
-                    diffuseColor: root.theme.axisOrange
-                    lighting: DefaultMaterial.NoLighting
-                }
-            }
-
-            Model {
-                source: "#Cylinder"
-                scale: Qt.vector3d(0.016, 3.40, 0.016)
-                eulerRotation: Qt.vector3d(90, 0, 0)
-                materials: DefaultMaterial {
-                    diffuseColor: root.theme.axisGreen
-                    lighting: DefaultMaterial.NoLighting
-                }
-            }
-
-            Model {
-                source: "#Cylinder"
-                scale: Qt.vector3d(0.016, 3.40, 0.016)
-                materials: DefaultMaterial {
-                    diffuseColor: root.theme.axisBlue
-                    lighting: DefaultMaterial.NoLighting
-                }
-            }
-
-            Repeater3D {
-                model: root.latitudeAngles
-
-                delegate: Node {
-                    required property real modelData
-
-                    property real latRad: modelData * Math.PI / 180
-                    property real ringRadiusValue: root.sphereRadius * Math.cos(latRad)
-
-                    y: root.sphereRadius * Math.sin(latRad)
-                    eulerRotation: Qt.vector3d(90, 0, 0)
-
-                    Repeater3D {
-                        model: root.ringSegments
-
-                        delegate: Model {
-                            property real midDeg: (index + 0.5) * 360 / root.ringSegments
-                            property real midRad: midDeg * Math.PI / 180
-                            property real segmentLength: 2 * Math.PI * parent.parent.ringRadiusValue / root.ringSegments
-
-                            source: "#Cylinder"
-                            position: Qt.vector3d(parent.parent.ringRadiusValue * Math.cos(midRad), parent.parent.ringRadiusValue * Math.sin(midRad), 0)
-                            eulerRotation: Qt.vector3d(0, 0, midDeg)
-                            scale: Qt.vector3d(0.010, Math.max(0.001, segmentLength / 100), 0.010)
-                            materials: DefaultMaterial {
-                                diffuseColor: parent.parent.modelData > 0 ? "#5b72ff" : "#a46b3c"
-                                lighting: DefaultMaterial.NoLighting
-                            }
-                        }
-                    }
-                }
-            }
-
-            Repeater3D {
-                model: root.meridianAngles
-
-                delegate: Node {
-                    required property real modelData
-
-                    eulerRotation: Qt.vector3d(0, modelData, 0)
-
-                    Repeater3D {
-                        model: root.ringSegments
-
-                        delegate: Model {
-                            property real midDeg: (index + 0.5) * 360 / root.ringSegments
-                            property real midRad: midDeg * Math.PI / 180
-                            property real segmentLength: 2 * Math.PI * root.sphereRadius / root.ringSegments
-                            property real localY: root.sphereRadius * Math.sin(midRad)
-
-                            source: "#Cylinder"
-                            position: Qt.vector3d(root.sphereRadius * Math.cos(midRad), root.sphereRadius * Math.sin(midRad), 0)
-                            eulerRotation: Qt.vector3d(0, 0, midDeg)
-                            scale: Qt.vector3d(0.010, Math.max(0.001, segmentLength / 100), 0.010)
-                            materials: DefaultMaterial {
-                                diffuseColor: localY >= 0 ? "#5b72ff" : "#a46b3c"
-                                lighting: DefaultMaterial.NoLighting
-                            }
-                        }
-                    }
-                }
-            }
-
-            Repeater3D {
-                model: root.diagonalAngles
-
-                delegate: Node {
-                    required property real modelData
-
-                    property real tiltRad: root.diagonalTilt * Math.PI / 180
-
-                    eulerRotation: Qt.vector3d(0, modelData, root.diagonalTilt)
-
-                    Repeater3D {
-                        model: root.ringSegments
-
-                        delegate: Model {
-                            property real midDeg: (index + 0.5) * 360 / root.ringSegments
-                            property real midRad: midDeg * Math.PI / 180
-                            property real segmentLength: 2 * Math.PI * root.sphereRadius / root.ringSegments
-                            property real localX: root.sphereRadius * Math.cos(midRad)
-                            property real localY: root.sphereRadius * Math.sin(midRad)
-                            property real worldY: localX * Math.sin(parent.parent.tiltRad) + localY * Math.cos(parent.parent.tiltRad)
-
-                            source: "#Cylinder"
-                            position: Qt.vector3d(localX, localY, 0)
-                            eulerRotation: Qt.vector3d(0, 0, midDeg)
-                            scale: Qt.vector3d(0.009, Math.max(0.001, segmentLength / 100), 0.009)
-                            materials: DefaultMaterial {
-                                diffuseColor: worldY >= 0 ? "#6d83ff" : "#9c6a42"
-                                lighting: DefaultMaterial.NoLighting
-                            }
-                        }
-                    }
-                }
-            }
-
-            Repeater3D {
-                model: root.visibleSources
-
-                delegate: Node {
-                    required property var modelData
-
-                    position: Qt.vector3d(modelData.x * root.sphereRadius, modelData.z * root.sphereRadius, modelData.y * root.sphereRadius)
+                Node {
+                    id: yawRoot
+                    eulerRotation.y: root.sphereYaw
 
                     Model {
-                        source: "#Sphere"
-                        scale: Qt.vector3d(0.105, 0.105, 0.105)
+                        source: "#Cylinder"
+                        scale: Qt.vector3d(root.equatorDiskScale, root.equatorDiskThicknessScale, root.equatorDiskScale)
                         materials: DefaultMaterial {
-                            diffuseColor: modelData.color
+                            diffuseColor: Qt.rgba(0.52, 0.69, 0.42, 0.56)
                             lighting: DefaultMaterial.NoLighting
                         }
                     }
 
                     Model {
-                        source: "#Sphere"
-                        scale: Qt.vector3d(0.042, 0.042, 0.042)
-                        position: Qt.vector3d(0, 0, 0.3)
+                        source: "#Cylinder"
+                        scale: Qt.vector3d(root.coreCylinderRadiusScale, root.coreCylinderHeightScale, root.coreCylinderRadiusScale)
                         materials: DefaultMaterial {
-                            diffuseColor: Qt.rgba(1, 1, 1, 0.72)
+                            diffuseColor: "#111111"
                             lighting: DefaultMaterial.NoLighting
+                        }
+                    }
+
+                    Model {
+                        source: "#Cube"
+                        scale: Qt.vector3d(root.coreCubeWidthScale, root.coreCubeHeightScale, root.coreCubeDepthScale)
+                        materials: DefaultMaterial {
+                            diffuseColor: "#111111"
+                            lighting: DefaultMaterial.NoLighting
+                        }
+                    }
+
+                    Model {
+                        source: "#Cylinder"
+                        scale: Qt.vector3d(root.axisRadiusScale, root.axisLengthScale, root.axisRadiusScale)
+                        eulerRotation: Qt.vector3d(0, 0, 90)
+                        materials: DefaultMaterial {
+                            diffuseColor: root.theme.axisOrange
+                            lighting: DefaultMaterial.NoLighting
+                        }
+                    }
+
+                    Model {
+                        source: "#Cylinder"
+                        scale: Qt.vector3d(root.axisRadiusScale, root.axisLengthScale, root.axisRadiusScale)
+                        eulerRotation: Qt.vector3d(90, 0, 0)
+                        materials: DefaultMaterial {
+                            diffuseColor: root.theme.axisGreen
+                            lighting: DefaultMaterial.NoLighting
+                        }
+                    }
+
+                    Model {
+                        source: "#Cylinder"
+                        scale: Qt.vector3d(root.axisRadiusScale, root.axisLengthScale, root.axisRadiusScale)
+                        materials: DefaultMaterial {
+                            diffuseColor: root.theme.axisBlue
+                            lighting: DefaultMaterial.NoLighting
+                        }
+                    }
+
+                    Repeater3D {
+                        model: root.latitudeAngles
+
+                        delegate: Node {
+                            required property real modelData
+
+                            property real latRad: modelData * Math.PI / 180
+                            property real ringRadiusValue: root.sphereRadius * Math.cos(latRad)
+
+                            y: root.sphereRadius * Math.sin(latRad)
+                            eulerRotation: Qt.vector3d(90, 0, 0)
+
+                            Repeater3D {
+                                model: root.ringSegments
+
+                                delegate: Model {
+                                    property real midDeg: (index + 0.5) * 360 / root.ringSegments
+                                    property real midRad: midDeg * Math.PI / 180
+                                    property real segmentLength: 2 * Math.PI * parent.parent.ringRadiusValue / root.ringSegments
+
+                                    source: "#Cylinder"
+                                    position: Qt.vector3d(parent.parent.ringRadiusValue * Math.cos(midRad), parent.parent.ringRadiusValue * Math.sin(midRad), 0)
+                                    eulerRotation: Qt.vector3d(0, 0, midDeg)
+                                    scale: Qt.vector3d(0.010, Math.max(0.001, segmentLength / 100), 0.010)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: parent.parent.modelData >= 0 ? "#5b72ff" : "#a46b3c"
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Repeater3D {
+                        model: root.meridianAngles
+
+                        delegate: Node {
+                            required property real modelData
+
+                            eulerRotation: Qt.vector3d(0, modelData, 0)
+
+                            Repeater3D {
+                                model: root.ringSegments
+
+                                delegate: Model {
+                                    property real midDeg: (index + 0.5) * 360 / root.ringSegments
+                                    property real midRad: midDeg * Math.PI / 180
+                                    property real segmentLength: 2 * Math.PI * root.sphereRadius / root.ringSegments
+                                    property real localY: root.sphereRadius * Math.sin(midRad)
+
+                                    source: "#Cylinder"
+                                    position: Qt.vector3d(root.sphereRadius * Math.cos(midRad), root.sphereRadius * Math.sin(midRad), 0)
+                                    eulerRotation: Qt.vector3d(0, 0, midDeg)
+                                    scale: Qt.vector3d(0.010, Math.max(0.001, segmentLength / 100), 0.010)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: localY >= 0 ? "#5b72ff" : "#a46b3c"
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Repeater3D {
+                        model: root.diagonalAngles
+
+                        delegate: Node {
+                            required property real modelData
+
+                            property real tiltRad: root.diagonalTilt * Math.PI / 180
+
+                            eulerRotation: Qt.vector3d(0, modelData, root.diagonalTilt)
+
+                            Repeater3D {
+                                model: root.ringSegments
+
+                                delegate: Model {
+                                    property real midDeg: (index + 0.5) * 360 / root.ringSegments
+                                    property real midRad: midDeg * Math.PI / 180
+                                    property real segmentLength: 2 * Math.PI * root.sphereRadius / root.ringSegments
+                                    property real localX: root.sphereRadius * Math.cos(midRad)
+                                    property real localY: root.sphereRadius * Math.sin(midRad)
+                                    property real worldY: localX * Math.sin(parent.parent.tiltRad) + localY * Math.cos(parent.parent.tiltRad)
+
+                                    source: "#Cylinder"
+                                    position: Qt.vector3d(localX, localY, 0)
+                                    eulerRotation: Qt.vector3d(0, 0, midDeg)
+                                    scale: Qt.vector3d(0.009, Math.max(0.001, segmentLength / 100), 0.009)
+                                    materials: DefaultMaterial {
+                                        diffuseColor: worldY >= 0 ? "#6d83ff" : "#9c6a42"
+                                        lighting: DefaultMaterial.NoLighting
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Repeater3D {
+                        model: root.visibleSources
+
+                        delegate: Node {
+                            required property var modelData
+
+                            position: root.sourcePositionVector(modelData)
+
+                            Model {
+                                source: "#Sphere"
+                                scale: Qt.vector3d(root.sourceMarkerScale, root.sourceMarkerScale, root.sourceMarkerScale)
+                                materials: DefaultMaterial {
+                                    diffuseColor: modelData.color
+                                    lighting: DefaultMaterial.NoLighting
+                                }
+                            }
+
+                            Model {
+                                source: "#Sphere"
+                                scale: Qt.vector3d(root.sourceHighlightScale, root.sourceHighlightScale, root.sourceHighlightScale)
+                                position: Qt.vector3d(0, 0, root.sourceHighlightOffset)
+                                materials: DefaultMaterial {
+                                    diffuseColor: Qt.rgba(1, 1, 1, 0.72)
+                                    lighting: DefaultMaterial.NoLighting
+                                }
+                            }
                         }
                     }
                 }
@@ -363,8 +417,7 @@ Rectangle {
             if (!(mouse.buttons & Qt.LeftButton)) {
                 return
             }
-            root.sphereYaw += (mouse.x - lastX) * 0.42
-            root.spherePitch = Math.max(-70, Math.min(70, root.spherePitch + (mouse.y - lastY) * 0.30))
+            root.applyDragDelta(mouse.x - lastX, mouse.y - lastY)
             lastX = mouse.x
             lastY = mouse.y
         }
