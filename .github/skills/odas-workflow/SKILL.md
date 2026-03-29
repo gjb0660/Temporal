@@ -11,7 +11,7 @@ This skill defines the **execution procedure** for integrating and debugging ODA
 
 It MUST orchestrate actions using:
 
-- ODAS domain knowledge (see `specs/knowledge/odas.md`)
+- ODAS domain knowledge (see `specs/knowledge/odas-overview.md`)
 - ODAS domain constraints (see `specs/contracts/odas-integration.md`)
 
 It MUST NOT redefine knowledge or constraints.

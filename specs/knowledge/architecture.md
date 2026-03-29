@@ -1,4 +1,4 @@
-# Temporal Architecture
+# Architecture
 
 ## 1. Overview
 

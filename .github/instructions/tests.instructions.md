@@ -13,7 +13,7 @@ Applies to unit and integration tests.
 
 - [specs/contracts/recording-filename.md](../../specs/contracts/recording-filename.md)
 - [specs/contracts/recording-lifecycle.md](../../specs/contracts/recording-lifecycle.md)
-- [specs/knowledge/unittest.md](../../specs/knowledge/unittest.md)
+- [specs/knowledge/testing.md](../../specs/knowledge/testing.md)
 
 A test file SHOULD be generated from a feature's Acceptance Criteria.
 
