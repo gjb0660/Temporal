@@ -2,8 +2,6 @@
 name: spec-code-alignment
 description: Detect, classify, and resolve drift between active feature truth and verified implementation evidence.
 argument-hint: feature scope or alignment mode
-user-invocable: true
-disable-model-invocation: false
 ---
 
 # Spec Code Alignment
