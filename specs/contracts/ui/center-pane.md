@@ -1,0 +1,44 @@
+---
+title: center-pane
+status: active
+stability: flexible
+version: 0.2
+---
+
+## Role
+
+定义中栏作为时间序列图表与空间位置视图的联合观察区。
+该 Contract 约束两张图表和球面视图的同步展示语义，而不定义数据生产逻辑。
+
+## Invariants
+
+- 中栏 MUST 同时呈现俯仰角图、方位角图和活动声源位置视图，作为一个
+  连续的观察区域。
+- 两张图表与球面视图 MUST 消费同一 bridge 输出的当前时间窗和同一可见
+  声源子集，MUST NOT 在本地生成独立时序或 fallback 点位。
+- 中栏 MUST 只消费 bridge 已整理好的 ticks、series 和点位数据，MUST
+  NOT 在 QML 中本地推导 preview/runtime 分支数据。
+- 场景切换和声源勾选控制 MUST 留在头部或右栏，中栏 MUST NOT 承担
+  选择器语义。
+- 球面视图 MUST 保持比单张图表更高的视觉权重，以维持空间感知为中栏
+  核心。
+
+## Variation Space
+
+- 图表与球面视图的高度比例、标题样式和间距 MAY 调整，只要三者仍被感知
+  为一个同步观察区。
+- 中栏内部容器样式 MAY 演进，但数据同步边界 MUST 继续由 bridge 决定。
+- 当可视化能力扩展时，中栏 MAY 增加辅助说明，但 MUST NOT 抢占主观察区
+  的层级。
+
+## Rationale
+
+- 中栏的价值在于把时序变化和空间分布放到同一观察语境里；一旦不同步，
+  用户会失去对当前帧的整体判断。
+- 将选择控件排除在中栏之外，可以保持观察区与控制区的角色分离。
+
+## Anti-Patterns
+
+- 在中栏内本地拼接 preview fixtures、运行态占位数据或额外时序分支。
+- 让图表和球面视图分别跟随不同的数据窗口或不同的可见 source 集合。
+- 把场景切换器或筛选控件塞进中栏标题区。

@@ -14,6 +14,7 @@ Applies to QML UI components and interaction logic.
 - [specs/contracts/app-bridge.md](../../specs/contracts/app-bridge.md)
 - [specs/contracts/preview-mapping.md](../../specs/contracts/preview-mapping.md)
 - [specs/contracts/preview-source.md](../../specs/contracts/preview-source.md)
+- [specs/contracts/ui/](../../specs/contracts/ui/)
 
 A QML file MUST be also mapped one-to-one with a UI specific contract
 in `specs/contracts/ui/*.md`, CamelCase -> kebab-case.
