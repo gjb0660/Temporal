@@ -417,6 +417,8 @@ Item {
 
     property bool clipped: sphere.clip
     property real equatorRadius: sphere.equatorRadius
+    property real coreChipSide: sphere.coreChipSide
+    property real coreChipThickness: sphere.coreChipThickness
     property real latitudeGapA: sphere.latitudeAngles[1] - sphere.latitudeAngles[0]
     property real latitudeGapB: sphere.latitudeAngles[2] - sphere.latitudeAngles[1]
     property real meridianGapA: sphere.meridianAngles[1] - sphere.meridianAngles[0]
@@ -438,6 +440,8 @@ Item {
         self.assertFalse(component.isError(), [error.toString() for error in component.errors()])
         self.assertTrue(obj.property("clipped"))
         self.assertEqual(obj.property("equatorRadius"), 150.0)
+        self.assertEqual(obj.property("coreChipSide"), 60.0)
+        self.assertEqual(obj.property("coreChipThickness"), 10.0)
         self.assertAlmostEqual(obj.property("latitudeGapA"), obj.property("latitudeGapB"), places=4)
         self.assertAlmostEqual(obj.property("meridianGapA"), obj.property("meridianGapB"), places=4)
         self.assertAlmostEqual(obj.property("normalizedX"), 0.3, places=4)

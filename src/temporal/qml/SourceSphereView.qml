@@ -31,13 +31,13 @@ Rectangle {
     readonly property real equatorRadius: sphereRadius
     readonly property real equatorDiskScale: equatorRadius / primitiveRadius
     readonly property real equatorDiskThicknessScale: 0.040
-    readonly property real coreCylinderRadiusScale: (sphereRadius * 0.115) / primitiveRadius
-    readonly property real coreCylinderHeightScale: (sphereRadius * 0.22) / primitiveHeight
-    readonly property real coreCubeWidthScale: (sphereRadius * 0.36) / primitiveHeight
-    readonly property real coreCubeHeightScale: (sphereRadius * 0.18) / primitiveHeight
-    readonly property real coreCubeDepthScale: (sphereRadius * 0.24) / primitiveHeight
+    readonly property real coreChipSide: sphereRadius * 0.40
+    readonly property real coreChipThickness: Math.max(10, sphereRadius * 0.055)
+    readonly property real coreChipSideScale: coreChipSide / primitiveHeight
+    readonly property real coreChipThicknessScale: coreChipThickness / primitiveHeight
     readonly property real axisRadiusScale: 0.016
-    readonly property real axisLengthScale: (sphereRadius * 2.22) / primitiveHeight
+    readonly property real axisLengthScale: (sphereRadius * 1.3) / primitiveHeight
+    readonly property real axisEndpointOffset: sphereRadius * 0.65
     readonly property real sourceMarkerScale: Math.max(0.16, sphereRadius / 940)
     readonly property real sourceHighlightScale: Math.max(0.065, sphereRadius / 2350)
     readonly property real sourceHighlightOffset: sphereRadius / 420
@@ -259,17 +259,8 @@ Rectangle {
                     }
 
                     Model {
-                        source: "#Cylinder"
-                        scale: Qt.vector3d(root.coreCylinderRadiusScale, root.coreCylinderHeightScale, root.coreCylinderRadiusScale)
-                        materials: DefaultMaterial {
-                            diffuseColor: "#111111"
-                            lighting: DefaultMaterial.NoLighting
-                        }
-                    }
-
-                    Model {
                         source: "#Cube"
-                        scale: Qt.vector3d(root.coreCubeWidthScale, root.coreCubeHeightScale, root.coreCubeDepthScale)
+                        scale: Qt.vector3d(root.coreChipSideScale, root.coreChipThicknessScale, root.coreChipSideScale)
                         materials: DefaultMaterial {
                             diffuseColor: "#111111"
                             lighting: DefaultMaterial.NoLighting
@@ -278,6 +269,7 @@ Rectangle {
 
                     Model {
                         source: "#Cylinder"
+                        position: Qt.vector3d(root.axisEndpointOffset, 0, 0)
                         scale: Qt.vector3d(root.axisRadiusScale, root.axisLengthScale, root.axisRadiusScale)
                         eulerRotation: Qt.vector3d(0, 0, 90)
                         materials: DefaultMaterial {
@@ -288,6 +280,7 @@ Rectangle {
 
                     Model {
                         source: "#Cylinder"
+                        position: Qt.vector3d(0, 0, -root.axisEndpointOffset)
                         scale: Qt.vector3d(root.axisRadiusScale, root.axisLengthScale, root.axisRadiusScale)
                         eulerRotation: Qt.vector3d(90, 0, 0)
                         materials: DefaultMaterial {
@@ -298,6 +291,7 @@ Rectangle {
 
                     Model {
                         source: "#Cylinder"
+                        position: Qt.vector3d(0, root.axisEndpointOffset, 0)
                         scale: Qt.vector3d(root.axisRadiusScale, root.axisLengthScale, root.axisRadiusScale)
                         materials: DefaultMaterial {
                             diffuseColor: root.theme.axisBlue
