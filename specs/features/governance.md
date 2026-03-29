@@ -3,7 +3,7 @@ title: governance
 tracker: primary-feature
 status: active
 owner: copilot
-updated: 2026-03-26
+updated: 2026-03-30
 ---
 
 ## Goal
@@ -18,6 +18,7 @@ updated: 2026-03-26
 ## Facts
 
 - 仓库需要区分全局工作流、仓库质量门禁、feature 真源与领域指令的 owner。
+- `AGENTS.md` 属于全局工作流 authority，不属于 `specs/` 执行真源。
 - 历史治理曾依赖 phase、board 与 handoff 等旧语义入口。
 - Primary Feature 与 Supporting Feature 已经成为当前 feature 结构中的稳定区分。
 - 该能力在本轮 feature 收敛中已经形成稳定边界。
@@ -27,6 +28,7 @@ updated: 2026-03-26
 - 将工作流行为收敛到 AGENTS 与相关技能体系中。
 - 将仓库质量门禁收敛到 `.github/copilot-instructions.md` 与领域 instructions。
 - 将 `specs/features/` 作为唯一执行真源，并以 `primary-feature` 明确主能力骨架。
+- 审计 `AGENTS.md` 时按全局工作流层处理，不按普通 feature spec 语义处理。
 - 通过命名规则、frontmatter 语义与 owner 分层维持 spec 治理的一致性。
 
 ## Acceptance

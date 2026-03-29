@@ -15,6 +15,16 @@ and mechanically enforceable.
 
 Detect violations in the rule system that can change agent behavior.
 
+## Owning Layers
+
+- `AGENTS.md` — global workflow authority for agent behavior
+- `specs/features/**` — execution truth for feature delivery
+- `specs/contracts/**` — system constraints that execution MUST NOT break
+- `.github/**` — repository and tooling constraints
+
+`AGENTS.md` MUST be audited as a global workflow layer.
+`AGENTS.md` MUST NOT be audited as a normal feature spec.
+
 ## Rule Model
 
 A rule is valid only if it:
@@ -32,6 +42,7 @@ Each finding MUST be classified as one of:
 - `overlap` — same rule defined in multiple layers
 - `weak-normative` — missing or incorrect RFC2119 keyword
 - `unscoped` — no clear ownership layer
+- `wrong-owner` — rule from one owning layer is applied to a different layer
 - `unverifiable` — cannot be tested or audited
 
 ## Output
@@ -46,6 +57,7 @@ Each finding MUST include:
 
 - `severity`
 - `type`
+- `owner`
 - `file`
 - `rule` (normative sentence)
 - `violation` (what breaks)
@@ -60,6 +72,7 @@ Each finding MUST include:
   - AGENTS.md
   - specs/** (features + contracts)
   - .github/**
+- Audit MUST determine the owning layer before evaluating a finding.
 - Audit SHOULD ignore non-governance content.
 - Audit MUST flag any rule that does not use RFC 2119 keywords.
 
