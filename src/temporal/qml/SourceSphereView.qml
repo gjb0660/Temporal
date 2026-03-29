@@ -137,7 +137,7 @@ Rectangle {
     }
 
     function sourcePositionVector(entry) {
-        return Qt.vector3d(entry.x * sphereRadius, entry.z * sphereRadius, entry.y * sphereRadius)
+        return Qt.vector3d(entry.x * sphereRadius, entry.z * sphereRadius, -entry.y * sphereRadius)
     }
 
     function clampPitch(value) {
@@ -494,7 +494,7 @@ Rectangle {
             const yPoint = root.axisEndpoint({
                 x: 0,
                 y: 0,
-                z: 1
+                z: -1
             }, axisScale)
             const zPoint = root.axisEndpoint({
                 x: 0,

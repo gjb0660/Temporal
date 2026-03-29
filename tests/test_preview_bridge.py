@@ -445,7 +445,7 @@ Item {
         self.assertAlmostEqual(obj.property("normalizedZ"), 0.5, places=4)
         self.assertAlmostEqual(obj.property("mappedX"), 45.0, places=3)
         self.assertAlmostEqual(obj.property("mappedY"), 75.0, places=3)
-        self.assertAlmostEqual(obj.property("mappedZ"), 60.0, places=3)
+        self.assertAlmostEqual(obj.property("mappedZ"), -60.0, places=3)
         self.assertLess(obj.property("pitchAfterFront"), 0.0)
         self.assertEqual(obj.property("pitchAfterFront"), obj.property("pitchAfterBack"))
         obj.deleteLater()

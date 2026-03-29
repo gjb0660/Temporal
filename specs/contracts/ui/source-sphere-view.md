@@ -15,8 +15,9 @@ version: 0.1
 - 声源球 MUST 在默认状态下持续呈现球体网壳、水平盘、核心体和
   `X / Y / Z` 方向提示，MUST NOT 退化为无方向感的普通点云。
 - 坐标轴语义 MUST 保持 `X=橙色`、`Y=绿色`、`Z=蓝色`。
-- ODAS 坐标到视图坐标的映射 MUST 保持一致，MUST NOT 因实现重构改变
-  用户对空间方向的理解。
+- ODAS 坐标到视图坐标的映射 MUST 保持 `ODAS(x, y, z) ->
+  QtQuick3D(x, z, -y)`，以维持 `Z-up` 语义下的右手坐标系；实现重构
+  MUST NOT 改变用户对空间方向的理解。
 - 点位颜色 MUST 保持与 source 身份稳定对应；组件 MUST 只渲染当前可见
   source 子集，MUST NOT 本地生成 preview fallback 点位或历史轨迹。
 - 空模型或缺失模型 MUST 仍能安全渲染空球体，MUST NOT 产生运行时警告
