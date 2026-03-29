@@ -136,9 +136,7 @@ Rectangle {
 
                             AppActionButton {
                                 theme: root.theme
-                                text: root.appBridge.odasStarting
-                                    ? "启动中"
-                                    : (root.appBridge.odasRunning ? "停止" : "启动")
+                                text: root.appBridge.odasStarting ? "启动中" : (root.appBridge.odasRunning ? "停止" : "启动")
                                 enabled: !root.appBridge.odasStarting
                                 Layout.fillWidth: true
                                 onClicked: root.appBridge.toggleRemoteOdas()
@@ -147,7 +145,7 @@ Rectangle {
                             AppActionButton {
                                 theme: root.theme
                                 text: root.appBridge.streamsActive ? "停止监听" : "监听"
-                                enabled: root.appBridge.canToggleStreams
+                                enabled: !!root.appBridge.canToggleStreams
                                 Layout.fillWidth: true
                                 onClicked: root.appBridge.toggleStreams()
                             }

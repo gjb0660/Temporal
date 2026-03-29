@@ -7,21 +7,28 @@ Rectangle {
 
     required property QtObject theme
     required property QtObject appBridge
+    readonly property int contentLeftMargin: Math.max(12, theme.panelInset)
+    readonly property int contentRightMargin: Math.max(10, theme.panelInset - 2)
+    readonly property int contentTopMargin: Math.max(8, theme.smallFont)
+    readonly property int contentBottomMargin: Math.max(10, theme.smallFont)
+    readonly property int sectionSpacing: Math.max(10, theme.smallFont)
 
     Layout.fillWidth: true
     Layout.fillHeight: true
     radius: theme.cardRadius
     color: "#ffffff"
     border.color: theme.borderColor
-    clip: true
 
     ColumnLayout {
-        anchors.fill: parent
-        anchors.leftMargin: Math.max(12, theme.panelInset)
-        anchors.rightMargin: Math.max(10, theme.panelInset - 2)
-        anchors.topMargin: Math.max(8, theme.smallFont)
-        anchors.bottomMargin: Math.max(10, theme.smallFont)
-        spacing: Math.max(10, theme.smallFont)
+        id: topContent
+        anchors.top: parent.top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: root.contentLeftMargin
+        anchors.rightMargin: root.contentRightMargin
+        anchors.topMargin: root.contentTopMargin
+        spacing: root.sectionSpacing
+        z: 1
 
         Label {
             text: "声源俯仰角"
@@ -68,18 +75,23 @@ Rectangle {
         }
 
         Label {
+            id: sphereTitle
             text: "活动声源位置"
             color: "#414952"
             font.pixelSize: theme.sideTitleFont
         }
+    }
 
-        SourceSphereView {
-            theme: root.theme
-            sourcePositionsModel: root.appBridge.sourcePositionsModel
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.preferredHeight: theme.sphereHeight
-            Layout.minimumHeight: theme.sphereHeight
-        }
+    SourceSphereView {
+        theme: root.theme
+        sourcePositionsModel: root.appBridge.sourcePositionsModel
+        anchors.top: topContent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: root.contentLeftMargin
+        anchors.rightMargin: root.contentRightMargin
+        anchors.bottomMargin: root.border.width
+        anchors.topMargin: -root.height * 0.1
     }
 }

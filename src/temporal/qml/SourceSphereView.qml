@@ -38,9 +38,9 @@ Rectangle {
     readonly property real coreCubeDepthScale: (sphereRadius * 0.24) / primitiveHeight
     readonly property real axisRadiusScale: 0.016
     readonly property real axisLengthScale: (sphereRadius * 2.22) / primitiveHeight
-    readonly property real sourceMarkerScale: sphereRadius / 1425
-    readonly property real sourceHighlightScale: sphereRadius / 3570
-    readonly property real sourceHighlightOffset: sphereRadius / 500
+    readonly property real sourceMarkerScale: Math.max(0.16, sphereRadius / 940)
+    readonly property real sourceHighlightScale: Math.max(0.065, sphereRadius / 2350)
+    readonly property real sourceHighlightOffset: sphereRadius / 420
     readonly property real cameraDistance: Math.max(sphereRadius * 4.55, sphereRadius * 4.05 + Math.max(0, 320 - sphereView.height) * 0.42)
     readonly property real sceneCenterYOffset: -Math.min(28, Math.max(12, sphereRadius * 0.10 + Math.max(0, 300 - sphereView.height) * 0.06))
     readonly property var visibleSources: normalizedSourceEntries()
