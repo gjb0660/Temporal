@@ -15,11 +15,17 @@ Rectangle {
     property real sphereYaw: 0
     property real spherePitch: 0
     property real sphereRadius: 150
-    property var latitudeAngles: [-60, -36, -18, 0, 18, 36, 60]
-    property var meridianAngles: [0, 30, 60, 90, 120, 150]
-    property var diagonalAngles: [0, 40, 80, 120, 160]
+    property int latitudeBandCount: 3
+    property int meridianBandCount: 12
+    property int diagonalBandCount: 6
+    readonly property var latitudeAngles: buildLatitudeAngles()
+    readonly property var meridianAngles: buildMeridianAngles()
+    readonly property var diagonalAngles: buildDiagonalAngles()
     property int ringSegments: 44
     property real diagonalTilt: 52
+    readonly property real gridLineOpacity: 0.76
+    readonly property real equatorDiskOpacity: 0.34
+    readonly property real sourceMarkerOpacity: 0.88
     readonly property real primitiveRadius: 50
     readonly property real primitiveHeight: 100
     readonly property real equatorRadius: sphereRadius
@@ -35,8 +41,8 @@ Rectangle {
     readonly property real sourceMarkerScale: sphereRadius / 1425
     readonly property real sourceHighlightScale: sphereRadius / 3570
     readonly property real sourceHighlightOffset: sphereRadius / 500
-    readonly property real cameraDistance: Math.max(sphereRadius * 4.35, sphereRadius * 3.95 + Math.max(0, 280 - sphereView.height) * 0.35)
-    readonly property real sceneCenterYOffset: -Math.min(16, Math.max(6, sphereRadius * 0.07))
+    readonly property real cameraDistance: Math.max(sphereRadius * 4.55, sphereRadius * 4.05 + Math.max(0, 320 - sphereView.height) * 0.42)
+    readonly property real sceneCenterYOffset: -Math.min(28, Math.max(12, sphereRadius * 0.10 + Math.max(0, 300 - sphereView.height) * 0.06))
     readonly property var visibleSources: normalizedSourceEntries()
 
     function colorForSource(sourceId) {
@@ -77,6 +83,37 @@ Rectangle {
         }
 
         return entries
+    }
+
+    function buildLatitudeAngles() {
+        const angles = []
+        const step = 90 / (latitudeBandCount + 1)
+        for (let index = latitudeBandCount; index >= 1; index -= 1) {
+            angles.push(-step * index)
+        }
+        angles.push(0)
+        for (let index = 1; index <= latitudeBandCount; index += 1) {
+            angles.push(step * index)
+        }
+        return angles
+    }
+
+    function buildMeridianAngles() {
+        const angles = []
+        const step = 180 / meridianBandCount
+        for (let index = 0; index < meridianBandCount; index += 1) {
+            angles.push(index * step)
+        }
+        return angles
+    }
+
+    function buildDiagonalAngles() {
+        const angles = []
+        const step = 180 / diagonalBandCount
+        for (let index = 0; index < diagonalBandCount; index += 1) {
+            angles.push(index * step + step / 2)
+        }
+        return angles
     }
 
     function rotateVector(vector) {
@@ -170,7 +207,7 @@ Rectangle {
         anchors.leftMargin: 8
         anchors.rightMargin: 8
         anchors.topMargin: 6
-        anchors.bottomMargin: 10
+        anchors.bottomMargin: 18
         renderMode: View3D.Offscreen
         camera: sphereCamera
 
@@ -216,6 +253,8 @@ Rectangle {
                         materials: DefaultMaterial {
                             diffuseColor: Qt.rgba(0.52, 0.69, 0.42, 0.56)
                             lighting: DefaultMaterial.NoLighting
+                            opacity: root.equatorDiskOpacity
+                            depthDrawMode: Material.NeverDepthDraw
                         }
                     }
 
@@ -293,6 +332,8 @@ Rectangle {
                                     materials: DefaultMaterial {
                                         diffuseColor: parent.parent.modelData >= 0 ? "#5b72ff" : "#a46b3c"
                                         lighting: DefaultMaterial.NoLighting
+                                        opacity: root.gridLineOpacity
+                                        depthDrawMode: Material.NeverDepthDraw
                                     }
                                 }
                             }
@@ -323,6 +364,8 @@ Rectangle {
                                     materials: DefaultMaterial {
                                         diffuseColor: localY >= 0 ? "#5b72ff" : "#a46b3c"
                                         lighting: DefaultMaterial.NoLighting
+                                        opacity: root.gridLineOpacity
+                                        depthDrawMode: Material.NeverDepthDraw
                                     }
                                 }
                             }
@@ -357,6 +400,8 @@ Rectangle {
                                     materials: DefaultMaterial {
                                         diffuseColor: worldY >= 0 ? "#6d83ff" : "#9c6a42"
                                         lighting: DefaultMaterial.NoLighting
+                                        opacity: root.gridLineOpacity - 0.08
+                                        depthDrawMode: Material.NeverDepthDraw
                                     }
                                 }
                             }
@@ -377,6 +422,8 @@ Rectangle {
                                 materials: DefaultMaterial {
                                     diffuseColor: modelData.color
                                     lighting: DefaultMaterial.NoLighting
+                                    opacity: root.sourceMarkerOpacity
+                                    depthDrawMode: Material.NeverDepthDraw
                                 }
                             }
 
@@ -387,6 +434,7 @@ Rectangle {
                                 materials: DefaultMaterial {
                                     diffuseColor: Qt.rgba(1, 1, 1, 0.72)
                                     lighting: DefaultMaterial.NoLighting
+                                    depthDrawMode: Material.NeverDepthDraw
                                 }
                             }
                         }
