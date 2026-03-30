@@ -145,6 +145,39 @@ Source level: direct source fact
 这些事件名应作为 odas_web 内部 UI contract 记录，
 但不应写成 ODAS 协议的一部分。
 
+### Time Window And Time Source
+
+Source level: direct source fact
+
+`resources/js/graph.js` 的两张曲线图横轴采用线性时间轴，
+数据点的 `x` 来自 `currentFrame.timestamp`（tracking）和
+`currentFrame.ptimestamp`（potential）。
+
+Source level: direct source fact
+
+tracking 曲线入图时直接使用 `currentFrame.timestamp` 作为时间值：
+
+- elevation tracked: `{x: currentFrame.timestamp, y: ...}`
+- azimuth tracked: `{x: currentFrame.timestamp, y: ...}`
+
+Source level: direct source fact
+
+potential 曲线入图时使用 `currentFrame.ptimestamp`，并且窗口上界 `dataMax`
+会取 `timestamp` 与 `ptimestamp` 的较大值，随后统一回写到 chart 的
+`xAxes[0].ticks.max/min`。
+
+Source level: direct source fact
+
+`resources/js/tcp_link.js` 的 `clearChart` 事件会把
+`currentFrame.timestamp` 与 `currentFrame.ptimestamp` 都重置为 `0`，
+并触发 tracking/potential/update-selection 刷新。这体现的是一次会话清空/
+重建后的时间窗归零语义。
+
+Source level: inference from source
+
+odas_web 图表主时间轴来自 tracking/potential 的 JSON 时间戳流，
+不是 SSS 音频流主导的时间轴。
+
 ### Fixed Slot Assumption
 
 Source level: direct source fact

@@ -7,7 +7,7 @@ Canvas {
     property var yTicks: []
     property var xTickModel: null
     property var seriesModel: null
-    property string xAxisLabel: "样本"
+    property string xAxisLabel: "时间 (0.01s)"
 
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()

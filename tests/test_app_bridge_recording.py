@@ -294,7 +294,7 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(bridge.elevationSeriesModel.count, 0)
         self.assertEqual(bridge.azimuthSeriesModel.count, 0)
 
-    def test_runtime_chart_window_rolls_and_prefers_timestamp_ticks(self) -> None:
+    def test_runtime_chart_window_rolls_with_zero_based_time_and_latest_tick(self) -> None:
         bridge = self._make_bridge()
 
         for index in range(12):
@@ -308,10 +308,38 @@ class TestAppBridgeRecording(unittest.TestCase):
         ticks = [bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)]
         self.assertEqual(
             ticks,
-            ["1032", "1048", "1064", "1080", "1096", "1112", "1128", "1144", "1160", "1176"],
+            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "176"],
         )
         values = json.loads(bridge.elevationSeriesModel.get(0)["valuesJson"])
         self.assertEqual(len(values), 10)
+
+    def test_runtime_chart_timestamp_rollback_resets_origin(self) -> None:
+        bridge = self._make_bridge()
+
+        bridge._on_sst({"timeStamp": 1000, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge._on_sst({"timeStamp": 1016, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge._on_sst({"timeStamp": 900, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
+
+        self.assertEqual(len(bridge._runtime_chart_frames), 1)
+        self.assertEqual(bridge._runtime_chart_frames[0]["sample"], 0)
+        self.assertEqual(bridge._runtime_chart_time_origin, 900)
+        ticks = [bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)]
+        self.assertEqual(ticks[-1], "0")
+
+    def test_stop_streams_clears_runtime_chart_clock_and_window(self) -> None:
+        bridge = self._make_bridge()
+        bridge._on_sst({"timeStamp": 1000, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge._on_sst({"timeStamp": 1016, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
+
+        bridge.stopStreams()
+
+        self.assertEqual(bridge._runtime_chart_frames, [])
+        self.assertIsNone(bridge._runtime_chart_time_origin)
+        self.assertIsNone(bridge._runtime_chart_last_timestamp)
+        ticks = [bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)]
+        self.assertEqual(ticks, ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "1800"])
+        self.assertEqual(bridge.elevationSeriesModel.count, 0)
+        self.assertEqual(bridge.azimuthSeriesModel.count, 0)
 
     def test_runtime_chart_tick_fallback_is_monotonic_without_timestamp(self) -> None:
         bridge = self._make_bridge()

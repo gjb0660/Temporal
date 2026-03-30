@@ -112,6 +112,8 @@ class AppBridge(QObject):
         self._runtime_chart_tick_count = len(self._RUNTIME_CHART_X_TICKS)
         self._runtime_chart_sample_step = 200
         self._runtime_chart_next_fallback_sample = 0
+        self._runtime_chart_time_origin: int | None = None
+        self._runtime_chart_last_timestamp: int | None = None
         self._runtime_chart_frames: list[dict[str, Any]] = []
 
         self._log_timer = QTimer(self)
@@ -394,6 +396,7 @@ class AppBridge(QObject):
             self.setStatus(f"本地监听启动失败: {exc}")
             return
 
+        self._reset_runtime_chart_clock()
         self._set_streams_active(True)
         self._apply_state_status()
 
@@ -403,6 +406,7 @@ class AppBridge(QObject):
         self._recorder.stop_all()
         self._source_channel_map.clear()
         self._channel_source_map.clear()
+        self._reset_runtime_chart_clock()
         self._set_streams_active(False)
         self._set_recording_source_count(0)
         self._set_recording_sessions([])
@@ -925,7 +929,19 @@ class AppBridge(QObject):
     def _append_runtime_chart_frame(self, message: dict[str, Any]) -> None:
         sample_raw = message.get("timeStamp")
         if isinstance(sample_raw, int):
-            sample = sample_raw
+            if (
+                self._runtime_chart_last_timestamp is not None
+                and sample_raw < self._runtime_chart_last_timestamp
+            ):
+                self._runtime_chart_frames = []
+                self._runtime_chart_time_origin = None
+                self._runtime_chart_next_fallback_sample = 0
+            if self._runtime_chart_time_origin is None:
+                if self._runtime_chart_frames:
+                    self._runtime_chart_frames = []
+                self._runtime_chart_time_origin = sample_raw
+            sample = max(0, sample_raw - self._runtime_chart_time_origin)
+            self._runtime_chart_last_timestamp = sample_raw
             self._runtime_chart_next_fallback_sample = sample + self._runtime_chart_sample_step
         else:
             sample = self._runtime_chart_next_fallback_sample
@@ -954,6 +970,15 @@ class AppBridge(QObject):
 
     def _runtime_window_frames(self) -> list[dict[str, Any]]:
         return list(self._runtime_chart_frames)
+
+    def _reset_runtime_chart_clock(self) -> None:
+        self._runtime_chart_next_fallback_sample = 0
+        self._runtime_chart_time_origin = None
+        self._runtime_chart_last_timestamp = None
+        self._runtime_chart_frames = []
+        self._chart_x_ticks_model.replace(self._RUNTIME_CHART_X_TICKS)
+        self._elevation_series_model.replace([])
+        self._azimuth_series_model.replace([])
 
     def _current_runtime_frame_sources(self) -> dict[int, dict[str, float]]:
         if not self._runtime_chart_frames:

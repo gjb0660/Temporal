@@ -139,7 +139,7 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(bridge.headerNavLabelsModel.count, 0)
         self.assertEqual(
             _scalar_values(bridge.chartXTicksModel),
-            ["1512", "1528", "1544", "1560", "1576", "1592", "1608", "1624", "1640", "1656"],
+            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "1800"],
         )
 
     def test_scenarios_keep_models_in_sync(self) -> None:
@@ -192,14 +192,14 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.advancePreviewTick()
         bridge.setSourceSelected(7, False)
 
-        self.assertNotEqual(_scalar_values(bridge.chartXTicksModel)[0], "1512")
+        self.assertNotEqual(_scalar_values(bridge.chartXTicksModel)[-1], "1800")
         self.assertNotIn(7, _source_ids(bridge))
 
         bridge.setPreviewScenario("equatorBoundary")
 
         self.assertEqual(sorted(_source_ids(bridge)), [12, 15, 27, 31])
         self.assertTrue(all(row["checked"] for row in _model_items(bridge.sourceRowsModel)))
-        self.assertEqual(_scalar_values(bridge.chartXTicksModel)[0], "1512")
+        self.assertEqual(_scalar_values(bridge.chartXTicksModel)[0], "0")
         self.assertEqual(bridge.remoteLogText, "等待连接远程 odaslive...\n当前场景：赤道边界")
 
     def test_unknown_preview_scenario_is_ignored(self) -> None:

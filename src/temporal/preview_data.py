@@ -14,8 +14,8 @@ PREVIEW_SCENARIO_KEYS = (
 )
 
 _DEFAULT_SAMPLE_WINDOW = {
-    "sampleStart": 1512,
-    "sampleStep": 16,
+    "sampleStart": 0,
+    "sampleStep": 200,
     "windowSize": 10,
     "tickCount": 10,
     "tickStride": 1,

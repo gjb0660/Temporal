@@ -3,7 +3,7 @@ title: preview-mode
 tracker: primary-feature
 status: active
 owner: codex/ui
-updated: 2026-03-30
+updated: 2026-03-31
 ---
 
 ## Goal
@@ -23,18 +23,24 @@ updated: 2026-03-30
 - `PreviewBridge` 当前维护 scenario、selection 与 sample window 驱动；
   row / positions / chart 投影计算已下沉到 shared projection layer。
 - preview 与 production 当前共享 bridge 契约名称、目标语义与投影实现层。
+- preview chart 时间窗语义当前与 runtime 对齐：单位 `0.01s`、主体刻度
+  步长 `200`、最后刻度显示最新时间、重启/切换后归零。
+- preview 允许保持 fixture 数据源与 runtime 不同，但不允许在 chart 语义
+  上继续漂移。
 
 ## Decision
 
 - 通过独立 `temporal-preview` 入口启动共享 `Main.qml`。
 - 使用 `PreviewBridge` 承接 preview 模式下的安全 no-op 控制与状态输出。
 - 保持 preview 对 `ui-system` 的语义对齐目标，并将展示投影统一委托给 shared projection layer。
+- 保持 preview 与 runtime 除数据来源外的 chart 语义一致，不在 QML 层引入分支逻辑。
 
 ## Acceptance
 
 1. `temporal-preview` 可在无需修改 QML 的前提下启动主界面。
 2. preview 与 production 共享同一套 `appBridge` 绑定名称。
 3. preview 左侧动作只影响本地 preview 状态，不触发真实 SSH 或网络行为。
+4. preview chart 在流重启或场景切换后从 `0` 重新起算，并保持 `200` 主体刻度 + 最新时间尾刻度语义。
 
 ## Plan
 

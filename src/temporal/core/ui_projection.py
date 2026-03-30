@@ -80,12 +80,17 @@ def build_chart_ticks(
     fallback_sample_step: int,
 ) -> list[str]:
     safe_tick_count = max(1, int(tick_count))
-    if not window_frames:
-        return [
-            str(int(fallback_sample_start) + int(fallback_sample_step) * index)
-            for index in range(safe_tick_count)
-        ]
-    return [str(int(frame.get("sample", 0))) for frame in window_frames[:safe_tick_count]]
+    base = int(fallback_sample_start)
+    step = max(1, int(fallback_sample_step))
+    if window_frames:
+        latest = int(window_frames[-1].get("sample", base + step * (safe_tick_count - 1)))
+    else:
+        latest = base + step * (safe_tick_count - 1)
+    if safe_tick_count == 1:
+        return [str(latest)]
+    ticks = [str(base + step * index) for index in range(safe_tick_count - 1)]
+    ticks.append(str(latest))
+    return ticks
 
 
 def build_chart_series(

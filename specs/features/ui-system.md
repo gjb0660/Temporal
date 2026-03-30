@@ -3,7 +3,7 @@ title: ui-system
 tracker: primary-feature
 status: active
 owner: codex/ui
-updated: 2026-03-30
+updated: 2026-03-31
 ---
 
 ## Goal
@@ -30,6 +30,9 @@ updated: 2026-03-30
   SST 输入与 frame window 维护职责。
 - 当前展示语义中，row / 3D positions 使用 current frame，
   chart 使用共享时间窗序列，并共享同一过滤语义。
+- chart 时间轴以连接首帧 `timeStamp` 归零，并在重连后重新归零。
+- chart 横轴显示单位为 0.01s，刻度以 200 整数步长为主体，最后
+  一个刻度显示最新时间。
 
 ## Decision
 
@@ -39,6 +42,7 @@ updated: 2026-03-30
 - 继续通过共享 `appBridge` 契约消费状态，不在 QML 内复制业务逻辑。
 - 当前冻结 row、chart 与 3D 的过滤/空态契约，并保持 runtime/preview
   在同一 projection 实现层上演进。
+- chart 时钟由 bridge 维护“原点 + 重连重置”语义，QML 仅消费 ticks。
 
 ## Acceptance
 
@@ -48,6 +52,7 @@ updated: 2026-03-30
 4. 右栏 row 与 3D 共享 current frame 语义，chart 使用共享时间窗序列，
    三者共享同一过滤语义。
 5. 取消最后一个勾选 source 后，row 集合保持稳定，只有图表与 3D 变空。
+6. chart 在连接首帧显示 `0`，发生重连后重新从 `0` 起算。
 
 ## Plan
 

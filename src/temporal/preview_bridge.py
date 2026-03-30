@@ -51,7 +51,8 @@ class PreviewBridge(QObject):
         self._preview_scenario_key = DEFAULT_PREVIEW_SCENARIO_KEY
         self._scenario = get_preview_scenario(self._preview_scenario_key)
         self._selected_source_ids: set[int] = set()
-        self._sample_window_offset = 0
+        self._sample_window_position = 0
+        self._preview_chart_sample_step = 200
         self._remote_log_lines = ["等待连接远程 odaslive...", "当前处于预览模式"]
 
         self._source_rows_model = QmlListModel(
@@ -276,7 +277,7 @@ class PreviewBridge(QObject):
             return
 
         advance_per_tick = max(1, int(self._sample_window_config()["advancePerTick"]))
-        self._sample_window_offset = (self._sample_window_offset + advance_per_tick) % frame_count
+        self._sample_window_position += advance_per_tick
         self._refresh_preview_models()
 
     def _scenario_sources(self) -> list[dict[str, Any]]:
@@ -302,7 +303,7 @@ class PreviewBridge(QObject):
         self._selected_source_ids = {int(source["id"]) for source in self._scenario_sources()}
 
     def _reset_preview_sample_window(self) -> None:
-        self._sample_window_offset = 0
+        self._sample_window_position = 0
 
     def _sample_window_config(self) -> dict[str, int]:
         raw = self._scenario.get("sampleWindow", {})
@@ -374,8 +375,8 @@ class PreviewBridge(QObject):
             build_chart_ticks(
                 window_frames,
                 tick_count=config["tickCount"],
-                fallback_sample_start=config["sampleStart"],
-                fallback_sample_step=config["sampleStep"],
+                fallback_sample_start=0,
+                fallback_sample_step=self._preview_chart_sample_step,
             )
         )
         self._elevation_series_model.replace(
@@ -392,8 +393,12 @@ class PreviewBridge(QObject):
         config = self._sample_window_config()
         window_size = max(config["windowSize"], config["tickCount"])
         frame_count = len(frames)
+        start_position = self._sample_window_position
         return [
-            frames[(self._sample_window_offset + index) % frame_count]
+            {
+                "sample": (start_position + index) * self._preview_chart_sample_step,
+                "sources": list(frames[(start_position + index) % frame_count].get("sources", [])),
+            }
             for index in range(window_size)
         ]
 
@@ -401,7 +406,7 @@ class PreviewBridge(QObject):
         frames = self._tracking_frames()
         if not frames:
             return {}
-        frame = frames[self._sample_window_offset % len(frames)]
+        frame = frames[self._sample_window_position % len(frames)]
         items: dict[int, dict[str, float]] = {}
         for source in frame.get("sources", []):
             if not isinstance(source, dict):

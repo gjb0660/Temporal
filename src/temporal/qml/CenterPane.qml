@@ -49,6 +49,7 @@ Rectangle {
                 yTicks: ["90", "60", "30", "0", "-30", "-60", "-90"]
                 xTickModel: root.appBridge.chartXTicksModel
                 seriesModel: root.appBridge.elevationSeriesModel
+                xAxisLabel: "时间 (0.01s)"
             }
         }
 
@@ -71,6 +72,7 @@ Rectangle {
                 yTicks: ["180", "120", "60", "0", "-60", "-120", "-180"]
                 xTickModel: root.appBridge.chartXTicksModel
                 seriesModel: root.appBridge.azimuthSeriesModel
+                xAxisLabel: "时间 (0.01s)"
             }
         }
 

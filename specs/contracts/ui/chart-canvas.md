@@ -2,7 +2,7 @@
 title: chart-canvas
 status: active
 stability: flexible
-version: 0.2
+version: 0.3
 ---
 
 ## Role
@@ -16,6 +16,8 @@ version: 0.2
 - 图表画布 MUST 支持零条或多条折线序列，并保持空数据时仍然安全显示空网格。
 - 每条折线 MUST 使用与输入 source 身份一致的颜色语义，MUST NOT 在组件内部重新发明颜色规则。
 - 图表画布 MUST 保持只读可视化语义，MUST NOT 默认引入缩放、平移或点选分析交互。
+- 时间轴 MUST 以 0.01s 为显示单位，并以当前连接首帧时间作为零点。
+- 横轴刻度 MUST 以 200 步长的整数刻度为主体，且仅最后一个刻度显示最新时间值。
 
 ## Variation Space
 

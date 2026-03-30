@@ -94,8 +94,8 @@ class TestProjectionParity(unittest.TestCase):
             "status": "Temporal 就绪",
             "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：Parity"],
             "sampleWindow": {
-                "sampleStart": 1512,
-                "sampleStep": 16,
+                "sampleStart": 0,
+                "sampleStep": 200,
                 "windowSize": 1,
                 "tickCount": 1,
                 "tickStride": 1,
@@ -103,7 +103,7 @@ class TestProjectionParity(unittest.TestCase):
                 "timerIntervalMs": 400,
             },
             "sources": [{"id": 15, "color": "#cf54ea", "energy": 0.88}],
-            "trackingFrames": [{"sample": 1512, "sources": [{"id": 15, "x": 1.0, "y": 0.0, "z": 0.0}]}],
+            "trackingFrames": [{"sample": 0, "sources": [{"id": 15, "x": 1.0, "y": 0.0, "z": 0.0}]}],
         }
         preview._reset_selected_sources()
         preview._reset_preview_sample_window()

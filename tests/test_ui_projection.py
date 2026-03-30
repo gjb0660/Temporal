@@ -68,7 +68,7 @@ class TestUiProjection(unittest.TestCase):
             fallback_sample_start=0,
             fallback_sample_step=200,
         )
-        self.assertEqual(ticks, ["100", "120"])
+        self.assertEqual(ticks, ["0", "120"])
 
         elevation = build_chart_series(window_frames, visible_rows, [15], axis="elevation")
         azimuth = build_chart_series(window_frames, visible_rows, [15], axis="azimuth")
