@@ -1,3 +1,4 @@
+import json
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
@@ -259,6 +260,67 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(len(bridge._source_channel_map), 4)
         self.assertEqual(bridge.recordingSourceCount, 4)
         self.assertFalse(any("Source 5" in item for item in bridge._recording_sessions))
+
+    def test_sst_refreshes_runtime_chart_series(self) -> None:
+        bridge = self._make_bridge()
+
+        bridge._on_sst({"src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}, {"id": 5, "x": 0.0, "y": 1.0, "z": 0.0}]})
+
+        self.assertEqual(bridge.elevationSeriesModel.count, 2)
+        self.assertEqual(bridge.azimuthSeriesModel.count, 2)
+
+        elevation_first = json.loads(bridge.elevationSeriesModel.get(0)["valuesJson"])
+        azimuth_first = json.loads(bridge.azimuthSeriesModel.get(0)["valuesJson"])
+        azimuth_second = json.loads(bridge.azimuthSeriesModel.get(1)["valuesJson"])
+
+        self.assertEqual(elevation_first, [0.5])
+        self.assertEqual(azimuth_first, [0.5])
+        self.assertEqual(azimuth_second, [0.75])
+
+    def test_unchecked_last_source_keeps_rows_but_clears_runtime_chart_and_positions(self) -> None:
+        bridge = self._make_bridge()
+        bridge._on_sst({"src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}, {"id": 5, "x": 0.0, "y": 1.0, "z": 0.0}]})
+
+        bridge.setSourceSelected(2, False)
+        self.assertEqual(bridge.elevationSeriesModel.count, 1)
+        self.assertEqual(bridge.azimuthSeriesModel.count, 1)
+        self.assertEqual(bridge.sourcePositionsModel.count, 1)
+        self.assertEqual(bridge.elevationSeriesModel.get(0)["sourceId"], 5)
+
+        bridge.setSourceSelected(5, False)
+
+        self.assertEqual(bridge.sourceRowsModel.count, 2)
+        self.assertEqual(bridge.sourcePositionsModel.count, 0)
+        self.assertEqual(bridge.elevationSeriesModel.count, 0)
+        self.assertEqual(bridge.azimuthSeriesModel.count, 0)
+
+    def test_runtime_chart_window_rolls_and_prefers_timestamp_ticks(self) -> None:
+        bridge = self._make_bridge()
+
+        for index in range(12):
+            bridge._on_sst(
+                {
+                    "timeStamp": 1000 + index * 16,
+                    "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}],
+                }
+            )
+
+        ticks = [bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)]
+        self.assertEqual(
+            ticks,
+            ["1032", "1048", "1064", "1080", "1096", "1112", "1128", "1144", "1160", "1176"],
+        )
+        values = json.loads(bridge.elevationSeriesModel.get(0)["valuesJson"])
+        self.assertEqual(len(values), 10)
+
+    def test_runtime_chart_tick_fallback_is_monotonic_without_timestamp(self) -> None:
+        bridge = self._make_bridge()
+
+        for _ in range(3):
+            bridge._on_sst({"src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
+
+        ticks = [bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)]
+        self.assertEqual(ticks[:3], ["0", "200", "400"])
 
 
 if __name__ == "__main__":

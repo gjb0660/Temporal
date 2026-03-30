@@ -3,7 +3,7 @@ title: runtime-reliability
 tracker: feature
 status: exploring
 owner: copilot
-updated: 2026-03-27
+updated: 2026-03-30
 ---
 
 ## Goal
@@ -21,7 +21,8 @@ updated: 2026-03-27
 - listener 启动、远端启动校验、过滤联动与 shell 语义属于高风险边界。
 - 本地质量门禁与运行文档仍需持续对齐当前系统事实。
 - `routing-session` 与 `recording` 当前已有路由、容量约束与会话可见性的行为级测试覆盖。
-- production `AppBridge` 仍缺少 chart series 投影，preview/runtime 展示 parity 也尚未冻结为共享实现契约。
+- production `AppBridge` 已补齐 chart series 时间窗投影与过滤联动测试，
+  preview/runtime 展示 parity 已冻结为 shared projection layer 契约。
 
 ## Decision
 
@@ -42,14 +43,14 @@ updated: 2026-03-27
 
 1. 为高风险契约补 red tests。
 2. 以最小修复收敛失败路径与状态机缺口。
-3. 为 production chart projection 与 preview/runtime parity 建立可失败的行为级测试。
+3. 为 preview/runtime parity 建立可失败的行为级测试，并持续冻结 production chart 行为。
 4. 运行 targeted unittest 与本地质量门禁，并确认行为回归受控。
 
 ## Progress
 
 - [x] 已明确高风险测试缺口与目标覆盖面。
 - [x] 已确认 routing、capacity limit、preview filtering 等关键行为已有测试保护。
-- [ ] 仍需补齐 production chart projection 与 preview/runtime parity 的行为级测试。
+- [x] 已补齐 preview/runtime parity 的行为级测试，并建立 shared projection layer 回归入口。
 - [ ] 仍需完成 targeted unittest、静态检查与残余风险记录。
 
 ## Todo

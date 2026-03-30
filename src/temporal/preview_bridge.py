@@ -2,8 +2,6 @@ from __future__ import annotations
 
 # pyright: reportMissingImports=false, reportUntypedFunctionDecorator=false
 
-import json
-from math import acos, atan2, degrees, sqrt
 from typing import Any
 
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
@@ -13,6 +11,14 @@ from temporal.preview_data import (
     get_preview_scenario,
     preview_scenario_keys,
     preview_scenario_options,
+)
+from temporal.core.ui_projection import (
+    build_chart_series,
+    build_chart_ticks,
+    build_positions_model_items,
+    build_rows_model_items,
+    compute_sidebar_sources,
+    compute_visible_source_ids,
 )
 from temporal.qml_list_model import QmlListModel
 
@@ -89,7 +95,8 @@ class PreviewBridge(QObject):
 
     @Property(list, notify=sourceIdsChanged)  # type: ignore[reportCallIssue]
     def sourceIds(self) -> list[int]:
-        return self._visible_source_ids()
+        sidebar_sources = self._sidebar_sources()
+        return compute_visible_source_ids(sidebar_sources, self._selected_source_ids)
 
     @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
     def sourceRowsModel(self) -> QmlListModel:
@@ -280,22 +287,16 @@ class PreviewBridge(QObject):
         return list(frames) if isinstance(frames, list) else []
 
     def _sidebar_sources(self) -> list[dict[str, Any]]:
-        if not self._sources_enabled:
-            return []
-        if not self._potentials_enabled:
-            return self._scenario_sources()
-        return [
-            source
-            for source in self._scenario_sources()
-            if self._potential_min <= float(source.get("energy", 0.0)) <= self._potential_max
-        ]
+        return compute_sidebar_sources(
+            self._scenario_sources(),
+            sources_enabled=self._sources_enabled,
+            potentials_enabled=self._potentials_enabled,
+            potential_min=self._potential_min,
+            potential_max=self._potential_max,
+        )
 
     def _visible_source_ids(self) -> list[int]:
-        return [
-            int(source["id"])
-            for source in self._sidebar_sources()
-            if int(source["id"]) in self._selected_source_ids
-        ]
+        return compute_visible_source_ids(self._sidebar_sources(), self._selected_source_ids)
 
     def _reset_selected_sources(self) -> None:
         self._selected_source_ids = {int(source["id"]) for source in self._scenario_sources()}
@@ -351,50 +352,37 @@ class PreviewBridge(QObject):
     def _refresh_preview_models(self) -> None:
         sidebar_sources = self._sidebar_sources()
         visible_rows = {int(source["id"]): source for source in sidebar_sources}
-        visible_source_ids = set(self._visible_source_ids())
+        visible_source_ids = self._visible_source_ids()
         current_frame_sources = self._current_frame_sources()
 
-        self._source_rows_model.replace(
-            [
-                {
-                    "sourceId": int(source["id"]),
-                    "label": "声源",
-                    "checked": int(source["id"]) in self._selected_source_ids,
-                    "enabled": True,
-                    "badge": str(int(source["id"])),
-                    "badgeColor": source["color"],
-                }
-                for source in sidebar_sources
-            ]
-        )
+        self._source_rows_model.replace(build_rows_model_items(sidebar_sources, self._selected_source_ids))
         self._source_positions_model.replace(
-            [
-                {
-                    "id": source_id,
-                    "color": visible_rows[source_id]["color"],
-                    "x": frame_source["x"],
-                    "y": frame_source["y"],
-                    "z": frame_source["z"],
-                }
-                for source_id, frame_source in current_frame_sources.items()
-                if source_id in visible_rows and source_id in visible_source_ids
-            ]
+            build_positions_model_items(current_frame_sources, visible_rows, set(visible_source_ids))
         )
         self._recording_sessions_model.replace([])
         self.sourceIdsChanged.emit()
-        self._refresh_chart_models()
+        self._refresh_chart_models(visible_rows, visible_source_ids)
 
-    def _refresh_chart_models(self) -> None:
-        visible_rows = {int(source["id"]): source for source in self._sidebar_sources()}
-        visible_source_ids = {
-            source_id for source_id in self._visible_source_ids() if source_id in visible_rows
-        }
-        self._chart_x_ticks_model.replace(self._chart_tick_values())
+    def _refresh_chart_models(
+        self,
+        visible_rows: dict[int, dict[str, Any]],
+        visible_source_ids: list[int],
+    ) -> None:
+        window_frames = self._window_frames()
+        config = self._sample_window_config()
+        self._chart_x_ticks_model.replace(
+            build_chart_ticks(
+                window_frames,
+                tick_count=config["tickCount"],
+                fallback_sample_start=config["sampleStart"],
+                fallback_sample_step=config["sampleStep"],
+            )
+        )
         self._elevation_series_model.replace(
-            self._series_items(visible_rows, visible_source_ids, axis="elevation")
+            build_chart_series(window_frames, visible_rows, visible_source_ids, axis="elevation")
         )
         self._azimuth_series_model.replace(
-            self._series_items(visible_rows, visible_source_ids, axis="azimuth")
+            build_chart_series(window_frames, visible_rows, visible_source_ids, axis="azimuth")
         )
 
     def _window_frames(self) -> list[dict[str, Any]]:
@@ -427,62 +415,6 @@ class PreviewBridge(QObject):
                 "z": float(source.get("z", 0.0)),
             }
         return items
-
-    def _chart_tick_values(self) -> list[str]:
-        config = self._sample_window_config()
-        tick_count = config["tickCount"]
-        frames = self._window_frames()
-        if not frames:
-            sample_start = config["sampleStart"]
-            sample_step = config["sampleStep"]
-            return [str(sample_start + sample_step * index) for index in range(tick_count)]
-        return [str(int(frame.get("sample", 0))) for frame in frames[:tick_count]]
-
-    def _series_items(
-        self,
-        visible_rows: dict[int, dict[str, Any]],
-        visible_source_ids: set[int],
-        axis: str,
-    ) -> list[dict[str, Any]]:
-        frames = self._window_frames()
-        if not frames:
-            return []
-
-        values_by_source: dict[int, list[float]] = {
-            source_id: [] for source_id in visible_source_ids
-        }
-        for frame in frames:
-            frame_sources = {
-                int(source["id"]): source
-                for source in frame.get("sources", [])
-                if isinstance(source, dict) and isinstance(source.get("id"), int)
-            }
-            for source_id in visible_source_ids:
-                source = frame_sources.get(source_id)
-                if source is None:
-                    continue
-                values_by_source[source_id].append(self._normalized_axis_value(source, axis))
-
-        return [
-            {
-                "sourceId": source_id,
-                "color": visible_rows[source_id]["color"],
-                "valuesJson": json.dumps(values),
-            }
-            for source_id, values in values_by_source.items()
-            if values
-        ]
-
-    def _normalized_axis_value(self, source: dict[str, Any], axis: str) -> float:
-        x = float(source.get("x", 0.0))
-        y = float(source.get("y", 0.0))
-        z = float(source.get("z", 0.0))
-        length = max(0.0001, sqrt(x * x + y * y + z * z))
-        if axis == "elevation":
-            elevation_deg = 90.0 - degrees(acos(max(-1.0, min(1.0, z / length))))
-            return (elevation_deg + 90.0) / 180.0
-        azimuth_deg = degrees(atan2(y, x))
-        return (azimuth_deg + 180.0) / 360.0
 
     def _set_status(self, status: str) -> None:
         if self._status == status:

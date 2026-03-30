@@ -475,7 +475,7 @@ class TestAppBridgePreviewDefaults(unittest.TestCase):
         self.assertEqual(_scalar_values(bridge.headerNavLabelsModel), ["配置", "录制", "相机"])
         self.assertEqual(
             _scalar_values(bridge.chartXTicksModel),
-            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600"],
+            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "1800"],
         )
         self.assertEqual(_model_items(bridge.sourceRowsModel), [])
         self.assertEqual(_model_items(bridge.elevationSeriesModel), [])

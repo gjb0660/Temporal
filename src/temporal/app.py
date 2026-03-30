@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Any
 
 from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication
@@ -17,6 +18,14 @@ from temporal.core.network.odas_message_view import (
     extract_source_ids,
     extract_source_positions,
 )
+from temporal.core.ui_projection import (
+    build_chart_series,
+    build_chart_ticks,
+    build_positions_model_items,
+    build_rows_model_items,
+    compute_sidebar_sources,
+    compute_visible_source_ids,
+)
 from temporal.core.recording.auto_recorder import AutoRecorder
 from temporal.core.ssh.remote_odas import RemoteOdasController
 from temporal.qml_list_model import QmlListModel
@@ -27,7 +36,18 @@ class AppBridge(QObject):
     _AUDIO_SAMPLE_WIDTH = 2
     _STARTUP_VERIFY_INTERVAL_MS = 200
     _STARTUP_VERIFY_ATTEMPTS = 11
-    _RUNTIME_CHART_X_TICKS = ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600"]
+    _RUNTIME_CHART_X_TICKS = [
+        "0",
+        "200",
+        "400",
+        "600",
+        "800",
+        "1000",
+        "1200",
+        "1400",
+        "1600",
+        "1800",
+    ]
     _HEADER_NAV_LABELS = ["配置", "录制", "相机"]
     _EMPTY_REMOTE_LOG = ["等待连接远程 odaslive..."]
 
@@ -89,6 +109,10 @@ class AppBridge(QObject):
         self._streams_active = False
         self._startup_attempts_remaining = 0
         self._startup_failure_hint = ""
+        self._runtime_chart_tick_count = len(self._RUNTIME_CHART_X_TICKS)
+        self._runtime_chart_sample_step = 200
+        self._runtime_chart_next_fallback_sample = 0
+        self._runtime_chart_frames: list[dict[str, Any]] = []
 
         self._log_timer = QTimer(self)
         self._log_timer.setInterval(1500)
@@ -450,6 +474,7 @@ class AppBridge(QObject):
 
     def _on_sst(self, message: dict) -> None:
         self._last_sst = message
+        self._append_runtime_chart_frame(message)
         self._refresh_sources()
         self._update_source_channel_map(self._source_ids)
         mapped_source_ids = [
@@ -856,26 +881,93 @@ class AppBridge(QObject):
             self.sourceItemsChanged.emit()
             self.sourceCountChanged.emit()
 
-        positions = extract_source_positions(
-            self._last_sst,
-            enabled=self._sources_enabled,
-            selected_ids=self._selected_source_ids,
+        base_sources = [{"id": source_id, "color": "#cf54ea"} for source_id in self._source_ids]
+        sidebar_sources = compute_sidebar_sources(
+            base_sources,
+            sources_enabled=self._sources_enabled,
+            potentials_enabled=False,
+            potential_min=0.0,
+            potential_max=1.0,
+        )
+        visible_source_ids = compute_visible_source_ids(sidebar_sources, self._selected_source_ids)
+        visible_rows = {int(source["id"]): source for source in sidebar_sources}
+        current_frame_sources = self._current_runtime_frame_sources()
+
+        positions = build_positions_model_items(
+            current_frame_sources,
+            visible_rows,
+            set(visible_source_ids),
         )
         self._set_source_positions(positions)
-        self._source_rows_model.replace(
-            [
-                {
-                    "sourceId": source_id,
-                    "label": "声源",
-                    "checked": source_id in self._selected_source_ids,
-                    "enabled": True,
-                    "badge": str(source_id),
-                    "badgeColor": "#cf54ea",
-                }
-                for source_id in self._source_ids
-                if self._sources_enabled
-            ]
+        self._source_rows_model.replace(build_rows_model_items(sidebar_sources, self._selected_source_ids))
+        self._refresh_chart_models(visible_rows, visible_source_ids)
+
+    def _refresh_chart_models(
+        self,
+        visible_rows: dict[int, dict[str, Any]],
+        visible_source_ids: list[int],
+    ) -> None:
+        window_frames = self._runtime_window_frames()
+        ticks = build_chart_ticks(
+            window_frames,
+            tick_count=self._runtime_chart_tick_count,
+            fallback_sample_start=0,
+            fallback_sample_step=self._runtime_chart_sample_step,
         )
+        self._chart_x_ticks_model.replace(ticks)
+        self._elevation_series_model.replace(
+            build_chart_series(window_frames, visible_rows, visible_source_ids, axis="elevation")
+        )
+        self._azimuth_series_model.replace(
+            build_chart_series(window_frames, visible_rows, visible_source_ids, axis="azimuth")
+        )
+
+    def _append_runtime_chart_frame(self, message: dict[str, Any]) -> None:
+        sample_raw = message.get("timeStamp")
+        if isinstance(sample_raw, int):
+            sample = sample_raw
+            self._runtime_chart_next_fallback_sample = sample + self._runtime_chart_sample_step
+        else:
+            sample = self._runtime_chart_next_fallback_sample
+            self._runtime_chart_next_fallback_sample += self._runtime_chart_sample_step
+
+        positions = extract_source_positions(
+            message,
+            enabled=True,
+            selected_ids=None,
+        )
+        frame = {
+            "sample": sample,
+            "sources": [
+                {
+                    "id": int(item["id"]),
+                    "x": float(item["x"]),
+                    "y": float(item["y"]),
+                    "z": float(item["z"]),
+                }
+                for item in positions
+            ],
+        }
+        self._runtime_chart_frames.append(frame)
+        if len(self._runtime_chart_frames) > self._runtime_chart_tick_count:
+            self._runtime_chart_frames = self._runtime_chart_frames[-self._runtime_chart_tick_count :]
+
+    def _runtime_window_frames(self) -> list[dict[str, Any]]:
+        return list(self._runtime_chart_frames)
+
+    def _current_runtime_frame_sources(self) -> dict[int, dict[str, float]]:
+        if not self._runtime_chart_frames:
+            return {}
+        latest = self._runtime_chart_frames[-1]
+        return {
+            int(source["id"]): {
+                "x": float(source.get("x", 0.0)),
+                "y": float(source.get("y", 0.0)),
+                "z": float(source.get("z", 0.0)),
+            }
+            for source in latest.get("sources", [])
+            if isinstance(source, dict) and isinstance(source.get("id"), int)
+        }
 
     def _refresh_potentials(self) -> None:
         count = count_potentials(
