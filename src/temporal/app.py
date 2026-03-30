@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 # pyright: reportMissingImports=false, reportUntypedFunctionDecorator=false
-
 import sys
 from pathlib import Path
 from typing import Any
@@ -10,11 +9,11 @@ from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
-from temporal.core.config_loader import TemporalConfig, load_config
 from temporal.core.chart_time import (
     DEFAULT_CHART_SAMPLE_STEP,
     build_default_chart_ticks,
 )
+from temporal.core.config_loader import TemporalConfig, load_config, resolve_default_config_path
 from temporal.core.network.odas_client import OdasClient
 from temporal.core.network.odas_message_view import (
     build_source_items,
@@ -22,6 +21,9 @@ from temporal.core.network.odas_message_view import (
     extract_source_ids,
     extract_source_positions,
 )
+from temporal.core.recording.auto_recorder import AutoRecorder
+from temporal.core.source_palette import SourceColorAllocator
+from temporal.core.ssh.remote_odas import RemoteOdasController
 from temporal.core.ui_projection import (
     build_chart_series,
     build_chart_ticks,
@@ -30,9 +32,6 @@ from temporal.core.ui_projection import (
     compute_sidebar_sources,
     compute_visible_source_ids,
 )
-from temporal.core.source_palette import SourceColorAllocator
-from temporal.core.recording.auto_recorder import AutoRecorder
-from temporal.core.ssh.remote_odas import RemoteOdasController
 from temporal.qml_list_model import QmlListModel
 
 
@@ -76,7 +75,7 @@ class AppBridge(QObject):
         super().__init__()
         self._status = "Temporal 就绪"
         self._root = Path(__file__).resolve().parents[2]
-        self._cfg_path = self._root / "config" / "odas.example.toml"
+        self._cfg_path = resolve_default_config_path(self._root)
         self._cfg = cfg or load_config(self._cfg_path)
         self._remote = remote or RemoteOdasController(self._cfg.remote, self._cfg.streams)
         self._client = client or OdasClient(

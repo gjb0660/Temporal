@@ -16,6 +16,14 @@ class TemporalConfig:
     streams: OdasStreamConfig
 
 
+def resolve_default_config_path(root: str | Path) -> Path:
+    root_path = Path(root)
+    primary_path = root_path / "config" / "odas.toml"
+    if primary_path.exists():
+        return primary_path
+    return root_path / "config" / "odas.example.toml"
+
+
 def _optional_string(value: object) -> str | None:
     if value is None:
         return None

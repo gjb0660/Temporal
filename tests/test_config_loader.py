@@ -4,10 +4,33 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from temporal.core.config_loader import load_config
+from temporal.core.config_loader import load_config, resolve_default_config_path
 
 
 class TestConfigLoader(unittest.TestCase):
+    def test_default_config_path_prefers_odas_toml(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_dir = root / "config"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            (config_dir / "odas.toml").write_text("", encoding="utf-8")
+            (config_dir / "odas.example.toml").write_text("", encoding="utf-8")
+
+            resolved = resolve_default_config_path(root)
+
+            self.assertEqual(resolved, config_dir / "odas.toml")
+
+    def test_default_config_path_falls_back_to_example(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            config_dir = root / "config"
+            config_dir.mkdir(parents=True, exist_ok=True)
+            (config_dir / "odas.example.toml").write_text("", encoding="utf-8")
+
+            resolved = resolve_default_config_path(root)
+
+            self.assertEqual(resolved, config_dir / "odas.example.toml")
+
     def test_empty_remote_credentials_are_treated_as_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             cfg_path = Path(temp_dir) / "odas.toml"
