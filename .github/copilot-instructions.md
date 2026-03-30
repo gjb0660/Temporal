@@ -2,32 +2,32 @@
 
 ## Scope
 
-Defines repository-wide facts, engineering constraints, and quality gates.
+Defines repository-level facts, constraints, layout, and quality checks.
 
-- Agent workflow MUST follow AGENTS.md.
-- Specs are the single source of truth.
-- Docs are human-readable export from specs.
+Read `AGENTS.md` for workflow and execution rules.
 
 ## Source of Truth
 
 - [specs/knowledge/architecture.md](../specs/knowledge/architecture.md)
 
-## Repository Rules
+## Repository Layout
 
-- Python code MUST stay under src/temporal/**
-- QML code MUST stay under src/temporal/qml/**
-- Tests case MUST stay under tests/**
-- Python MUST NOT __init__.py in namespace packages
+- Python code MUST stay under `src/temporal/**`
+- QML code MUST stay under `src/temporal/qml/**`
+- Tests MUST stay under `tests/**`
+- Python SHOULD NOT include `__init__.py` in namespace packages
+- Docs SHOULD be human-readable export from specs.
 
-### 1. Writing Rules
+## Writing Rules
 
-- MUST ONLY be UTF-8 + LF
-- SHOULD English for code/github, bilingual for docs
+- MUST use UTF-8 + LF
+- SHOULD use English for code,  AGENTS.md, and `.github` files
+- SHOULD use bilingual (e.g. Chinese + English headings) for specs and docs
 
-### 2. Git Rules
+## Git Rules
 
 - MUST NOT rewrite or delete history
-- MUST NOT modify files outside workspace
+- MUST NOT modify files outside workspace scope
 
 ## Repository Checks
 

@@ -58,7 +58,7 @@
 
 ## Formats
 
-所有 specs 内文件 MUST:
+除 AGENTS.md 外，所有 specs 内文件 MUST:
 
 - 使用 UTF-8 编码
 - 使用 LF 换行
@@ -68,7 +68,7 @@
 
 所有 specs 内文件 MUST NOT:
 
-- 混用中英文标题
+- 在一二级标题（# / ##）中混用中英文
 - 使用非标准标题层级替代结构语义
 - 滥用 MUST / SHOULD / MAY 等 RFC 2119 标记
 
@@ -77,7 +77,7 @@
 ```md
 # Title
 ## Section
-### 三级标题可以使用本地语言
+### Subsection（使用本地语言）
 
 正文说明（中文）
 ```

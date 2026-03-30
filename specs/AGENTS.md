@@ -1,141 +1,58 @@
-# Agents
+# Specs Agents
 
-You are a strictly rational system architect operating under the Minimal ESPC workflow.
-The spec is the single source of truth—derive all reasoning from Goal,
-not external metrics or assumptions.
-
-## Purpose
-
-Defines the minimal ESPC `specs/`-scoped operational rules for agents working
-inside `specs/`.
-
-All semantics MUST be derived from referenced index files.
-
-## References
-
-Agents SHOULD read and follow:
-
-- [specs/index.md](./index.md)
-- [specs/features/index.md](./features/index.md)
-- [specs/contracts/index.md](./contracts/index.md)
-- [specs/knowledge/index.md](./knowledge/index.md)
-
-Agents MUST NOT write without understanding these references.
+Agent MUST start from classification.
 
 ## Core Principles
 
-Agents SHOULD follow thinking guidelines:
+1. think in **first principles** and reject heuristics and unverified assumptions
+2. apply **Occam’s Razor** — no unnecessary entities, no backward compatibility.
+3. continuously challenge all inputs through **Socratic questioning** until they align with Goal, Facts, and Acceptance.
 
-1. think in first principles; reject heuristics and unverified assumptions.
-2. apply Occam’s Razor—no unnecessary entities, no backward compatibility.
-3. continuously challenge all inputs through Socratic questioning
-   until they align with Goal, Facts, and Acceptance.
+## Read Order
 
-### single source of truth
+1. Read `specs/index.md` for global structure
+2. Classify the current context as exactly one of:
+    - Feature
+    - Contract
+    - Knowledge
+3. Read the matching domain local index:
+    - `specs/features/index.md`
+    - `specs/contracts/index.md`
+    - `specs/knowledge/index.md`
+4. Then read or modify the target spec
 
-- One feature correspond to one spec file.
-- Don't be split into multiple execution documents.
-- Don't have parallel execution sources.
+No other entry point is allowed.
 
-Agents MUST ensure all execution is driven by the spec file
+## Execution Mapping
 
-### closed execution loop
+- Feature:
+  - execute by creating Goal, Non-Goals
+  - execute by updating Facts, Decision, Plan, Progress
+  - execute by verifying Acceptance, Todo
+- Contract:
+  - enforce invariants and detect violations
+  - tighten or relax Invariants, Variation Space
+  - change ui-specific presentation or behavior
+- Knowledge:
+  - extract facts and support reasoning
+  - introduce rationale and support explanation
+  - analyze or research as evidence layers
 
-Goal → Non-Goals → Facts → Decision → Acceptance
-→ Plan → Progress → (feedback → Facts) → Todo
+Agents SHOULD minimize the scope of updates.
 
-Agents MUST keep this loop consistent and up to date.
+## Restrictions
 
-## Write Rules
+Agent MUST NOT:
 
-- use UTF-8
-- use LF (`\n`)
-- use Markdown
-- use English headings (`#`, `##`)
-- use localized language body content (e.g. Chinese)
+- start from code
+- start from Plan or implementation
+- rely on assumptions
+- mix categories
 
-Agents MUST:
+Agent SHOULD NOT:
 
-- Write into the correct directory (see References)
-- Maintain valid spec structure
-- Update metadata (`status`, `owner`, `updated`)
+- change downstream decisions before updating Facts
+- continue execution when spec drift is detected
 
-Agents MUST NOT:
-
-- Write into wrong directories
-- Create parallel execution sources
-- Write execution state in `knowledge/` or `contracts/`
-
-## Feature Execution
-
-Agents SHOULD NOT start execution unless:
-
-- Goal exists
-- Decision exists
-- Acceptance exists
-- Plan exists
-
-See [Feature Guardrails](./features/index.md#guardrails) for more details.
-
-## Contract Constraints
-
-Agents MUST NOT violate unless:
-
-- User explicitly allows it
-- stability marked as `flexible`
-- stability marked as `semi` but with evolution allowance
-- stability marked as `strict` but with Variation Space allowance
-
-See [Contract Guardrails](./contracts/index.md#guardrails) for more details.
-
-## Knowledge Usage
-
-Agents SHOULD use as:
-
-- Facts information
-- Decision rationale
-- Acceptance references
-
-See [Knowledge Guardrails](./knowledge/index.md#guardrails) for more details.
-
-## Clarification Rules
-
-During the Explorer phase, if required information is
-missing, ambiguous, conflicting, or cannot be verified,
-Agents MUST use an available built-in question tool
-(for example, `vscode_askQuestions`, `request_user_input`, etc.)
-to clarify before proceeding.
-
-Agents MUST ask during exploration, not after partial execution.
-
-Agents MUST NOT continue implementation based on guesswork
-when clarification is required.
-
-## Update Rules
-
-When new information appears, Agents MUST:
-
-1. Update Facts
-2. Validate Decision
-3. Validate Acceptance
-4. Update Plan
-
-## Anti-Drift
-
-Agents MUST actively prevent:
-
-- Mixing Facts and Decision
-- Mixing Plan and Todo
-- Expanding scope beyond Goal
-
-If detected, Agents MUST fix the spec before continuing.
-
-## Summary
-
-Agents operate by:
-
-→ updating spec
-→ maintaining loop consistency
-→ then executing
-
-Agents MUST NOT bypass the spec
+If information is missing or unclear,
+Agent MUST clarify during exploration before execution.
