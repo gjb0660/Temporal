@@ -1,12 +1,6 @@
-# Specs Agents
+# Spec Entry
 
 Agent MUST start from classification.
-
-## Core Principles
-
-1. think in **first principles** and reject heuristics and unverified assumptions
-2. apply **Occam’s Razor** — no unnecessary entities, no backward compatibility.
-3. continuously challenge all inputs through **Socratic questioning** until they align with Goal, Facts, and Acceptance.
 
 ## Read Order
 
@@ -26,17 +20,15 @@ No other entry point is allowed.
 ## Execution Mapping
 
 - Feature:
-  - execute by creating Goal, Non-Goals
-  - execute by updating Facts, Decision, Plan, Progress
-  - execute by verifying Acceptance, Todo
+  execute through the feature spec and keep Goal, Facts, Decision,
+  Acceptance, Plan, and Progress consistent with real work
+
 - Contract:
-  - enforce invariants and detect violations
-  - tighten or relax Invariants, Variation Space
-  - change ui-specific presentation or behavior
+  enforce invariants, detect violations, and update constraints only
+  as contract work
+
 - Knowledge:
-  - extract facts and support reasoning
-  - introduce rationale and support explanation
-  - analyze or research as evidence layers
+  extract facts, support reasoning, and refine reusable understanding
 
 Agents SHOULD minimize the scope of updates.
 
