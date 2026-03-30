@@ -255,7 +255,10 @@ class PreviewBridge(AppBridge):
     def _current_preview_sst_message(self) -> dict[str, Any]:
         frames = self._tracking_frames()
         if not frames:
-            return {"timeStamp": self._sample_window_position * DEFAULT_CHART_SAMPLE_STEP, "src": []}
+            return {
+                "timeStamp": self._sample_window_position * DEFAULT_CHART_SAMPLE_STEP,
+                "src": [],
+            }
         frame = frames[self._sample_window_position % len(frames)]
         sources = [
             {

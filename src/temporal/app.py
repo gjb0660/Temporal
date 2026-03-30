@@ -30,6 +30,7 @@ from temporal.core.ui_projection import (
     compute_sidebar_sources,
     compute_visible_source_ids,
 )
+from temporal.core.source_palette import SourceColorAllocator
 from temporal.core.recording.auto_recorder import AutoRecorder
 from temporal.core.ssh.remote_odas import RemoteOdasController
 from temporal.qml_list_model import QmlListModel
@@ -115,6 +116,7 @@ class AppBridge(QObject):
         self._runtime_chart_time_origin: int | None = None
         self._runtime_chart_last_timestamp: int | None = None
         self._runtime_chart_frames: list[dict[str, Any]] = []
+        self._source_color_allocator = SourceColorAllocator()
 
         self._log_timer = QTimer(self)
         self._log_timer.setInterval(1500)
@@ -644,7 +646,7 @@ class AppBridge(QObject):
             [
                 {
                     "id": int(item["id"]),
-                    "color": item.get("color", "#cf54ea"),
+                    "color": item.get("color", ""),
                     "x": float(item["x"]),
                     "y": float(item["y"]),
                     "z": float(item["z"]),
@@ -885,7 +887,10 @@ class AppBridge(QObject):
             self.sourceItemsChanged.emit()
             self.sourceCountChanged.emit()
 
-        base_sources = [{"id": source_id, "color": "#cf54ea"} for source_id in self._source_ids]
+        base_sources = [
+            {"id": source_id, "color": self._source_color_allocator.color_for(source_id)}
+            for source_id in self._source_ids
+        ]
         sidebar_sources = compute_sidebar_sources(
             base_sources,
             sources_enabled=self._sources_enabled,
@@ -903,7 +908,9 @@ class AppBridge(QObject):
             set(visible_source_ids),
         )
         self._set_source_positions(positions)
-        self._source_rows_model.replace(build_rows_model_items(sidebar_sources, self._selected_source_ids))
+        self._source_rows_model.replace(
+            build_rows_model_items(sidebar_sources, self._selected_source_ids)
+        )
         self._refresh_chart_models(visible_rows, visible_source_ids)
 
     def _refresh_chart_models(
@@ -966,7 +973,9 @@ class AppBridge(QObject):
         }
         self._runtime_chart_frames.append(frame)
         if len(self._runtime_chart_frames) > self._runtime_chart_tick_count:
-            self._runtime_chart_frames = self._runtime_chart_frames[-self._runtime_chart_tick_count :]
+            self._runtime_chart_frames = self._runtime_chart_frames[
+                -self._runtime_chart_tick_count :
+            ]
 
     def _runtime_window_frames(self) -> list[dict[str, Any]]:
         return list(self._runtime_chart_frames)
@@ -976,6 +985,7 @@ class AppBridge(QObject):
         self._runtime_chart_time_origin = None
         self._runtime_chart_last_timestamp = None
         self._runtime_chart_frames = []
+        self._source_color_allocator.reset()
         self._chart_x_ticks_model.replace(self._RUNTIME_CHART_X_TICKS)
         self._elevation_series_model.replace([])
         self._azimuth_series_model.replace([])

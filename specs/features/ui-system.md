@@ -33,6 +33,9 @@ updated: 2026-03-31
 - chart 时间轴以连接首帧 `timeStamp` 归零，并在重连后重新归零。
 - chart 横轴显示单位为 0.01s，刻度以 200 整数步长为主体，最后
   一个刻度显示最新时间。
+- source 颜色语义当前由 bridge 维护“连接内独立分配、重连重置”的
+  状态化分配器输出；右栏、图表与 3D 必须共享该映射。
+- 颜色分配前 4 色当前与 odas_web 基准调色板一致，扩展颜色使用固定表。
 
 ## Decision
 
@@ -43,6 +46,8 @@ updated: 2026-03-31
 - 当前冻结 row、chart 与 3D 的过滤/空态契约，并保持 runtime/preview
   在同一 projection 实现层上演进。
 - chart 时钟由 bridge 维护“原点 + 重连重置”语义，QML 仅消费 ticks。
+- 颜色语义由 bridge allocator 单一维护，MUST NOT 在 projection/QML
+  引入并行颜色业务语义。
 - runtime 在 bridge 层应保持单一行为真源，MUST NOT 并行维护
   两套筛选、模型刷新、状态推导逻辑。
 

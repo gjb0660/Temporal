@@ -16,6 +16,7 @@ from PySide6.QtQml import QQmlComponent, QQmlEngine
 from temporal.app import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
+from temporal.core.source_palette import SOURCE_COLOR_PALETTE
 from temporal.preview_bridge import PreviewBridge
 from temporal.preview_data import DEFAULT_PREVIEW_SCENARIO_KEY, PREVIEW_SCENARIO_KEYS
 from temporal.preview_main import main as preview_main
@@ -175,6 +176,16 @@ class TestPreviewBridge(unittest.TestCase):
             self.assertEqual(
                 {item["sourceId"] for item in azimuth_series}, set(_source_ids(bridge))
             )
+            if expected_count > 1:
+                self.assertGreater(
+                    len({row["badgeColor"] for row in source_rows}),
+                    1,
+                )
+            if expected_count >= 4:
+                self.assertEqual(
+                    [row["badgeColor"] for row in source_rows[:4]],
+                    list(SOURCE_COLOR_PALETTE[:4]),
+                )
 
     def test_preview_scenario_options_are_exposed_in_chinese(self) -> None:
         bridge = PreviewBridge()
@@ -188,6 +199,8 @@ class TestPreviewBridge(unittest.TestCase):
     def test_scenario_switch_resets_selection_and_window(self) -> None:
         bridge = PreviewBridge()
         bridge.setPreviewScenario("hemisphereSpread")
+        before_switch_colors = [row["badgeColor"] for row in _model_items(bridge.sourceRowsModel)]
+        self.assertEqual(before_switch_colors[:4], list(SOURCE_COLOR_PALETTE[:4]))
         bridge.toggleStreams()
         bridge.advancePreviewTick()
         bridge.setSourceSelected(7, False)
@@ -206,6 +219,8 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(sorted(_source_ids(bridge)), [12, 15, 27, 31])
         self.assertTrue(all(row["checked"] for row in _model_items(bridge.sourceRowsModel)))
         self.assertEqual(_scalar_values(bridge.chartXTicksModel)[0], "0")
+        after_switch_colors = [row["badgeColor"] for row in _model_items(bridge.sourceRowsModel)]
+        self.assertEqual(after_switch_colors[:4], list(SOURCE_COLOR_PALETTE[:4]))
         self.assertEqual(bridge.remoteLogText, "等待连接远程 odaslive...\n当前场景：赤道边界")
 
     def test_unknown_preview_scenario_is_ignored(self) -> None:
@@ -284,6 +299,10 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.toggleStreams()
         self.assertEqual(_scalar_values(bridge.chartXTicksModel), initial_ticks)
         self.assertEqual(_model_items(bridge.sourcePositionsModel), initial_positions)
+        self.assertEqual(
+            [item["badgeColor"] for item in _model_items(bridge.sourceRowsModel)[:4]],
+            list(SOURCE_COLOR_PALETTE[:4]),
+        )
 
     def test_advance_preview_tick_updates_ticks_series_and_positions(self) -> None:
         bridge = PreviewBridge()
@@ -321,7 +340,9 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(bridge.potentialsEnabled)
         self.assertEqual(bridge.potentialEnergyMin, 0.8)
         self.assertEqual(bridge.potentialEnergyMax, 1.0)
-        self.assertEqual([item["sourceId"] for item in _model_items(bridge.sourceRowsModel)], [7, 15, 21, 31])
+        self.assertEqual(
+            [item["sourceId"] for item in _model_items(bridge.sourceRowsModel)], [7, 15, 21, 31]
+        )
         self.assertEqual(_source_ids(bridge), [7, 15, 21, 31])
 
 

@@ -48,7 +48,7 @@ def build_rows_model_items(
             "checked": int(source["id"]) in selected_source_ids,
             "enabled": True,
             "badge": str(int(source["id"])),
-            "badgeColor": str(source.get("color", "#cf54ea")),
+            "badgeColor": str(source.get("color", "")),
         }
         for source in sidebar_sources
     ]
@@ -62,7 +62,7 @@ def build_positions_model_items(
     return [
         {
             "id": source_id,
-            "color": str(visible_rows[source_id].get("color", "#cf54ea")),
+            "color": str(visible_rows[source_id].get("color", "")),
             "x": float(frame_source["x"]),
             "y": float(frame_source["y"]),
             "z": float(frame_source["z"]),
@@ -119,7 +119,7 @@ def build_chart_series(
     return [
         {
             "sourceId": source_id,
-            "color": str(visible_rows[source_id].get("color", "#cf54ea")),
+            "color": str(visible_rows[source_id].get("color", "")),
             "valuesJson": json.dumps(values),
         }
         for source_id, values in values_by_source.items()

@@ -5,6 +5,7 @@ from unittest.mock import patch
 from temporal.app import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
+from temporal.core.source_palette import SOURCE_COLOR_PALETTE
 from temporal.preview_bridge import PreviewBridge
 
 
@@ -122,6 +123,13 @@ class TestProjectionParity(unittest.TestCase):
         self.assertEqual(
             [item["id"] for item in _model_items(runtime.sourcePositionsModel)],
             [item["id"] for item in _model_items(preview.sourcePositionsModel)],
+        )
+        self.assertEqual(
+            [item["color"] for item in _model_items(runtime.sourcePositionsModel)],
+            [item["color"] for item in _model_items(preview.sourcePositionsModel)],
+        )
+        self.assertEqual(
+            _model_items(runtime.sourcePositionsModel)[0]["color"], SOURCE_COLOR_PALETTE[0]
         )
         self.assertEqual(
             [item["value"] for item in _model_items(runtime.chartXTicksModel)],
