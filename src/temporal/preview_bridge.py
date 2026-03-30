@@ -4,152 +4,132 @@ from __future__ import annotations
 
 from typing import Any
 
-from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
+from PySide6.QtCore import Property, QTimer, Signal, Slot
 
+from temporal.app import AppBridge
+from temporal.core.chart_time import DEFAULT_CHART_SAMPLE_STEP
+from temporal.core.config_loader import TemporalConfig
+from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
+from temporal.core.ssh.remote_odas import CommandResult
 from temporal.preview_data import (
     DEFAULT_PREVIEW_SCENARIO_KEY,
     get_preview_scenario,
     preview_scenario_keys,
     preview_scenario_options,
 )
-from temporal.core.ui_projection import (
-    build_chart_series,
-    build_chart_ticks,
-    build_positions_model_items,
-    build_rows_model_items,
-    compute_sidebar_sources,
-    compute_visible_source_ids,
-)
-from temporal.qml_list_model import QmlListModel
 
 
-class PreviewBridge(QObject):
-    statusChanged = Signal()
-    remoteConnectedChanged = Signal()
-    odasRunningChanged = Signal()
-    streamsActiveChanged = Signal()
-    sourceIdsChanged = Signal()
-    sourcesEnabledChanged = Signal()
-    potentialsEnabledChanged = Signal()
-    potentialRangeChanged = Signal()
+class _PreviewRecorder:
+    def __init__(self) -> None:
+        self._active: set[int] = set()
+
+    def stop_all(self) -> None:
+        self._active.clear()
+
+    def sessions_snapshot(self) -> list[Any]:
+        return []
+
+    def update_active_sources(self, source_ids: list[int]) -> None:
+        self._active = {int(source_id) for source_id in source_ids if int(source_id) > 0}
+
+    def sweep_inactive(self) -> list[int]:
+        return []
+
+    def active_sources(self) -> set[int]:
+        return set(self._active)
+
+    def push(self, _source_id: int, _mode: str, _pcm_chunk: bytes) -> None:
+        return
+
+
+class _PreviewClient:
+    def __init__(self) -> None:
+        self.started = False
+
+    def start(self) -> None:
+        self.started = True
+
+    def stop(self) -> None:
+        self.started = False
+
+
+class _PreviewRemoteController:
+    def __init__(self) -> None:
+        self.connected = True
+        self.running = False
+        self.log_lines = ["等待连接远程 odaslive..."]
+
+    def connect(self) -> None:
+        self.connected = True
+
+    def is_connected(self) -> bool:
+        return self.connected
+
+    def start_odaslive(self) -> CommandResult:
+        self.running = True
+        return CommandResult(code=0, stdout="preview\n", stderr="")
+
+    def stop_odaslive(self) -> CommandResult:
+        self.running = False
+        return CommandResult(code=0, stdout="", stderr="")
+
+    def status(self) -> CommandResult:
+        return CommandResult(code=0, stdout="preview\n" if self.running else "", stderr="")
+
+    def read_log_tail(self, _lines: int = 80) -> CommandResult:
+        return CommandResult(code=0, stdout="\n".join(self.log_lines), stderr="")
+
+
+def _preview_config() -> TemporalConfig:
+    remote = RemoteOdasConfig(
+        host="127.0.0.1",
+        port=22,
+        username="preview",
+        private_key=None,
+        odas_command="preview-odaslive",
+        odas_args=[],
+        odas_cwd=None,
+        odas_log="preview.log",
+    )
+    streams = OdasStreamConfig(
+        sst=OdasEndpoint(host="127.0.0.1", port=9000),
+        ssl=OdasEndpoint(host="127.0.0.1", port=9001),
+        sss_sep=OdasEndpoint(host="127.0.0.1", port=10000),
+        sss_pf=OdasEndpoint(host="127.0.0.1", port=10010),
+    )
+    return TemporalConfig(remote=remote, streams=streams)
+
+
+class PreviewBridge(AppBridge):
     previewModeChanged = Signal()
     previewScenarioKeyChanged = Signal()
     previewScenarioKeysChanged = Signal()
-    remoteLogTextChanged = Signal()
 
     def __init__(self) -> None:
-        super().__init__()
-        self._status = "Temporal 就绪"
-        self._remote_connected = False
-        self._odas_running = False
-        self._streams_active = False
-        self._sources_enabled = True
-        self._potentials_enabled = False
-        self._potential_min = 0.0
-        self._potential_max = 1.0
+        self._preview_remote = _PreviewRemoteController()
+        self._preview_client = _PreviewClient()
+        self._preview_recorder = _PreviewRecorder()
+        super().__init__(
+            cfg=_preview_config(),
+            remote=self._preview_remote,
+            client=self._preview_client,
+            recorder=self._preview_recorder,
+        )
+
         self._preview_scenario_keys = preview_scenario_keys()
         self._preview_scenario_key = DEFAULT_PREVIEW_SCENARIO_KEY
         self._scenario = get_preview_scenario(self._preview_scenario_key)
-        self._selected_source_ids: set[int] = set()
         self._sample_window_position = 0
-        self._preview_chart_sample_step = 200
-        self._remote_log_lines = ["等待连接远程 odaslive...", "当前处于预览模式"]
-
-        self._source_rows_model = QmlListModel(
-            ["sourceId", "label", "checked", "enabled", "badge", "badgeColor"], self
-        )
-        self._source_positions_model = QmlListModel(["id", "color", "x", "y", "z"], self)
-        self._elevation_series_model = QmlListModel(["sourceId", "color", "valuesJson"], self)
-        self._azimuth_series_model = QmlListModel(["sourceId", "color", "valuesJson"], self)
-        self._preview_scenario_options_model = QmlListModel(["key", "label"], self)
-        self._chart_x_ticks_model = QmlListModel(["value"], self)
-        self._header_nav_labels_model = QmlListModel(["value"], self)
-        self._recording_sessions_model = QmlListModel(["value"], self)
         self._preview_tick_timer = QTimer(self)
         self._preview_tick_timer.timeout.connect(self.advancePreviewTick)
 
         self._preview_scenario_options_model.replace(preview_scenario_options())
-        self._chart_x_ticks_model.replace([])
-        self._header_nav_labels_model.replace([])
-        self._recording_sessions_model.replace([])
-
+        self._set_remote_connected(self._preview_remote.is_connected())
         self._reset_selected_sources()
         self._reset_preview_sample_window()
         self._apply_scenario_metadata()
-        self._refresh_preview_models()
-
-    @Property(str, notify=statusChanged)  # type: ignore[reportCallIssue]
-    def status(self) -> str:
-        return self._status
-
-    @Property(bool, notify=remoteConnectedChanged)  # type: ignore[reportCallIssue]
-    def remoteConnected(self) -> bool:
-        return self._remote_connected
-
-    @Property(bool, notify=odasRunningChanged)  # type: ignore[reportCallIssue]
-    def odasRunning(self) -> bool:
-        return self._odas_running
-
-    @Property(bool, notify=streamsActiveChanged)  # type: ignore[reportCallIssue]
-    def streamsActive(self) -> bool:
-        return self._streams_active
-
-    @Property(list, notify=sourceIdsChanged)  # type: ignore[reportCallIssue]
-    def sourceIds(self) -> list[int]:
-        sidebar_sources = self._sidebar_sources()
-        return compute_visible_source_ids(sidebar_sources, self._selected_source_ids)
-
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def sourceRowsModel(self) -> QmlListModel:
-        return self._source_rows_model
-
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def sourcePositionsModel(self) -> QmlListModel:
-        return self._source_positions_model
-
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def elevationSeriesModel(self) -> QmlListModel:
-        return self._elevation_series_model
-
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def azimuthSeriesModel(self) -> QmlListModel:
-        return self._azimuth_series_model
-
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def previewScenarioOptionsModel(self) -> QmlListModel:
-        return self._preview_scenario_options_model
-
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def chartXTicksModel(self) -> QmlListModel:
-        return self._chart_x_ticks_model
-
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def headerNavLabelsModel(self) -> QmlListModel:
-        return self._header_nav_labels_model
-
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def recordingSessionsModel(self) -> QmlListModel:
-        return self._recording_sessions_model
-
-    @Property(str, notify=remoteLogTextChanged)  # type: ignore[reportCallIssue]
-    def remoteLogText(self) -> str:
-        return "\n".join(self._remote_log_lines)
-
-    @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
-    def sourcesEnabled(self) -> bool:
-        return self._sources_enabled
-
-    @Property(bool, notify=potentialsEnabledChanged)  # type: ignore[reportCallIssue]
-    def potentialsEnabled(self) -> bool:
-        return self._potentials_enabled
-
-    @Property(float, notify=potentialRangeChanged)  # type: ignore[reportCallIssue]
-    def potentialEnergyMin(self) -> float:
-        return self._potential_min
-
-    @Property(float, notify=potentialRangeChanged)  # type: ignore[reportCallIssue]
-    def potentialEnergyMax(self) -> float:
-        return self._potential_max
+        self._refresh_preview_models(reset_chart=True)
+        self.setStatus(str(self._scenario.get("status", "Temporal 就绪")))
 
     @Property(bool, notify=previewModeChanged)  # type: ignore[reportCallIssue]
     def previewMode(self) -> bool:
@@ -168,83 +148,25 @@ class PreviewBridge(QObject):
         return True
 
     @Slot()
-    def toggleRemoteOdas(self) -> None:
-        if self._odas_running:
-            if self._streams_active:
-                self._stop_preview_streams()
-            self._odas_running = False
-            self.odasRunningChanged.emit()
-            self._set_status("远程 odaslive 已停止")
-            self._set_remote_log_lines(["等待连接远程 odaslive...", "远程 odaslive 已停止"])
-            return
-
+    def startStreams(self) -> None:
+        was_active = self._streams_active
+        super().startStreams()
         if not self._streams_active:
-            self._start_preview_streams()
-        if not self._remote_connected:
-            self._remote_connected = True
-            self.remoteConnectedChanged.emit()
-        self._odas_running = True
-        self.odasRunningChanged.emit()
-        self._set_status("远程 odaslive 已启动")
-        self._set_remote_log_lines(["远程 odaslive 已启动", "正在监听 SST/SSL/SSS 数据流"])
+            return
+        if not was_active:
+            self._reset_preview_sample_window()
+            self._refresh_preview_models(reset_chart=True)
+        self._preview_tick_timer.setInterval(self._sample_window_config()["timerIntervalMs"])
+        if not self._preview_tick_timer.isActive():
+            self._preview_tick_timer.start()
+        self._apply_state_status()
 
     @Slot()
-    def toggleStreams(self) -> None:
-        if self._streams_active:
-            self._stop_preview_streams()
-            return
-        self._start_preview_streams()
-
-    @Slot(int, bool)
-    def setSourceSelected(self, source_id: int, selected: bool) -> None:
-        valid_source_ids = {int(source["id"]) for source in self._scenario_sources()}
-        if source_id not in valid_source_ids:
-            return
-
-        if selected:
-            if source_id in self._selected_source_ids:
-                return
-            self._selected_source_ids.add(source_id)
-        else:
-            if source_id not in self._selected_source_ids:
-                return
-            self._selected_source_ids.remove(source_id)
-
-        self._refresh_preview_models()
-
-    @Slot(int, result=bool)
-    def isSourceSelected(self, source_id: int) -> bool:
-        return source_id in self._selected_source_ids
-
-    @Slot(bool)
-    def setSourcesEnabled(self, enabled: bool) -> None:
-        if self._sources_enabled == enabled:
-            return
-        self._sources_enabled = enabled
-        self.sourcesEnabledChanged.emit()
-        self._set_status("声源筛选已更新")
-        self._refresh_preview_models()
-
-    @Slot(bool)
-    def setPotentialsEnabled(self, enabled: bool) -> None:
-        if self._potentials_enabled == enabled:
-            return
-        self._potentials_enabled = enabled
-        self.potentialsEnabledChanged.emit()
-        self._set_status("候选点筛选已更新")
-        self._refresh_preview_models()
-
-    @Slot(float, float)
-    def setPotentialEnergyRange(self, minimum: float, maximum: float) -> None:
-        low = min(minimum, maximum)
-        high = max(minimum, maximum)
-        if self._potential_min == low and self._potential_max == high:
-            return
-        self._potential_min = low
-        self._potential_max = high
-        self.potentialRangeChanged.emit()
-        self._set_status("候选声源能量范围已更新")
-        self._refresh_preview_models()
+    def stopStreams(self) -> None:
+        if self._preview_tick_timer.isActive():
+            self._preview_tick_timer.stop()
+        super().stopStreams()
+        self._set_remote_log_lines(self._scenario_remote_lines())
 
     @Slot(str)
     def setPreviewScenario(self, key: str) -> None:
@@ -252,7 +174,7 @@ class PreviewBridge(QObject):
             return
 
         was_streaming = self._streams_active
-        if was_streaming:
+        if was_streaming and self._preview_tick_timer.isActive():
             self._preview_tick_timer.stop()
 
         self._preview_scenario_key = key
@@ -261,21 +183,25 @@ class PreviewBridge(QObject):
         self._reset_preview_sample_window()
         self._apply_scenario_metadata()
         self.previewScenarioKeyChanged.emit()
-        self._refresh_preview_models()
+        self.previewModeChanged.emit()
+        self.previewStateChanged.emit()
+        self._refresh_preview_models(reset_chart=True)
 
         if was_streaming:
             self._preview_tick_timer.setInterval(self._sample_window_config()["timerIntervalMs"])
             self._preview_tick_timer.start()
+            self._apply_state_status()
+            return
+
+        self.setStatus(str(self._scenario.get("status", "Temporal 就绪")))
 
     @Slot()
     def advancePreviewTick(self) -> None:
         if not self._streams_active:
             return
-
-        frame_count = len(self._tracking_frames())
-        if frame_count <= 0:
+        frames = self._tracking_frames()
+        if not frames:
             return
-
         advance_per_tick = max(1, int(self._sample_window_config()["advancePerTick"]))
         self._sample_window_position += advance_per_tick
         self._refresh_preview_models()
@@ -286,18 +212,6 @@ class PreviewBridge(QObject):
     def _tracking_frames(self) -> list[dict[str, Any]]:
         frames = self._scenario.get("trackingFrames", [])
         return list(frames) if isinstance(frames, list) else []
-
-    def _sidebar_sources(self) -> list[dict[str, Any]]:
-        return compute_sidebar_sources(
-            self._scenario_sources(),
-            sources_enabled=self._sources_enabled,
-            potentials_enabled=self._potentials_enabled,
-            potential_min=self._potential_min,
-            potential_max=self._potential_max,
-        )
-
-    def _visible_source_ids(self) -> list[int]:
-        return compute_visible_source_ids(self._sidebar_sources(), self._selected_source_ids)
 
     def _reset_selected_sources(self) -> None:
         self._selected_source_ids = {int(source["id"]) for source in self._scenario_sources()}
@@ -310,125 +224,55 @@ class PreviewBridge(QObject):
         if not isinstance(raw, dict):
             raw = {}
         return {
-            "sampleStart": int(raw.get("sampleStart", 0)),
-            "sampleStep": max(1, int(raw.get("sampleStep", 1))),
             "windowSize": max(1, int(raw.get("windowSize", 1))),
             "tickCount": max(1, int(raw.get("tickCount", 1))),
-            "tickStride": max(1, int(raw.get("tickStride", 1))),
             "advancePerTick": max(1, int(raw.get("advancePerTick", 1))),
             "timerIntervalMs": max(50, int(raw.get("timerIntervalMs", 400))),
         }
 
+    def _scenario_remote_lines(self) -> list[str]:
+        lines = self._scenario.get("remoteLogLines", ["等待连接远程 odaslive..."])
+        return list(lines) if isinstance(lines, list) else ["等待连接远程 odaslive..."]
+
     def _apply_scenario_metadata(self) -> None:
-        self._set_status(str(self._scenario.get("status", "Temporal 就绪")))
-        self._set_remote_log_lines(
-            list(self._scenario.get("remoteLogLines", ["等待连接远程 odaslive..."]))
-        )
+        lines = self._scenario_remote_lines()
+        self._preview_remote.log_lines = lines
+        self._set_remote_log_lines(lines)
 
-    def _start_preview_streams(self) -> None:
-        self._reset_preview_sample_window()
-        self._streams_active = True
-        self.streamsActiveChanged.emit()
-        self._preview_tick_timer.setInterval(self._sample_window_config()["timerIntervalMs"])
-        self._preview_tick_timer.start()
-        if self._odas_running:
-            self._set_remote_log_lines(["远程 odaslive 已启动", "正在监听 SST/SSL/SSS 数据流"])
-        else:
-            self._set_remote_log_lines(["本地 listener 已开启", "等待远程 odaslive 接入"])
-        self._set_status("正在监听 SST/SSL/SSS 数据流")
-        self._refresh_preview_models()
-
-    def _stop_preview_streams(self) -> None:
-        if not self._streams_active:
-            return
-        self._preview_tick_timer.stop()
-        self._streams_active = False
-        self.streamsActiveChanged.emit()
-        if self._odas_running:
-            self._set_remote_log_lines(["远程 odaslive 已启动", "已停止监听 SST/SSL/SSS 数据流"])
-        else:
-            self._set_remote_log_lines(["本地 listener 已关闭", "等待连接远程 odaslive..."])
-        self._set_status("数据流已关闭")
-
-    def _refresh_preview_models(self) -> None:
-        sidebar_sources = self._sidebar_sources()
-        visible_rows = {int(source["id"]): source for source in sidebar_sources}
-        visible_source_ids = self._visible_source_ids()
-        current_frame_sources = self._current_frame_sources()
-
-        self._source_rows_model.replace(build_rows_model_items(sidebar_sources, self._selected_source_ids))
-        self._source_positions_model.replace(
-            build_positions_model_items(current_frame_sources, visible_rows, set(visible_source_ids))
-        )
-        self._recording_sessions_model.replace([])
-        self.sourceIdsChanged.emit()
-        self._refresh_chart_models(visible_rows, visible_source_ids)
-
-    def _refresh_chart_models(
-        self,
-        visible_rows: dict[int, dict[str, Any]],
-        visible_source_ids: list[int],
-    ) -> None:
-        window_frames = self._window_frames()
+    def _refresh_preview_models(self, *, reset_chart: bool = False) -> None:
         config = self._sample_window_config()
-        self._chart_x_ticks_model.replace(
-            build_chart_ticks(
-                window_frames,
-                tick_count=config["tickCount"],
-                fallback_sample_start=0,
-                fallback_sample_step=self._preview_chart_sample_step,
-            )
-        )
-        self._elevation_series_model.replace(
-            build_chart_series(window_frames, visible_rows, visible_source_ids, axis="elevation")
-        )
-        self._azimuth_series_model.replace(
-            build_chart_series(window_frames, visible_rows, visible_source_ids, axis="azimuth")
-        )
+        self._runtime_chart_tick_count = max(1, int(config["tickCount"]))
+        self._runtime_chart_sample_step = DEFAULT_CHART_SAMPLE_STEP
+        if reset_chart:
+            self._reset_runtime_chart_clock()
+        sst = self._current_preview_sst_message()
+        self._last_sst = sst
+        self._append_runtime_chart_frame(sst)
+        self._refresh_sources()
+        self._last_ssl = self._current_preview_ssl_message()
+        self._refresh_potentials()
 
-    def _window_frames(self) -> list[dict[str, Any]]:
+    def _current_preview_sst_message(self) -> dict[str, Any]:
         frames = self._tracking_frames()
         if not frames:
-            return []
-        config = self._sample_window_config()
-        window_size = max(config["windowSize"], config["tickCount"])
-        frame_count = len(frames)
-        start_position = self._sample_window_position
-        return [
-            {
-                "sample": (start_position + index) * self._preview_chart_sample_step,
-                "sources": list(frames[(start_position + index) % frame_count].get("sources", [])),
-            }
-            for index in range(window_size)
-        ]
-
-    def _current_frame_sources(self) -> dict[int, dict[str, float]]:
-        frames = self._tracking_frames()
-        if not frames:
-            return {}
+            return {"timeStamp": self._sample_window_position * DEFAULT_CHART_SAMPLE_STEP, "src": []}
         frame = frames[self._sample_window_position % len(frames)]
-        items: dict[int, dict[str, float]] = {}
-        for source in frame.get("sources", []):
-            if not isinstance(source, dict):
-                continue
-            source_id = source.get("id")
-            if not isinstance(source_id, int):
-                continue
-            items[source_id] = {
+        sources = [
+            {
+                "id": int(source.get("id", 0)),
                 "x": float(source.get("x", 0.0)),
                 "y": float(source.get("y", 0.0)),
                 "z": float(source.get("z", 0.0)),
             }
-        return items
+            for source in frame.get("sources", [])
+            if isinstance(source, dict)
+        ]
+        return {
+            "timeStamp": self._sample_window_position * DEFAULT_CHART_SAMPLE_STEP,
+            "src": sources,
+        }
 
-    def _set_status(self, status: str) -> None:
-        if self._status == status:
-            return
-        self._status = status
-        self.statusChanged.emit()
-
-    def _set_remote_log_lines(self, lines: list[str]) -> None:
-        if self._remote_log_lines == lines:
-            return
-        self._remote_log_lines = lines
-        self.remoteLogTextChanged.emit()
+    def _current_preview_ssl_message(self) -> dict[str, Any]:
+        return {
+            "src": [{"E": float(source.get("energy", 0.0))} for source in self._scenario_sources()]
+        }

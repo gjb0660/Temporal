@@ -10,7 +10,11 @@ from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
-from temporal.core.config_loader import load_config
+from temporal.core.config_loader import TemporalConfig, load_config
+from temporal.core.chart_time import (
+    DEFAULT_CHART_SAMPLE_STEP,
+    build_default_chart_ticks,
+)
 from temporal.core.network.odas_client import OdasClient
 from temporal.core.network.odas_message_view import (
     build_source_items,
@@ -36,18 +40,7 @@ class AppBridge(QObject):
     _AUDIO_SAMPLE_WIDTH = 2
     _STARTUP_VERIFY_INTERVAL_MS = 200
     _STARTUP_VERIFY_ATTEMPTS = 11
-    _RUNTIME_CHART_X_TICKS = [
-        "0",
-        "200",
-        "400",
-        "600",
-        "800",
-        "1000",
-        "1200",
-        "1400",
-        "1600",
-        "1800",
-    ]
+    _RUNTIME_CHART_X_TICKS = build_default_chart_ticks()
     _HEADER_NAV_LABELS = ["配置", "录制", "相机"]
     _EMPTY_REMOTE_LOG = ["等待连接远程 odaslive..."]
 
@@ -71,21 +64,28 @@ class AppBridge(QObject):
     potentialRangeChanged = Signal()
     previewStateChanged = Signal()
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        cfg: TemporalConfig | None = None,
+        remote: Any | None = None,
+        client: Any | None = None,
+        recorder: Any | None = None,
+    ) -> None:
         super().__init__()
         self._status = "Temporal 就绪"
         self._root = Path(__file__).resolve().parents[2]
         self._cfg_path = self._root / "config" / "odas.example.toml"
-        self._cfg = load_config(self._cfg_path)
-        self._remote = RemoteOdasController(self._cfg.remote, self._cfg.streams)
-        self._client = OdasClient(
+        self._cfg = cfg or load_config(self._cfg_path)
+        self._remote = remote or RemoteOdasController(self._cfg.remote, self._cfg.streams)
+        self._client = client or OdasClient(
             config=self._cfg.streams,
             on_sst=self._on_sst,
             on_ssl=self._on_ssl,
             on_sep_audio=self._on_sep_audio,
             on_pf_audio=self._on_pf_audio,
         )
-        self._recorder = AutoRecorder(self._root / "recordings")
+        self._recorder = recorder or AutoRecorder(self._root / "recordings")
 
         self._last_sst: dict = {}
         self._last_ssl: dict = {}
@@ -110,7 +110,7 @@ class AppBridge(QObject):
         self._startup_attempts_remaining = 0
         self._startup_failure_hint = ""
         self._runtime_chart_tick_count = len(self._RUNTIME_CHART_X_TICKS)
-        self._runtime_chart_sample_step = 200
+        self._runtime_chart_sample_step = DEFAULT_CHART_SAMPLE_STEP
         self._runtime_chart_next_fallback_sample = 0
         self._runtime_chart_time_origin: int | None = None
         self._runtime_chart_last_timestamp: int | None = None

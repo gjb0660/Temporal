@@ -24,7 +24,7 @@ updated: 2026-03-31
 - runtime `AppBridge` 目前已经稳定投影 `sourceRowsModel`、
   `sourcePositionsModel`、`elevationSeriesModel`、`azimuthSeriesModel`
   与筛选状态。
-- runtime 与 preview 已共享 `core/ui_projection.py` 的 row / positions /
+- runtime 使用 `core/ui_projection.py` 的 row / positions /
   chart ticks / series 计算实现。
 - preview 仍保留 scenario 数据与 tick 推进驱动职责；runtime 仍保留
   SST 输入与 frame window 维护职责。
@@ -43,6 +43,8 @@ updated: 2026-03-31
 - 当前冻结 row、chart 与 3D 的过滤/空态契约，并保持 runtime/preview
   在同一 projection 实现层上演进。
 - chart 时钟由 bridge 维护“原点 + 重连重置”语义，QML 仅消费 ticks。
+- runtime 在 bridge 层应保持单一行为真源，MUST NOT 并行维护
+  两套筛选、模型刷新、状态推导逻辑。
 
 ## Acceptance
 

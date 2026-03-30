@@ -14,8 +14,6 @@ PREVIEW_SCENARIO_KEYS = (
 )
 
 _DEFAULT_SAMPLE_WINDOW = {
-    "sampleStart": 0,
-    "sampleStep": 200,
     "windowSize": 10,
     "tickCount": 10,
     "tickStride": 1,
@@ -39,7 +37,6 @@ def _build_tracking_frames(
 
     for frame_index in range(frame_count):
         ratio = frame_index / frame_count
-        sample = sample_window["sampleStart"] + frame_index * sample_window["sampleStep"]
         sources: list[dict[str, Any]] = []
 
         for anchor in anchors:
@@ -55,7 +52,7 @@ def _build_tracking_frames(
             )
             sources.append({"id": source_id, "x": x, "y": y, "z": z})
 
-        frames.append({"sample": sample, "sources": sources})
+        frames.append({"sources": sources})
 
     return frames
 

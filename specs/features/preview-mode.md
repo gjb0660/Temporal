@@ -20,11 +20,13 @@ updated: 2026-03-31
 - preview 与 production 需要共享同一份主界面布局。
 - preview 需要独立入口、独立 bridge 与本地安全控制行为。
 - preview fixture 数据必须保留在 Python 真源，而不是散落在 QML 层。
-- `PreviewBridge` 当前维护 scenario、selection 与 sample window 驱动；
-  row / positions / chart 投影计算已下沉到 shared projection layer。
+- `PreviewBridge` 当前维护 scenario、selection 与 sample window 推进驱动；
+  通过复用 `AppBridge` 的共享行为层完成 row / positions / chart 投影。
 - preview 与 production 当前共享 bridge 契约名称、目标语义与投影实现层。
 - preview chart 时间窗语义当前与 runtime 对齐：单位 `0.01s`、主体刻度
   步长 `200`、最后刻度显示最新时间、重启/切换后归零。
+- preview fixture 仅作为 source 位置数据真源；chart 时间轴由 bridge + shared
+  chart-time 规则统一生成，不再以 fixture 内绝对 sample 作为显示真源。
 - preview 允许保持 fixture 数据源与 runtime 不同，但不允许在 chart 语义
   上继续漂移。
 
@@ -32,6 +34,7 @@ updated: 2026-03-31
 
 - 通过独立 `temporal-preview` 入口启动共享 `Main.qml`。
 - 使用 `PreviewBridge` 承接 preview 模式下的安全 no-op 控制与状态输出。
+- `PreviewBridge` 以 `AppBridge` 作为行为真源，除数据来源外不得分叉 bridge 逻辑。
 - 保持 preview 对 `ui-system` 的语义对齐目标，并将展示投影统一委托给 shared projection layer。
 - 保持 preview 与 runtime 除数据来源外的 chart 语义一致，不在 QML 层引入分支逻辑。
 

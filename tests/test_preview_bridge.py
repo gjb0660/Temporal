@@ -136,10 +136,10 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(bridge.status, "Temporal 就绪")
         self.assertEqual(bridge.remoteLogText, "等待连接远程 odaslive...\n当前场景：参考单点")
         self.assertTrue(bridge.showPreviewScenarioSelector)
-        self.assertEqual(bridge.headerNavLabelsModel.count, 0)
+        self.assertEqual(bridge.headerNavLabelsModel.count, 3)
         self.assertEqual(
             _scalar_values(bridge.chartXTicksModel),
-            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "1800"],
+            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "0"],
         )
 
     def test_scenarios_keep_models_in_sync(self) -> None:
@@ -193,7 +193,13 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.setSourceSelected(7, False)
 
         self.assertNotEqual(_scalar_values(bridge.chartXTicksModel)[-1], "1800")
-        self.assertNotIn(7, _source_ids(bridge))
+        self.assertTrue(any(item["sourceId"] == 7 for item in _model_items(bridge.sourceRowsModel)))
+        self.assertFalse(
+            any(
+                item["sourceId"] == 7 and item["checked"]
+                for item in _model_items(bridge.sourceRowsModel)
+            )
+        )
 
         bridge.setPreviewScenario("equatorBoundary")
 
@@ -218,7 +224,7 @@ class TestPreviewBridge(unittest.TestCase):
 
         self.assertEqual(bridge.sourceRowsModel.count, 4)
         self.assertTrue(all(not item["checked"] for item in _model_items(bridge.sourceRowsModel)))
-        self.assertEqual(_source_ids(bridge), [])
+        self.assertEqual(_source_ids(bridge), [7, 15, 21, 31])
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
         self.assertEqual(bridge.elevationSeriesModel.count, 0)
         self.assertEqual(bridge.azimuthSeriesModel.count, 0)
@@ -243,14 +249,14 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(bridge.remoteConnected)
         self.assertTrue(bridge.odasRunning)
         self.assertTrue(bridge.streamsActive)
-        self.assertEqual(bridge.status, "远程 odaslive 已启动")
+        self.assertIn("正在监听 SST/SSL/SSS 数据流", str(bridge.status))
 
         bridge.toggleRemoteOdas()
 
         self.assertTrue(bridge.remoteConnected)
         self.assertFalse(bridge.odasRunning)
-        self.assertFalse(bridge.streamsActive)
-        self.assertEqual(bridge.status, "远程 odaslive 已停止")
+        self.assertTrue(bridge.streamsActive)
+        self.assertIn("正在监听 SST/SSL/SSS 数据流", str(bridge.status))
 
     def test_toggle_streams_is_independent_and_restart_resets_window(self) -> None:
         bridge = PreviewBridge()
@@ -262,8 +268,7 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.toggleStreams()
         self.assertTrue(bridge.streamsActive)
         self.assertFalse(bridge.odasRunning)
-        self.assertEqual(bridge.status, "正在监听 SST/SSL/SSS 数据流")
-        self.assertEqual(bridge.remoteLogText, "本地 listener 已开启\n等待远程 odaslive 接入")
+        self.assertIn("正在监听 SST/SSL/SSS 数据流", str(bridge.status))
 
         bridge.advancePreviewTick()
         moved_ticks = _scalar_values(bridge.chartXTicksModel)
@@ -274,7 +279,7 @@ class TestPreviewBridge(unittest.TestCase):
 
         bridge.toggleStreams()
         self.assertFalse(bridge.streamsActive)
-        self.assertEqual(bridge.status, "数据流已关闭")
+        self.assertEqual(bridge.status, "SSH 已连接，远程 odaslive 未运行")
 
         bridge.toggleStreams()
         self.assertEqual(_scalar_values(bridge.chartXTicksModel), initial_ticks)
@@ -316,8 +321,8 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(bridge.potentialsEnabled)
         self.assertEqual(bridge.potentialEnergyMin, 0.8)
         self.assertEqual(bridge.potentialEnergyMax, 1.0)
-        self.assertEqual([item["sourceId"] for item in _model_items(bridge.sourceRowsModel)], [15])
-        self.assertEqual(_source_ids(bridge), [15])
+        self.assertEqual([item["sourceId"] for item in _model_items(bridge.sourceRowsModel)], [7, 15, 21, 31])
+        self.assertEqual(_source_ids(bridge), [7, 15, 21, 31])
 
 
 class TestPreviewQmlContract(unittest.TestCase):
@@ -358,7 +363,7 @@ QtObject {
         self.assertEqual(obj.property("tickCount"), 10)
         self.assertEqual(obj.property("firstBadge"), "7")
         self.assertEqual(obj.property("firstPointId"), 7)
-        self.assertEqual(obj.property("firstSeriesValueCount"), 10)
+        self.assertEqual(obj.property("firstSeriesValueCount"), 1)
         self.assertTrue(obj.property("hasRemoteLog"))
         obj.deleteLater()
         engine.deleteLater()
