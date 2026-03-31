@@ -126,6 +126,7 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(bridge.previewMode)
         self.assertEqual(bridge.previewScenarioKey, DEFAULT_PREVIEW_SCENARIO_KEY)
         self.assertEqual(bridge.previewScenarioKeys, list(PREVIEW_SCENARIO_KEYS))
+        self.assertFalse(bridge.odasStarting)
         self.assertEqual(len(source_rows), 1)
         self.assertEqual(source_rows[0]["sourceId"], 15)
         self.assertEqual(source_rows[0]["label"], "声源")
@@ -370,6 +371,7 @@ QtObject {
     property int firstPointId: bridge.sourcePositionsModel.get(0).id
     property int firstSeriesValueCount: JSON.parse(bridge.elevationSeriesModel.get(0).valuesJson).length
     property bool hasRemoteLog: bridge.remoteLogText.length > 0
+    property bool odasStartingDefaultFalse: bridge.odasStarting === false
 }
 """,
             QUrl(),
@@ -386,6 +388,7 @@ QtObject {
         self.assertEqual(obj.property("firstPointId"), 7)
         self.assertEqual(obj.property("firstSeriesValueCount"), 1)
         self.assertTrue(obj.property("hasRemoteLog"))
+        self.assertTrue(obj.property("odasStartingDefaultFalse"))
         obj.deleteLater()
         engine.deleteLater()
         self._app.processEvents()

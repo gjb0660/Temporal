@@ -308,6 +308,49 @@ class TestRemoteOdasController(unittest.TestCase):
             'while kill -0 -- "-$pid" 2>/dev/null || kill -0 "$pid" 2>/dev/null; do', helper
         )
 
+    def test_helper_shell_uses_pid_only_running_truth_without_proc_identity_checks(self) -> None:
+        controller = RemoteOdasController(
+            _make_config(odas_command="./build/bin/odaslive", odas_args=["-c", "config/odas.cfg"]),
+            _make_streams(),
+        )
+
+        helper = controller._helper_shell
+
+        self.assertIn('if [ ! -f "$pid_path" ]; then', helper)
+        self.assertIn('case "$pid" in', helper)
+        self.assertIn("''|*[!0-9]*)", helper)
+        self.assertIn('if ! kill -0 "$pid" 2>/dev/null; then', helper)
+        self.assertNotIn("/proc/$pid/cmdline", helper)
+        self.assertNotIn("/proc/$pid/cwd", helper)
+        self.assertNotIn("/proc/$pid/exe", helper)
+        self.assertNotIn("actual_cmdline", helper)
+        self.assertIn(
+            "temporal_status() {\n"
+            "    resolve_runtime_paths >/dev/null 2>&1 || return 0\n"
+            "    if ! load_valid_pid; then",
+            helper,
+        )
+        self.assertIn(
+            "temporal_stop() {\n"
+            "    resolve_runtime_paths >/dev/null 2>&1 || return 0\n"
+            "    if ! load_valid_pid; then",
+            helper,
+        )
+
+    def test_helper_shell_requires_pid_file_write_and_readback_consistency(self) -> None:
+        controller = RemoteOdasController(_make_config(), _make_streams())
+
+        helper = controller._helper_shell
+
+        self.assertIn('if ! printf "%s\\n" "$pid" > "$pid_path"; then', helper)
+        self.assertIn("failed to write pid file %s\\n", helper)
+        self.assertIn(
+            "persisted_pid=\"$(tr -d '[:space:]' < \"$pid_path\" 2>/dev/null || printf '')\"",
+            helper,
+        )
+        self.assertIn('if [ "$persisted_pid" != "$pid" ]; then', helper)
+        self.assertIn("failed to persist pid file %s\\n", helper)
+
     def test_control_shell_rebootstraps_after_shell_loss(self) -> None:
         first_shell = _FakeShellChannel()
         second_shell = _FakeShellChannel(lambda _name, _args: CommandResult(0, "4242\n", ""))
@@ -468,6 +511,40 @@ class TestRemoteOdasController(unittest.TestCase):
             helper_calls,
             ["temporal_metadata", "temporal_cat_file", "temporal_cat_file", "temporal_start"],
         )
+
+    def test_start_odaslive_surfaces_pid_persistence_failure(self) -> None:
+        def response_fn(name: str, args: list[str]) -> CommandResult:
+            if name == "temporal_metadata":
+                return _runtime_metadata_result()
+            if name == "temporal_cat_file" and args[0].endswith("odas_loop.sh"):
+                return CommandResult(
+                    code=0,
+                    stdout='#!/bin/sh\nexec odaslive -c "./configs/odas.cfg"\n',
+                    stderr="",
+                )
+            if name == "temporal_cat_file" and args[0].endswith("configs/odas.cfg"):
+                return CommandResult(code=0, stdout=_valid_cfg(host="10.10.0.8"), stderr="")
+            if name == "temporal_start":
+                return CommandResult(
+                    code=1,
+                    stdout="",
+                    stderr="failed to write pid file /home/tester/workspace/ODAS/odas/odaslive.pid\n",
+                )
+            return CommandResult(code=1, stdout="", stderr="unexpected helper")
+
+        shell = _FakeShellChannel(response_fn)
+        fake_client = _FakeSSHClient([shell])
+        controller = RemoteOdasController(_make_config(), _make_streams(listen_host="10.10.0.8"))
+
+        with patch(
+            "temporal.core.ssh.remote_odas.paramiko.SSHClient",
+            return_value=fake_client,
+        ):
+            controller.connect()
+            result = controller.start_odaslive()
+
+        self.assertEqual(result.code, 1)
+        self.assertIn("failed to write pid file", result.stderr)
 
     def test_stop_odaslive_returns_shell_failure_as_is(self) -> None:
         shell = _FakeShellChannel(

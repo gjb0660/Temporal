@@ -391,17 +391,6 @@ preflight_or_exit() {
 """.strip()
 
     def _build_pid_shell(self) -> str:
-        arg_check_lines: list[str] = []
-        for arg in self._cfg.odas_args:
-            arg_check_lines.extend(
-                [
-                    f"    if ! printf '%s\\n' \"$actual_cmdline\" | grep -Fxq -- {shlex.quote(arg)}; then",
-                    "        cleanup_pid",
-                    "        return 1",
-                    "    fi",
-                ]
-            )
-        flattened_arg_checks = "\n".join(arg_check_lines)
         return r"""
 cleanup_pid() {
     rm -f "$pid_path"
@@ -423,28 +412,9 @@ load_valid_pid() {
         cleanup_pid
         return 1
     fi
-    cmdline_path="/proc/$pid/cmdline"
-    if [ ! -r "$cmdline_path" ]; then
-        cleanup_pid
-        return 1
-    fi
-    actual_cmdline="$(tr '\000' '\n' < "$cmdline_path")"
-    if ! printf '%s\n' "$actual_cmdline" | grep -Fxq -- "$cfg_command"; then
-        if [ -z "$resolved_command" ] || ! printf '%s\n' "$actual_cmdline" | grep -Fxq -- "$resolved_command"; then
-            cleanup_pid
-            return 1
-        fi
-    fi
-__ARG_CHECKS__
-    actual_cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || printf '')"
-    expected_cwd="$(pwd -P)"
-    if [ -n "$resolved_cwd" ] && { [ -z "$actual_cwd" ] || [ "$actual_cwd" != "$expected_cwd" ]; }; then
-        cleanup_pid
-        return 1
-    fi
     return 0
 }
-""".replace("__ARG_CHECKS__", flattened_arg_checks).strip()
+""".strip()
 
     def _bootstrap_marker(self) -> str:
         return f"{self._MARKER}{self._BOOTSTRAP_NAME}{self._MARKER}"
@@ -466,7 +436,6 @@ __ARG_CHECKS__
         stop_body = f"""
 temporal_stop() {{
     resolve_runtime_paths >/dev/null 2>&1 || return 0
-    resolve_command_path >/dev/null 2>&1 || return 0
     if ! load_valid_pid; then
         return 0
     fi
@@ -521,13 +490,23 @@ temporal_start() {
             f'setsid {self._quoted_command()} >> "$resolved_log" 2>&1 < /dev/null &',
             r"""
     pid="$!"
-    printf "%s\n" "$pid" > "$pid_path"
+    if ! printf "%s\n" "$pid" > "$pid_path"; then
+        printf "failed to write pid file %s\n" "$pid_path" >&2
+        kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+        return 1
+    fi
+    persisted_pid="$(tr -d '[:space:]' < "$pid_path" 2>/dev/null || printf '')"
+    if [ "$persisted_pid" != "$pid" ]; then
+        printf "failed to persist pid file %s\n" "$pid_path" >&2
+        cleanup_pid
+        kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
+        return 1
+    fi
     printf "%s\n" "$pid"
 }
 
 temporal_status() {
     resolve_runtime_paths >/dev/null 2>&1 || return 0
-    resolve_command_path >/dev/null 2>&1 || return 0
     if ! load_valid_pid; then
         return 0
     fi

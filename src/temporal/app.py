@@ -836,6 +836,8 @@ class AppBridge(QObject):
                 self.setStatus(reason)
                 return
             self._set_remote_log_lines([f"日志读取失败: {message}"])
+            if self._remote_connected and not self._odas_starting:
+                self._sync_remote_odas_state(update_status=True)
             return
 
         if result.code != 0 and result.stderr.strip():

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 # pyright: reportMissingImports=false, reportUntypedFunctionDecorator=false
-
 from typing import Any
 
 from PySide6.QtCore import Property, QTimer, Signal, Slot
