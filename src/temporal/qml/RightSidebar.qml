@@ -8,6 +8,8 @@ Rectangle {
 
     required property QtObject theme
     required property QtObject appBridge
+    readonly property int sectionTitleFont: Math.max(20, theme.sideTitleFont)
+    readonly property color sectionTitleColor: theme.titleColor
 
     Layout.preferredWidth: theme.rightPanelWidth
     Layout.fillHeight: true
@@ -24,8 +26,8 @@ Rectangle {
 
         Label {
             text: "声源"
-            color: theme.titleColor
-            font.pixelSize: Math.max(26, theme.sideTitleFont + 3)
+            color: root.sectionTitleColor
+            font.pixelSize: root.sectionTitleFont
         }
 
         Repeater {
@@ -36,7 +38,6 @@ Rectangle {
                 required property int sourceId
                 required property string label
                 required property bool checked
-                required property bool enabled
                 required property string badge
                 required property string badgeColor
 
@@ -99,21 +100,14 @@ Rectangle {
             Layout.fillWidth: true
         }
 
-        Rectangle {
-            visible: root.appBridge.sourceRowsModel.count === 0
-            Layout.fillWidth: true
-            Layout.preferredHeight: 1
-            color: "#c9d9d2"
-        }
-
         Item {
-            Layout.preferredHeight: 18
+            Layout.fillHeight: true
         }
 
         Label {
             text: "筛选器"
-            color: theme.titleColor
-            font.pixelSize: Math.max(26, theme.sideTitleFont + 3)
+            color: root.sectionTitleColor
+            font.pixelSize: root.sectionTitleFont
         }
 
         Rectangle {
@@ -136,10 +130,6 @@ Rectangle {
             onToggled: root.appBridge.setPotentialsEnabled(checked)
         }
 
-        Item {
-            Layout.preferredHeight: 16
-        }
-
         Label {
             text: "候选声源能量范围"
             color: "#55635d"
@@ -148,12 +138,20 @@ Rectangle {
 
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 72
+            Layout.preferredHeight: 48
 
             Label {
-                anchors.left: parent.left
                 anchors.top: parent.top
-                text: root.appBridge.potentialEnergyMin.toFixed(0)
+                anchors.left: parent.left
+                text: root.appBridge.potentialEnergyMin.toFixed(2)
+                color: "#3f4743"
+                font.pixelSize: theme.bodyFont
+            }
+
+            Label {
+                anchors.top: parent.top
+                anchors.right: parent.right
+                text: root.appBridge.potentialEnergyMax.toFixed(2)
                 color: "#3f4743"
                 font.pixelSize: theme.bodyFont
             }
@@ -193,8 +191,8 @@ Rectangle {
                     x: parent.leftPadding + parent.first.visualPosition * (parent.availableWidth - width)
                     y: parent.topPadding + parent.availableHeight / 2 - height / 2
                     implicitWidth: 16
-                    implicitHeight: 22
-                    radius: 4
+                    implicitHeight: implicitWidth
+                    radius: implicitWidth / 2
                     color: "#1b92d5"
                 }
 
@@ -202,19 +200,10 @@ Rectangle {
                     x: parent.leftPadding + parent.second.visualPosition * (parent.availableWidth - width)
                     y: parent.topPadding + parent.availableHeight / 2 - height / 2
                     implicitWidth: 16
-                    implicitHeight: 22
-                    radius: 4
+                    implicitHeight: implicitWidth
+                    radius: implicitWidth / 2
                     color: "#1b92d5"
                 }
-            }
-
-            Label {
-                anchors.left: parent.left
-                anchors.top: energySlider.bottom
-                anchors.topMargin: 4
-                text: root.appBridge.potentialEnergyMax.toFixed(0)
-                color: "#3f4743"
-                font.pixelSize: theme.bodyFont
             }
         }
 
@@ -230,8 +219,8 @@ Rectangle {
 
         Label {
             text: "录音会话"
-            color: theme.titleColor
-            font.pixelSize: Math.max(20, theme.sideTitleFont)
+            color: root.sectionTitleColor
+            font.pixelSize: root.sectionTitleFont
         }
 
         Repeater {
