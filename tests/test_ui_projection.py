@@ -1,6 +1,8 @@
 import unittest
 
 from temporal.core.ui_projection import (
+    build_chart_series,
+    build_chart_window_model,
     build_positions_model_items,
     build_rows_model_items,
     compute_sidebar_sources,
@@ -54,6 +56,18 @@ class TestUiProjection(unittest.TestCase):
         visible_rows = {int(source["id"]): source for source in sidebar_sources}
         positions = build_positions_model_items(current_frame_sources, visible_rows, {15})
         self.assertEqual([item["id"] for item in positions], [15])
+
+    def test_chart_projection_uses_structured_models(self) -> None:
+        messages = [
+            {"timeStamp": 350, "sources": [{"id": 15, "x": 0.0, "y": 1.0, "z": 0.0}]}
+        ]
+
+        window = build_chart_window_model(messages)
+        series = build_chart_series(messages, {15: {"color": "#123456"}}, [15], axis="azimuth")
+
+        self.assertEqual([tick["value"] for tick in window["ticks"]], [-1200, -1000, -800, -600, -400, -200, 0, 200, 350])
+        self.assertTrue(window["ticks"][-1]["isLatest"])
+        self.assertEqual(series[0]["points"][0]["y"], 90.0)
 
 
 if __name__ == "__main__":

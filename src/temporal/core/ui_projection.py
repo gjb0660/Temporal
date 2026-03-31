@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import json
-from math import acos, atan2, degrees, sqrt
 from typing import Any
+
+from temporal.core.chart_window import build_chart_series_model, build_chart_window_model
 
 
 def compute_sidebar_sources(
@@ -72,68 +72,21 @@ def build_positions_model_items(
     ]
 
 
-def build_chart_ticks(
-    window_frames: list[dict[str, Any]],
-    *,
-    tick_count: int,
-    fallback_sample_start: int,
-    fallback_sample_step: int,
-) -> list[str]:
-    safe_tick_count = max(1, int(tick_count))
-    base = int(fallback_sample_start)
-    step = max(1, int(fallback_sample_step))
-    if window_frames:
-        latest = int(window_frames[-1].get("sample", base + step * (safe_tick_count - 1)))
-    else:
-        latest = base + step * (safe_tick_count - 1)
-    if safe_tick_count == 1:
-        return [str(latest)]
-    ticks = [str(base + step * index) for index in range(safe_tick_count - 1)]
-    ticks.append(str(latest))
-    return ticks
+def build_chart_ticks(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+    messages = list(args[0]) if args else list(kwargs.pop("messages", []))
+    return build_chart_window_model(messages)["ticks"]
 
 
-def build_chart_series(
-    window_frames: list[dict[str, Any]],
-    visible_rows: dict[int, dict[str, Any]],
-    visible_source_ids: list[int],
-    *,
-    axis: str,
-) -> list[dict[str, Any]]:
-    if not window_frames:
-        return []
-
-    values_by_source: dict[int, list[float]] = {source_id: [] for source_id in visible_source_ids}
-    for frame in window_frames:
-        frame_sources = {
-            int(source["id"]): source
-            for source in frame.get("sources", [])
-            if isinstance(source, dict) and isinstance(source.get("id"), int)
-        }
-        for source_id in visible_source_ids:
-            source = frame_sources.get(source_id)
-            if source is None:
-                continue
-            values_by_source[source_id].append(normalized_axis_value(source, axis=axis))
-
-    return [
-        {
-            "sourceId": source_id,
-            "color": str(visible_rows[source_id].get("color", "")),
-            "valuesJson": json.dumps(values),
-        }
-        for source_id, values in values_by_source.items()
-        if values
-    ]
-
-
-def normalized_axis_value(source: dict[str, Any], *, axis: str) -> float:
-    x = float(source.get("x", 0.0))
-    y = float(source.get("y", 0.0))
-    z = float(source.get("z", 0.0))
-    length = max(0.0001, sqrt(x * x + y * y + z * z))
-    if axis == "elevation":
-        elevation_deg = 90.0 - degrees(acos(max(-1.0, min(1.0, z / length))))
-        return (elevation_deg + 90.0) / 180.0
-    azimuth_deg = degrees(atan2(y, x))
-    return (azimuth_deg + 180.0) / 360.0
+def build_chart_series(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
+    messages = list(args[0]) if args else list(kwargs.pop("messages", []))
+    visible_rows = dict(args[1]) if len(args) > 1 else dict(kwargs.pop("visible_rows", {}))
+    visible_source_ids = (
+        list(args[2]) if len(args) > 2 else list(kwargs.pop("visible_source_ids", []))
+    )
+    axis = str(kwargs.pop("axis", "elevation"))
+    return build_chart_series_model(
+        messages,
+        visible_rows,
+        visible_source_ids,
+        axis=axis,
+    )
