@@ -17,39 +17,32 @@ updated: 2026-03-31
 
 ## Facts
 
-- 主界面需要保持三栏布局与稳定的信息层级。
-- 左侧控制区需要围绕远端控制与监听控制呈现明确按钮语义。
-- 3D 声源区域与整体视觉主题需要单独收口。
-- `preview-mode` 与主界面共享同名 bridge 契约与状态投影接口。
-- runtime `AppBridge` 目前已经稳定投影 `sourceRowsModel`、
-  `sourcePositionsModel`、`elevationSeriesModel`、`azimuthSeriesModel`
-  与筛选状态。
-- runtime 使用 `core/ui_projection.py` 的 row / positions /
-  chart ticks / series 计算实现。
-- preview 仍保留 scenario 数据与 tick 推进驱动职责；runtime 仍保留
-  SST 输入与 frame window 维护职责。
-- 当前展示语义中，row / 3D positions 使用 current frame，
-  chart 使用共享时间窗序列，并共享同一过滤语义。
-- chart 时间轴以连接首帧 `timeStamp` 归零，并在重连后重新归零。
-- chart 横轴显示单位为 0.01s，刻度以 200 整数步长为主体，最后
-  一个刻度显示最新时间。
-- source 颜色语义当前由 bridge 维护“连接内独立分配、重连重置”的
-  状态化分配器输出；右栏、图表与 3D 必须共享该映射。
-- 颜色分配前 4 色当前与 odas_web 基准调色板一致，扩展颜色使用固定表。
+- 主界面当前是三栏结构，并已形成控制区、图表区、3D 区的稳定信息层级。
+- `preview-mode` 与 production 共享同名 `appBridge` 契约与同一投影实现层。
+- runtime 已稳定投影 `sourceRowsModel`、`sourcePositionsModel`、
+  `elevationSeriesModel`、`azimuthSeriesModel` 与筛选状态。
+- runtime/preview 的语义分工是：preview 负责 scenario 数据推进，
+  runtime 负责 SST 输入与窗口维护；展示投影共享。
+- 当前可视化语义已固定：row/3D 基于 current frame，chart 基于共享时间窗，
+  三者共享同一过滤语义。
+- chart 时间语义已固定为：首帧归零、重连后重新归零、单位 0.01s、
+  200 主刻度 + 最新时间尾刻度。
+- source 颜色由 bridge 状态化分配器输出（连接内独立分配、重连重置），
+  且 row/3D/chart 共享同一映射。
+- 颜色前 4 色与 odas_web 基准调色板一致，扩展颜色使用固定表。
 
 ## Decision
 
-- 将界面布局、视觉比重、按钮呈现与视觉风格作为独立 UI feature 收口。
-- 将共享 bridge 契约、数据投影、过滤、空态与时序推进语义继续视为
-  `ui-system` owner，并通过 shared projection layer 统一实现。
-- 继续通过共享 `appBridge` 契约消费状态，不在 QML 内复制业务逻辑。
-- 当前冻结 row、chart 与 3D 的过滤/空态契约，并保持 runtime/preview
-  在同一 projection 实现层上演进。
-- chart 时钟由 bridge 维护“原点 + 重连重置”语义，QML 仅消费 ticks。
+- `ui-system` 继续作为共享展示语义 owner，统一维护布局、投影、过滤、
+  空态与时序展示边界。
+- QML 只消费 bridge 输出，不复制业务推导；runtime/preview 继续在同一
+  projection 层演进。
+- row/chart/3D 的过滤与空态契约保持冻结，后续演进只能走 shared projection
+  单路径收敛。
 - 颜色语义由 bridge allocator 单一维护，MUST NOT 在 projection/QML
-  引入并行颜色业务语义。
-- runtime 在 bridge 层应保持单一行为真源，MUST NOT 并行维护
-  两套筛选、模型刷新、状态推导逻辑。
+  引入并行颜色业务语义或业务 fallback。
+- runtime 在 bridge 层保持单一行为真源，MUST NOT 并行维护两套筛选、
+  模型刷新与状态推导逻辑。
 
 ## Acceptance
 
