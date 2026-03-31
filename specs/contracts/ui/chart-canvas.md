@@ -2,7 +2,7 @@
 title: chart-canvas
 status: active
 stability: flexible
-version: 0.3
+version: 0.4
 ---
 
 ## Role
@@ -14,10 +14,18 @@ version: 0.3
 
 - 图表画布 MUST 渲染稳定的网格、纵轴刻度、横轴刻度和底部横轴标签。
 - 图表画布 MUST 支持零条或多条折线序列，并保持空数据时仍然安全显示空网格。
-- 每条折线 MUST 使用与输入 source 身份一致的颜色语义，MUST NOT 在组件内部重新发明颜色规则。
+- 图表输入 MUST 使用结构化数值模型（sample / value），MUST NOT 依赖 `valuesJson` 等 JSON 字符串载荷。
+- 每条折线 MUST 使用与输入空间目标身份一致的颜色语义，MUST NOT 在组件内部重新发明颜色规则。
+- 图表最多渲染 8 条可见序列；当候选空间目标超过 8 条时，上游 MUST 先按“空间目标最近出现时间”降序选择前 8，若出现时间并列则按当前帧 `sourceId` 升序打破平局。
+- 单连接会话内，空间目标连续映射到颜色的关系 MUST 保持稳定；当前可见的 `<=8` 条序列之间 MUST NOT 出现重复颜色。
+- 颜色映射 MUST 与 `sourceId` 数值范围解耦；`sourceId` MAY 继续用于标签展示，但 MUST NOT 作为颜色绑定主键。
 - 图表画布 MUST 保持只读可视化语义，MUST NOT 默认引入缩放、平移或点选分析交互。
 - 时间轴 MUST 以 0.01s 为显示单位，并以当前连接首帧时间作为零点。
-- 横轴刻度 MUST 以 200 步长的整数刻度为主体，且仅最后一个刻度显示最新时间值。
+- 横轴可见窗口 MUST 固定为 1600 个 sample（在 0.01s 单位下为 16s）。
+- 横轴窗口 MUST 采用滚动区间 `[latest-1600, latest]`。
+- 该滚动区间中的负刻度 MUST 显示刻度线与标签。
+- 可见区间内所有可被 200 整除的刻度值 MUST 同时绘制刻度线与标签。
+- latest 刻度值 MUST 始终显示标签；当 latest 本身可被 200 整除时，MUST NOT 产生重复刻度线或重复标签。
 
 ## Variation Space
 
