@@ -22,7 +22,7 @@ dev = [
 
 [project.scripts]
 temporal = "temporal.main:main"
-temporal-preview = "temporal.preview_main:main"
+temporal-preview = "temporal.main:preview_main"
 
 [tool.pyright]
 include = [

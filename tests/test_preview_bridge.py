@@ -17,9 +17,9 @@ from temporal.app import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.core.source_palette import SOURCE_COLOR_PALETTE
+from temporal.main import preview_main
 from temporal.preview_bridge import PreviewBridge
 from temporal.preview_data import DEFAULT_PREVIEW_SCENARIO_KEY, PREVIEW_SCENARIO_KEYS
-from temporal.preview_main import main as preview_main
 
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -517,11 +517,9 @@ class TestPreviewEntrypoint(unittest.TestCase):
         events: list[str] = []
 
         with (
-            patch("temporal.preview_main.QGuiApplication") as qapp_cls,
-            patch(
-                "temporal.preview_main.PreviewBridge", return_value=sentinel_bridge
-            ) as bridge_cls,
-            patch("temporal.preview_main.run_with_bridge", return_value=7) as run_with_bridge,
+            patch("temporal.main.QGuiApplication") as qapp_cls,
+            patch("temporal.main.PreviewBridge", return_value=sentinel_bridge) as bridge_cls,
+            patch("temporal.main.run_with_bridge", return_value=7) as run_with_bridge,
         ):
             qapp_cls.instance.side_effect = lambda: None
             qapp_cls.side_effect = lambda argv: events.append("app") or sentinel_app
