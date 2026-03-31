@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 import unittest
@@ -16,7 +15,6 @@ from PySide6.QtQml import QQmlComponent, QQmlEngine
 from temporal.app import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
-from temporal.core.source_palette import SOURCE_COLOR_PALETTE
 from temporal.main import preview_main
 from temporal.preview_bridge import PreviewBridge
 from temporal.preview_data import DEFAULT_PREVIEW_SCENARIO_KEY, PREVIEW_SCENARIO_KEYS
@@ -102,17 +100,6 @@ def _source_ids(bridge: PreviewBridge) -> list[int]:
     return cast(list[int], getattr(bridge, "sourceIds"))
 
 
-def _series_items(model) -> list[dict[str, Any]]:
-    return [
-        {
-            "sourceId": item["sourceId"],
-            "color": item["color"],
-            "values": json.loads(item["valuesJson"]),
-        }
-        for item in _model_items(model)
-    ]
-
-
 class TestPreviewBridge(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -139,10 +126,6 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(bridge.remoteLogText, "等待连接远程 odaslive...\n当前场景：参考单点")
         self.assertTrue(bridge.showPreviewScenarioSelector)
         self.assertEqual(bridge.headerNavLabelsModel.count, 3)
-        self.assertEqual(
-            _scalar_values(bridge.chartXTicksModel),
-            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "0"],
-        )
 
     def test_scenarios_keep_models_in_sync(self) -> None:
         expectations = {
@@ -158,34 +141,19 @@ class TestPreviewBridge(unittest.TestCase):
 
             source_rows = _model_items(bridge.sourceRowsModel)
             source_positions = _model_items(bridge.sourcePositionsModel)
-            elevation_series = _series_items(bridge.elevationSeriesModel)
-            azimuth_series = _series_items(bridge.azimuthSeriesModel)
 
             self.assertEqual(len(source_rows), expected_count)
             self.assertEqual(len(_source_ids(bridge)), expected_count)
             self.assertEqual(len(source_positions), expected_count)
-            self.assertEqual(len(elevation_series), expected_count)
-            self.assertEqual(len(azimuth_series), expected_count)
             self.assertEqual(
                 {row["sourceId"] for row in source_rows if row["checked"]},
                 set(_source_ids(bridge)),
             )
             self.assertEqual({item["id"] for item in source_positions}, set(_source_ids(bridge)))
-            self.assertEqual(
-                {item["sourceId"] for item in elevation_series}, set(_source_ids(bridge))
-            )
-            self.assertEqual(
-                {item["sourceId"] for item in azimuth_series}, set(_source_ids(bridge))
-            )
             if expected_count > 1:
                 self.assertGreater(
                     len({row["badgeColor"] for row in source_rows}),
                     1,
-                )
-            if expected_count >= 4:
-                self.assertEqual(
-                    [row["badgeColor"] for row in source_rows[:4]],
-                    list(SOURCE_COLOR_PALETTE[:4]),
                 )
 
     def test_preview_scenario_options_are_exposed_in_chinese(self) -> None:
@@ -197,16 +165,13 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(options[0]["label"], "参考单点")
         self.assertEqual(options[-1]["label"], "空状态")
 
-    def test_scenario_switch_resets_selection_and_window(self) -> None:
+    def test_scenario_switch_resets_selection_and_state(self) -> None:
         bridge = PreviewBridge()
         bridge.setPreviewScenario("hemisphereSpread")
-        before_switch_colors = [row["badgeColor"] for row in _model_items(bridge.sourceRowsModel)]
-        self.assertEqual(before_switch_colors[:4], list(SOURCE_COLOR_PALETTE[:4]))
         bridge.toggleStreams()
         bridge.advancePreviewTick()
         bridge.setSourceSelected(7, False)
 
-        self.assertNotEqual(_scalar_values(bridge.chartXTicksModel)[-1], "1800")
         self.assertTrue(any(item["sourceId"] == 7 for item in _model_items(bridge.sourceRowsModel)))
         self.assertFalse(
             any(
@@ -219,9 +184,6 @@ class TestPreviewBridge(unittest.TestCase):
 
         self.assertEqual(sorted(_source_ids(bridge)), [12, 15, 27, 31])
         self.assertTrue(all(row["checked"] for row in _model_items(bridge.sourceRowsModel)))
-        self.assertEqual(_scalar_values(bridge.chartXTicksModel)[0], "0")
-        after_switch_colors = [row["badgeColor"] for row in _model_items(bridge.sourceRowsModel)]
-        self.assertEqual(after_switch_colors[:4], list(SOURCE_COLOR_PALETTE[:4]))
         self.assertEqual(bridge.remoteLogText, "等待连接远程 odaslive...\n当前场景：赤道边界")
 
     def test_unknown_preview_scenario_is_ignored(self) -> None:
@@ -242,8 +204,6 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(all(not item["checked"] for item in _model_items(bridge.sourceRowsModel)))
         self.assertEqual(_source_ids(bridge), [7, 15, 21, 31])
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
-        self.assertEqual(bridge.elevationSeriesModel.count, 0)
-        self.assertEqual(bridge.azimuthSeriesModel.count, 0)
 
     def test_empty_state_yields_no_fake_sources(self) -> None:
         bridge = PreviewBridge()
@@ -253,8 +213,6 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(bridge.sourceRowsModel.count, 0)
         self.assertEqual(_source_ids(bridge), [])
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
-        self.assertEqual(bridge.elevationSeriesModel.count, 0)
-        self.assertEqual(bridge.azimuthSeriesModel.count, 0)
         self.assertEqual(bridge.remoteLogText, "等待连接远程 odaslive...\n当前场景：空状态")
 
     def test_toggle_remote_auto_starts_streams_and_stop_clears_both(self) -> None:
@@ -274,11 +232,10 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(bridge.streamsActive)
         self.assertIn("正在监听 SST/SSL/SSS 数据流", str(bridge.status))
 
-    def test_toggle_streams_is_independent_and_restart_resets_window(self) -> None:
+    def test_toggle_streams_is_independent_and_restart_resets_positions(self) -> None:
         bridge = PreviewBridge()
         bridge.setPreviewScenario("hemisphereSpread")
 
-        initial_ticks = _scalar_values(bridge.chartXTicksModel)
         initial_positions = _model_items(bridge.sourcePositionsModel)
 
         bridge.toggleStreams()
@@ -287,10 +244,8 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertIn("正在监听 SST/SSL/SSS 数据流", str(bridge.status))
 
         bridge.advancePreviewTick()
-        moved_ticks = _scalar_values(bridge.chartXTicksModel)
         moved_positions = _model_items(bridge.sourcePositionsModel)
 
-        self.assertNotEqual(moved_ticks, initial_ticks)
         self.assertNotEqual(moved_positions, initial_positions)
 
         bridge.toggleStreams()
@@ -298,29 +253,18 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(bridge.status, "SSH 已连接，远程 odaslive 未运行")
 
         bridge.toggleStreams()
-        self.assertEqual(_scalar_values(bridge.chartXTicksModel), initial_ticks)
         self.assertEqual(_model_items(bridge.sourcePositionsModel), initial_positions)
-        self.assertEqual(
-            [item["badgeColor"] for item in _model_items(bridge.sourceRowsModel)[:4]],
-            list(SOURCE_COLOR_PALETTE[:4]),
-        )
 
-    def test_advance_preview_tick_updates_ticks_series_and_positions(self) -> None:
+    def test_advance_preview_tick_updates_positions(self) -> None:
         bridge = PreviewBridge()
         bridge.setPreviewScenario("hemisphereSpread")
         bridge.toggleStreams()
 
-        before_ticks = _scalar_values(bridge.chartXTicksModel)
         before_positions = _model_items(bridge.sourcePositionsModel)
-        before_elevation = _series_items(bridge.elevationSeriesModel)
-        before_azimuth = _series_items(bridge.azimuthSeriesModel)
 
         bridge.advancePreviewTick()
 
-        self.assertNotEqual(_scalar_values(bridge.chartXTicksModel), before_ticks)
         self.assertNotEqual(_model_items(bridge.sourcePositionsModel), before_positions)
-        self.assertNotEqual(_series_items(bridge.elevationSeriesModel), before_elevation)
-        self.assertNotEqual(_series_items(bridge.azimuthSeriesModel), before_azimuth)
 
     def test_global_filters_update_sidebar_and_visible_outputs(self) -> None:
         bridge = PreviewBridge()
@@ -331,8 +275,6 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertFalse(bridge.sourcesEnabled)
         self.assertEqual(bridge.sourceRowsModel.count, 0)
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
-        self.assertEqual(bridge.elevationSeriesModel.count, 0)
-        self.assertEqual(bridge.azimuthSeriesModel.count, 0)
 
         bridge.setSourcesEnabled(True)
         bridge.setPotentialsEnabled(True)
@@ -364,12 +306,9 @@ import QtQuick
 QtObject {
     property int rowCount: bridge.sourceRowsModel.count
     property int pointCount: bridge.sourcePositionsModel.count
-    property int seriesCount: bridge.elevationSeriesModel.count
     property int optionCount: bridge.previewScenarioOptionsModel.count
-    property int tickCount: bridge.chartXTicksModel.count
     property string firstBadge: bridge.sourceRowsModel.get(0).badge
     property int firstPointId: bridge.sourcePositionsModel.get(0).id
-    property int firstSeriesValueCount: JSON.parse(bridge.elevationSeriesModel.get(0).valuesJson).length
     property bool hasRemoteLog: bridge.remoteLogText.length > 0
     property bool odasStartingDefaultFalse: bridge.odasStarting === false
 }
@@ -381,12 +320,9 @@ QtObject {
         self.assertFalse(component.isError(), [error.toString() for error in component.errors()])
         self.assertEqual(obj.property("rowCount"), 4)
         self.assertEqual(obj.property("pointCount"), 4)
-        self.assertEqual(obj.property("seriesCount"), 4)
         self.assertEqual(obj.property("optionCount"), 4)
-        self.assertEqual(obj.property("tickCount"), 10)
         self.assertEqual(obj.property("firstBadge"), "7")
         self.assertEqual(obj.property("firstPointId"), 7)
-        self.assertEqual(obj.property("firstSeriesValueCount"), 1)
         self.assertTrue(obj.property("hasRemoteLog"))
         self.assertTrue(obj.property("odasStartingDefaultFalse"))
         obj.deleteLater()
@@ -502,13 +438,7 @@ class TestAppBridgePreviewDefaults(unittest.TestCase):
         self.assertFalse(bridge.showPreviewScenarioSelector)
         self.assertEqual(_model_items(bridge.previewScenarioOptionsModel), [])
         self.assertEqual(_scalar_values(bridge.headerNavLabelsModel), ["配置", "录制", "相机"])
-        self.assertEqual(
-            _scalar_values(bridge.chartXTicksModel),
-            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "1800"],
-        )
         self.assertEqual(_model_items(bridge.sourceRowsModel), [])
-        self.assertEqual(_model_items(bridge.elevationSeriesModel), [])
-        self.assertEqual(_model_items(bridge.azimuthSeriesModel), [])
         bridge.setPreviewScenario("referenceSingle")
         self.assertEqual(bridge.previewScenarioKey, "")
 

@@ -1,4 +1,3 @@
-import json
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,7 +6,6 @@ from unittest.mock import patch
 from temporal.app import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
-from temporal.core.source_palette import SOURCE_COLOR_PALETTE
 from temporal.core.ssh.remote_odas import CommandResult
 
 
@@ -169,40 +167,6 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(bridge.recordingSourceCount, 0)
         self.assertEqual(bridge._status, "Temporal 就绪")
 
-    def test_source_channel_map_reuses_existing_channel(self) -> None:
-        bridge = self._make_bridge()
-
-        bridge._on_sst({"src": [{"id": 10}, {"id": 20}]})
-        self.assertEqual(bridge._source_channel_map, {10: 0, 20: 1})
-        color_by_source = {
-            row["sourceId"]: row["badgeColor"]
-            for row in [
-                bridge.sourceRowsModel.get(index) for index in range(bridge.sourceRowsModel.count)
-            ]
-        }
-        self.assertEqual(color_by_source[10], SOURCE_COLOR_PALETTE[0])
-        self.assertEqual(color_by_source[20], SOURCE_COLOR_PALETTE[1])
-
-        bridge._on_sst({"src": [{"id": 20}, {"id": 30}]})
-        self.assertEqual(bridge._source_channel_map, {20: 1, 30: 0})
-        color_by_source = {
-            row["sourceId"]: row["badgeColor"]
-            for row in [
-                bridge.sourceRowsModel.get(index) for index in range(bridge.sourceRowsModel.count)
-            ]
-        }
-        self.assertEqual(color_by_source[20], SOURCE_COLOR_PALETTE[1])
-        self.assertEqual(color_by_source[30], SOURCE_COLOR_PALETTE[2])
-
-        bridge._on_sst({"src": [{"id": 10}]})
-        color_by_source = {
-            row["sourceId"]: row["badgeColor"]
-            for row in [
-                bridge.sourceRowsModel.get(index) for index in range(bridge.sourceRowsModel.count)
-            ]
-        }
-        self.assertEqual(color_by_source[10], SOURCE_COLOR_PALETTE[0])
-
     def test_sep_audio_routes_to_mapped_sources(self) -> None:
         bridge = self._make_bridge()
         recorder = bridge._recorder
@@ -319,42 +283,7 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(bridge.recordingSourceCount, 4)
         self.assertFalse(any("Source 5" in item for item in bridge._recording_sessions))
 
-    def test_sst_refreshes_runtime_chart_series(self) -> None:
-        bridge = self._make_bridge()
-
-        bridge._on_sst(
-            {
-                "src": [
-                    {"id": 2, "x": 1.0, "y": 0.0, "z": 0.0},
-                    {"id": 5, "x": 0.0, "y": 1.0, "z": 0.0},
-                ]
-            }
-        )
-
-        self.assertEqual(bridge.elevationSeriesModel.count, 2)
-        self.assertEqual(bridge.azimuthSeriesModel.count, 2)
-
-        elevation_first = json.loads(bridge.elevationSeriesModel.get(0)["valuesJson"])
-        azimuth_first = json.loads(bridge.azimuthSeriesModel.get(0)["valuesJson"])
-        azimuth_second = json.loads(bridge.azimuthSeriesModel.get(1)["valuesJson"])
-
-        self.assertEqual(elevation_first, [0.5])
-        self.assertEqual(azimuth_first, [0.5])
-        self.assertEqual(azimuth_second, [0.75])
-        row_colors = {
-            bridge.sourceRowsModel.get(index)["badgeColor"]
-            for index in range(bridge.sourceRowsModel.count)
-        }
-        self.assertGreater(len(row_colors), 1)
-        self.assertEqual(
-            [
-                bridge.sourceRowsModel.get(index)["badgeColor"]
-                for index in range(bridge.sourceRowsModel.count)
-            ],
-            [SOURCE_COLOR_PALETTE[0], SOURCE_COLOR_PALETTE[1]],
-        )
-
-    def test_unchecked_last_source_keeps_rows_but_clears_runtime_chart_and_positions(self) -> None:
+    def test_unchecked_last_source_keeps_rows_but_clears_visible_outputs(self) -> None:
         bridge = self._make_bridge()
         bridge._on_sst(
             {
@@ -366,99 +295,12 @@ class TestAppBridgeRecording(unittest.TestCase):
         )
 
         bridge.setSourceSelected(2, False)
-        self.assertEqual(bridge.elevationSeriesModel.count, 1)
-        self.assertEqual(bridge.azimuthSeriesModel.count, 1)
         self.assertEqual(bridge.sourcePositionsModel.count, 1)
-        self.assertEqual(bridge.elevationSeriesModel.get(0)["sourceId"], 5)
 
         bridge.setSourceSelected(5, False)
 
         self.assertEqual(bridge.sourceRowsModel.count, 2)
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
-        self.assertEqual(bridge.elevationSeriesModel.count, 0)
-        self.assertEqual(bridge.azimuthSeriesModel.count, 0)
-
-    def test_runtime_chart_window_rolls_with_zero_based_time_and_latest_tick(self) -> None:
-        bridge = self._make_bridge()
-
-        for index in range(12):
-            bridge._on_sst(
-                {
-                    "timeStamp": 1000 + index * 16,
-                    "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}],
-                }
-            )
-
-        ticks = [
-            bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)
-        ]
-        self.assertEqual(
-            ticks,
-            ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "176"],
-        )
-        values = json.loads(bridge.elevationSeriesModel.get(0)["valuesJson"])
-        self.assertEqual(len(values), 10)
-
-    def test_runtime_chart_timestamp_rollback_resets_origin(self) -> None:
-        bridge = self._make_bridge()
-
-        bridge._on_sst({"timeStamp": 1000, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
-        bridge._on_sst({"timeStamp": 1016, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
-        bridge._on_sst({"timeStamp": 900, "src": [{"id": 5, "x": 1.0, "y": 0.0, "z": 0.0}]})
-
-        self.assertEqual(len(bridge._runtime_chart_frames), 1)
-        self.assertEqual(bridge._runtime_chart_frames[0]["sample"], 0)
-        self.assertEqual(bridge._runtime_chart_time_origin, 900)
-        ticks = [
-            bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)
-        ]
-        self.assertEqual(ticks[-1], "0")
-        self.assertEqual(bridge.sourceRowsModel.get(0)["sourceId"], 5)
-        self.assertEqual(bridge.sourceRowsModel.get(0)["badgeColor"], SOURCE_COLOR_PALETTE[1])
-
-    def test_stop_streams_clears_runtime_chart_clock_and_window(self) -> None:
-        bridge = self._make_bridge()
-        bridge._on_sst(
-            {
-                "timeStamp": 1000,
-                "src": [
-                    {"id": 2, "x": 1.0, "y": 0.0, "z": 0.0},
-                    {"id": 5, "x": 0.0, "y": 1.0, "z": 0.0},
-                ],
-            }
-        )
-        bridge._on_sst({"timeStamp": 1016, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
-        self.assertEqual(bridge.sourceRowsModel.get(0)["badgeColor"], SOURCE_COLOR_PALETTE[0])
-
-        bridge.stopStreams()
-
-        self.assertEqual(bridge._runtime_chart_frames, [])
-        self.assertIsNone(bridge._runtime_chart_time_origin)
-        self.assertIsNone(bridge._runtime_chart_last_timestamp)
-        ticks = [
-            bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)
-        ]
-        self.assertEqual(
-            ticks, ["0", "200", "400", "600", "800", "1000", "1200", "1400", "1600", "1800"]
-        )
-        self.assertEqual(bridge.elevationSeriesModel.count, 0)
-        self.assertEqual(bridge.azimuthSeriesModel.count, 0)
-
-        bridge._on_sst({"timeStamp": 2000, "src": [{"id": 99, "x": 1.0, "y": 0.0, "z": 0.0}]})
-        self.assertEqual(bridge.sourceRowsModel.get(0)["sourceId"], 99)
-        self.assertEqual(bridge.sourceRowsModel.get(0)["badgeColor"], SOURCE_COLOR_PALETTE[0])
-
-    def test_runtime_chart_tick_fallback_is_monotonic_without_timestamp(self) -> None:
-        bridge = self._make_bridge()
-
-        for _ in range(3):
-            bridge._on_sst({"src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
-
-        ticks = [
-            bridge.chartXTicksModel.get(i)["value"] for i in range(bridge.chartXTicksModel.count)
-        ]
-        self.assertEqual(ticks[:3], ["0", "200", "400"])
-
 
 if __name__ == "__main__":
     unittest.main()
