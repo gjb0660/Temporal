@@ -262,21 +262,18 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(bridge._client.stop_calls, 0)
         self.assertIn("监听", bridge._status)
 
-    def test_toggle_streams_requires_live_control_channel(self) -> None:
+    def test_toggle_streams_is_independent_from_control_channel(self) -> None:
         bridge = self._make_bridge()
 
         bridge.toggleStreams()
-        self.assertFalse(bridge.streamsActive)
-        self.assertEqual(bridge._status, "请先连接远程 SSH")
-
-        bridge.connectRemote()
-        bridge.toggleStreams()
         self.assertTrue(bridge.streamsActive)
         self.assertEqual(bridge._client.start_calls, 1)
+        self.assertTrue(bridge.canToggleStreams)
+        self.assertIn("正在监听", bridge._status)
 
         bridge._remote.connected = False
         bridge._refresh_remote_connection_state()
-        self.assertFalse(bridge.canToggleStreams)
+        self.assertTrue(bridge.canToggleStreams)
 
     def test_sst_over_capacity_limits_recording_to_mapped_sources(self) -> None:
         bridge = self._make_bridge()

@@ -223,16 +223,16 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertEqual(client.start_calls, 1)
             self.assertEqual(remote.start_calls, 1)
 
-    def test_start_streams_requires_ssh_connection(self) -> None:
+    def test_start_streams_does_not_require_ssh_connection(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
             bridge = self._make_bridge(recorder)
 
             bridge.startStreams()
 
-            self.assertFalse(bridge.streamsActive)
-            self.assertFalse(bridge.canToggleStreams)
-            self.assertEqual(bridge._status, "请先连接远程 SSH")
+            self.assertTrue(bridge.streamsActive)
+            self.assertTrue(bridge.canToggleStreams)
+            self.assertIn("正在监听", bridge._status)
 
     def test_connect_remote_reports_control_channel_init_failure_without_labeling_ssh_failure(
         self,
@@ -442,7 +442,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertTrue(bridge.odasRunning)
             self.assertFalse(bridge.remoteConnected)
-            self.assertFalse(bridge.canToggleStreams)
+            self.assertTrue(bridge.canToggleStreams)
             self.assertEqual(bridge._status, "停止失败: 远程控制通道已断开")
 
     def test_toggle_remote_reconnects_control_channel_before_stopping_running_remote(self) -> None:
@@ -483,7 +483,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertFalse(bridge.streamsActive)
             self.assertEqual(bridge._status, "SSH 已连接，远程 odaslive 运行中")
 
-    def test_can_toggle_streams_turns_false_when_control_channel_disconnects(self) -> None:
+    def test_can_toggle_streams_stays_true_when_control_channel_disconnects(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
             bridge = self._make_bridge(recorder)
@@ -496,7 +496,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
             bridge._refresh_remote_connection_state()
 
             self.assertTrue(bridge.streamsActive)
-            self.assertFalse(bridge.canToggleStreams)
+            self.assertTrue(bridge.canToggleStreams)
 
 
 if __name__ == "__main__":

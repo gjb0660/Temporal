@@ -166,7 +166,7 @@ class AppBridge(QObject):
 
     @Property(bool, notify=canToggleStreamsChanged)  # type: ignore[reportCallIssue]
     def canToggleStreams(self) -> bool:
-        return self._remote_connected
+        return True
 
     @Property(list, notify=sourceItemsChanged)  # type: ignore[reportCallIssue]
     def sourceItems(self) -> list[str]:
@@ -385,9 +385,6 @@ class AppBridge(QObject):
     def startStreams(self) -> None:
         if self._streams_active:
             self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
-            return
-        if not self._refresh_remote_connection_state():
-            self.setStatus("请先连接远程 SSH")
             return
 
         try:
