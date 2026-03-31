@@ -181,10 +181,20 @@ updated: YYYY-MM-DD
 ---
 
 ## Goal
+
+<clear and focused goal statement>
+
 ## Non-Goals
+- <clarify out-of-scope item 1>
+- <clarify out-of-scope item 2>
 
 ## Facts
+- <evidence or reality 1>
+- <evidence or reality 2>
+
 ## Decision
+- <chosen approach 1>
+- <chosen approach 2>
 
 ## Acceptance
 1. <acceptance criteria 1>
