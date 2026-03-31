@@ -102,7 +102,7 @@ Knowledge MAY 在以下位置被引用：
 
 > 如果无法明确 concept 的边界，则应当合并回 `<domain>.md`
 
-### References Layer
+### Evidence Layer
 
 - SHOULD 加工成可直接引用的 markdown 文件
 - SHOULD NOT 直接构成知识内容
@@ -111,6 +111,7 @@ Knowledge MAY 在以下位置被引用：
 - MAY 知识来源的原始材料（如文献、数据集、图表等）
 
 存储在 `references/` 目录下，并通过相对路径引用
+证据层 MUST 仅针对分析目标的事实和依据，不允许带入本项目现状或推断
 
 ## Format
 
