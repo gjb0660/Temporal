@@ -9,10 +9,7 @@ from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
-from temporal.core.chart_time import (
-    DEFAULT_CHART_SAMPLE_STEP,
-    build_default_chart_ticks,
-)
+from temporal.core.chart_time import build_default_chart_ticks
 from temporal.core.config_loader import TemporalConfig, load_config, resolve_default_config_path
 from temporal.core.network.odas_client import OdasClient
 from temporal.core.network.odas_message_view import (
@@ -23,10 +20,11 @@ from temporal.core.network.odas_message_view import (
 )
 from temporal.core.recording.auto_recorder import AutoRecorder
 from temporal.core.source_palette import SourceColorAllocator
+from temporal.core.source_tracking import SourceObservation, SpaceTargetSession, TrackingResult
 from temporal.core.ssh.remote_odas import RemoteOdasController
 from temporal.core.ui_projection import (
-    build_chart_series,
-    build_chart_ticks,
+    build_chart_series_model,
+    build_chart_window_model,
     build_positions_model_items,
     build_rows_model_items,
     compute_sidebar_sources,
@@ -110,12 +108,13 @@ class AppBridge(QObject):
         self._streams_active = False
         self._startup_attempts_remaining = 0
         self._startup_failure_hint = ""
-        self._runtime_chart_tick_count = len(self._RUNTIME_CHART_X_TICKS)
-        self._runtime_chart_sample_step = DEFAULT_CHART_SAMPLE_STEP
-        self._runtime_chart_next_fallback_sample = 0
-        self._runtime_chart_time_origin: int | None = None
-        self._runtime_chart_last_timestamp: int | None = None
-        self._runtime_chart_frames: list[dict[str, Any]] = []
+        self._runtime_chart_messages: list[dict[str, Any]] = []
+        self._runtime_chart_frame_sources: dict[int, dict[str, float]] = {}
+        self._runtime_tracking_result = TrackingResult(
+            visible_targets=[],
+            dropped_source_ids=[],
+        )
+        self._space_target_session = SpaceTargetSession()
         self._source_color_allocator = SourceColorAllocator()
 
         self._log_timer = QTimer(self)
@@ -129,21 +128,21 @@ class AppBridge(QObject):
             ["sourceId", "label", "checked", "enabled", "badge", "badgeColor"], self
         )
         self._source_positions_model = QmlListModel(["id", "color", "x", "y", "z"], self)
-        self._elevation_series_model = QmlListModel(["sourceId", "color", "valuesJson"], self)
-        self._azimuth_series_model = QmlListModel(["sourceId", "color", "valuesJson"], self)
+        self._elevation_chart_series_model = QmlListModel(["sourceId", "color", "points"], self)
+        self._azimuth_chart_series_model = QmlListModel(["sourceId", "color", "points"], self)
         self._preview_scenario_options_model = QmlListModel(["key", "label"], self)
-        self._chart_x_ticks_model = QmlListModel(["value"], self)
+        self._chart_window_model = QmlListModel(["value"], self)
         self._header_nav_labels_model = QmlListModel(["value"], self)
         self._recording_sessions_model = QmlListModel(["value"], self)
 
         self._preview_scenario_options_model.replace([])
-        self._chart_x_ticks_model.replace(self._RUNTIME_CHART_X_TICKS)
+        self._chart_window_model.replace(self._RUNTIME_CHART_X_TICKS)
         self._header_nav_labels_model.replace(self._HEADER_NAV_LABELS)
         self._recording_sessions_model.replace([])
         self._source_rows_model.replace([])
         self._source_positions_model.replace([])
-        self._elevation_series_model.replace([])
-        self._azimuth_series_model.replace([])
+        self._elevation_chart_series_model.replace([])
+        self._azimuth_chart_series_model.replace([])
 
     @Property(str, notify=statusChanged)  # type: ignore[reportCallIssue]
     def status(self) -> str:
@@ -230,20 +229,20 @@ class AppBridge(QObject):
         return self._source_positions_model
 
     @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def elevationSeriesModel(self) -> QmlListModel:
-        return self._elevation_series_model
+    def elevationChartSeriesModel(self) -> QmlListModel:
+        return self._elevation_chart_series_model
 
     @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def azimuthSeriesModel(self) -> QmlListModel:
-        return self._azimuth_series_model
+    def azimuthChartSeriesModel(self) -> QmlListModel:
+        return self._azimuth_chart_series_model
 
     @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
     def previewScenarioOptionsModel(self) -> QmlListModel:
         return self._preview_scenario_options_model
 
     @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
-    def chartXTicksModel(self) -> QmlListModel:
-        return self._chart_x_ticks_model
+    def chartWindowModel(self) -> QmlListModel:
+        return self._chart_window_model
 
     @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
     def headerNavLabelsModel(self) -> QmlListModel:
@@ -478,8 +477,8 @@ class AppBridge(QObject):
 
     def _on_sst(self, message: dict) -> None:
         self._last_sst = message
-        self._append_runtime_chart_frame(message)
-        self._refresh_sources()
+        refresh_chart = self._append_runtime_chart_frame(message)
+        self._refresh_sources(refresh_chart=refresh_chart)
         self._update_source_channel_map(self._source_ids)
         mapped_source_ids = [
             source_id for source_id in self._source_ids if source_id in self._source_channel_map
@@ -892,7 +891,7 @@ class AppBridge(QObject):
         else:
             self._recording_sample_rate_warning = ""
 
-    def _refresh_sources(self) -> None:
+    def _refresh_sources(self, *, refresh_chart: bool = True) -> None:
         source_ids = extract_source_ids(self._last_sst)
         if source_ids != self._source_ids:
             current = set(source_ids)
@@ -915,10 +914,16 @@ class AppBridge(QObject):
             self.sourceItemsChanged.emit()
             self.sourceCountChanged.emit()
 
-        base_sources = [
-            {"id": source_id, "color": self._source_color_allocator.color_for(source_id)}
-            for source_id in self._source_ids
-        ]
+        if self._runtime_tracking_result.visible_targets:
+            base_sources = [
+                {"id": target.source_id, "color": target.color}
+                for target in self._runtime_tracking_result.visible_targets
+            ]
+        else:
+            base_sources = [
+                {"id": source_id, "color": self._source_color_allocator.color_for(source_id)}
+                for source_id in self._source_ids
+            ]
         sidebar_sources = compute_sidebar_sources(
             base_sources,
             sources_enabled=self._sources_enabled,
@@ -939,98 +944,111 @@ class AppBridge(QObject):
         self._source_rows_model.replace(
             build_rows_model_items(sidebar_sources, self._selected_source_ids)
         )
-        self._refresh_chart_models(visible_rows, visible_source_ids)
+        if refresh_chart:
+            self._refresh_chart_models(visible_rows, visible_source_ids)
 
     def _refresh_chart_models(
         self,
         visible_rows: dict[int, dict[str, Any]],
         visible_source_ids: list[int],
     ) -> None:
-        window_frames = self._runtime_window_frames()
-        ticks = build_chart_ticks(
-            window_frames,
-            tick_count=self._runtime_chart_tick_count,
-            fallback_sample_start=0,
-            fallback_sample_step=self._runtime_chart_sample_step,
+        window_model = build_chart_window_model(self._runtime_chart_messages)
+        self._chart_window_model.replace(window_model["ticks"])
+        self._elevation_chart_series_model.replace(
+            self._chart_series_model_items(
+                self._runtime_chart_messages,
+                visible_rows,
+                visible_source_ids,
+                axis="elevation",
+            )
         )
-        self._chart_x_ticks_model.replace(ticks)
-        self._elevation_series_model.replace(
-            build_chart_series(window_frames, visible_rows, visible_source_ids, axis="elevation")
-        )
-        self._azimuth_series_model.replace(
-            build_chart_series(window_frames, visible_rows, visible_source_ids, axis="azimuth")
+        self._azimuth_chart_series_model.replace(
+            self._chart_series_model_items(
+                self._runtime_chart_messages,
+                visible_rows,
+                visible_source_ids,
+                axis="azimuth",
+            )
         )
 
-    def _append_runtime_chart_frame(self, message: dict[str, Any]) -> None:
-        sample_raw = message.get("timeStamp")
-        if isinstance(sample_raw, int):
-            if (
-                self._runtime_chart_last_timestamp is not None
-                and sample_raw < self._runtime_chart_last_timestamp
-            ):
-                self._runtime_chart_frames = []
-                self._runtime_chart_time_origin = None
-                self._runtime_chart_next_fallback_sample = 0
-            if self._runtime_chart_time_origin is None:
-                if self._runtime_chart_frames:
-                    self._runtime_chart_frames = []
-                self._runtime_chart_time_origin = sample_raw
-            sample = max(0, sample_raw - self._runtime_chart_time_origin)
-            self._runtime_chart_last_timestamp = sample_raw
-            self._runtime_chart_next_fallback_sample = sample + self._runtime_chart_sample_step
-        else:
-            sample = self._runtime_chart_next_fallback_sample
-            self._runtime_chart_next_fallback_sample += self._runtime_chart_sample_step
+    def _chart_series_model_items(
+        self,
+        messages: list[dict[str, Any]],
+        visible_rows: dict[int, dict[str, Any]],
+        visible_source_ids: list[int],
+        *,
+        axis: str,
+    ) -> list[dict[str, Any]]:
+        items = build_chart_series_model(messages, visible_rows, visible_source_ids, axis=axis)
+        return [
+            {
+                "sourceId": int(item["sourceId"]),
+                "color": str(item["color"]),
+                "points": list(item.get("points", [])),
+            }
+            for item in items
+        ]
 
+    def _append_runtime_chart_frame(self, message: dict[str, Any]) -> bool:
         positions = extract_source_positions(
             message,
             enabled=True,
             selected_ids=None,
         )
-        frame = {
-            "sample": sample,
-            "sources": [
-                {
-                    "id": int(item["id"]),
-                    "x": float(item["x"]),
-                    "y": float(item["y"]),
-                    "z": float(item["z"]),
-                }
-                for item in positions
-            ],
+        normalized_sources = [
+            {
+                "id": int(item["id"]),
+                "x": float(item["x"]),
+                "y": float(item["y"]),
+                "z": float(item["z"]),
+            }
+            for item in positions
+        ]
+        self._runtime_chart_frame_sources = {
+            int(item["id"]): {
+                "x": float(item["x"]),
+                "y": float(item["y"]),
+                "z": float(item["z"]),
+            }
+            for item in normalized_sources
         }
-        self._runtime_chart_frames.append(frame)
-        if len(self._runtime_chart_frames) > self._runtime_chart_tick_count:
-            self._runtime_chart_frames = self._runtime_chart_frames[
-                -self._runtime_chart_tick_count :
-            ]
+        sample_raw = message.get("timeStamp")
+        if type(sample_raw) is not int:
+            return False
 
-    def _runtime_window_frames(self) -> list[dict[str, Any]]:
-        return list(self._runtime_chart_frames)
+        sample = int(sample_raw)
+        self._runtime_chart_messages.append({"timeStamp": sample, "src": normalized_sources})
+        if len(self._runtime_chart_messages) > 1600:
+            self._runtime_chart_messages = self._runtime_chart_messages[-1600:]
+        self._runtime_tracking_result = self._space_target_session.step(
+            [
+                SourceObservation(
+                    source_id=int(item["id"]),
+                    sample=sample,
+                    x=float(item["x"]),
+                    y=float(item["y"]),
+                    z=float(item["z"]),
+                )
+                for item in normalized_sources
+            ]
+        )
+        return True
 
     def _reset_runtime_chart_clock(self) -> None:
-        self._runtime_chart_next_fallback_sample = 0
-        self._runtime_chart_time_origin = None
-        self._runtime_chart_last_timestamp = None
-        self._runtime_chart_frames = []
+        self._runtime_chart_messages = []
+        self._runtime_chart_frame_sources = {}
+        self._runtime_tracking_result = TrackingResult(
+            visible_targets=[],
+            dropped_source_ids=[],
+        )
+        self._space_target_session = SpaceTargetSession()
         self._source_color_allocator.reset()
-        self._chart_x_ticks_model.replace(self._RUNTIME_CHART_X_TICKS)
-        self._elevation_series_model.replace([])
-        self._azimuth_series_model.replace([])
+        self._chart_window_model.replace(self._RUNTIME_CHART_X_TICKS)
+        self._elevation_chart_series_model.replace([])
+        self._azimuth_chart_series_model.replace([])
 
     def _current_runtime_frame_sources(self) -> dict[int, dict[str, float]]:
-        if not self._runtime_chart_frames:
-            return {}
-        latest = self._runtime_chart_frames[-1]
-        return {
-            int(source["id"]): {
-                "x": float(source.get("x", 0.0)),
-                "y": float(source.get("y", 0.0)),
-                "z": float(source.get("z", 0.0)),
-            }
-            for source in latest.get("sources", [])
-            if isinstance(source, dict) and isinstance(source.get("id"), int)
-        }
+        return dict(self._runtime_chart_frame_sources)
 
     def _refresh_potentials(self) -> None:
         count = count_potentials(

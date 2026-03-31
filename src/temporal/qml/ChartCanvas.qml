@@ -69,19 +69,86 @@ Canvas {
         return ticks
     }
 
+    function parseTickValues(ticks) {
+        const values = []
+        for (let index = 0; index < ticks.length; index += 1) {
+            const value = Number(ticks[index])
+            if (Number.isFinite(value)) {
+                values.push(value)
+            }
+        }
+        return values
+    }
+
+    function rangeBounds(values) {
+        if (values.length === 0) {
+            return {
+                min: 0,
+                max: 1
+            }
+        }
+        let minValue = values[0]
+        let maxValue = values[0]
+        for (let index = 1; index < values.length; index += 1) {
+            minValue = Math.min(minValue, values[index])
+            maxValue = Math.max(maxValue, values[index])
+        }
+        return {
+            min: minValue,
+            max: maxValue
+        }
+    }
+
+    function normalizeValue(value, minValue, maxValue) {
+        if (maxValue === minValue) {
+            return 0.5
+        }
+        return (value - minValue) / (maxValue - minValue)
+    }
+
+    function normalizePoint(point, xMin, xMax, yMin, yMax) {
+        if (!point || point.y === null || point.y === undefined) {
+            return null
+        }
+        const xValue = Number(point.x)
+        const yValue = Number(point.y)
+        if (!Number.isFinite(xValue) || !Number.isFinite(yValue)) {
+            return null
+        }
+        return {
+            x: normalizeValue(xValue, xMin, xMax),
+            y: normalizeValue(yValue, yMin, yMax)
+        }
+    }
+
     function normalizedSeries() {
         const normalized = []
         const count = modelCount(seriesModel)
+        const xValues = parseTickValues(readTicks())
+        const xBounds = rangeBounds(xValues)
+        const yValues = parseTickValues(yTicks)
+        const yBounds = rangeBounds(yValues)
         for (let index = 0; index < count; index += 1) {
             const item = seriesModel.get(index)
-            let values = []
-            try {
-                values = JSON.parse(String(item.valuesJson || "[]"))
-            } catch (error) {
-                values = []
-            }
-            if (!Array.isArray(values) || values.length === 0) {
+            const points = Array.isArray(item.points) ? item.points : (Array.isArray(item.values) ? item.values : [])
+            if (points.length === 0) {
                 continue
+            }
+            const structuredPoints = points.some(function (point) {
+                return point && typeof point === "object"
+            })
+            const values = []
+            for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
+                const point = points[pointIndex]
+                if (structuredPoints) {
+                    values.push(normalizePoint(point, xBounds.min, xBounds.max, yBounds.min, yBounds.max))
+                    continue
+                }
+                const numericValue = Number(point)
+                values.push(Number.isFinite(numericValue) ? {
+                    x: points.length === 1 ? 0.5 : pointIndex / (points.length - 1),
+                    y: normalizeValue(numericValue, yBounds.min, yBounds.max)
+                } : null)
             }
             normalized.push({
                 color: item.color,
@@ -144,17 +211,29 @@ Canvas {
         function plot(points, color) {
             ctx.strokeStyle = color
             ctx.lineWidth = 2
-            ctx.beginPath()
+            let drawing = false
             for (let index = 0; index < points.length; index += 1) {
-                const px = leftPad + index * plotW / Math.max(1, points.length - 1)
-                const py = topPad + plotH * (1 - points[index])
-                if (index === 0) {
+                const point = points[index]
+                if (!point) {
+                    if (drawing) {
+                        ctx.stroke()
+                        drawing = false
+                    }
+                    continue
+                }
+                const px = leftPad + point.x * plotW
+                const py = topPad + plotH * (1 - point.y)
+                if (!drawing) {
+                    ctx.beginPath()
                     ctx.moveTo(px, py)
+                    drawing = true
                 } else {
                     ctx.lineTo(px, py)
                 }
             }
-            ctx.stroke()
+            if (drawing) {
+                ctx.stroke()
+            }
         }
 
         for (let index = 0; index < visibleSeries.length; index += 1) {

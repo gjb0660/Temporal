@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from itertools import permutations
 from math import acos, degrees, sqrt
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence, cast
 
 from temporal.core.source_palette import SOURCE_COLOR_PALETTE
 
@@ -41,11 +41,11 @@ def _coerce_observation(item: SourceObservation | dict[str, object]) -> SourceOb
     if isinstance(item, SourceObservation):
         return item
     return SourceObservation(
-        source_id=int(item["source_id"]),
-        sample=int(item["sample"]),
-        x=float(item["x"]),
-        y=float(item["y"]),
-        z=float(item["z"]),
+        source_id=int(cast(Any, item["source_id"])),
+        sample=int(cast(Any, item["sample"])),
+        x=float(cast(Any, item["x"])),
+        y=float(cast(Any, item["y"])),
+        z=float(cast(Any, item["z"])),
     )
 
 

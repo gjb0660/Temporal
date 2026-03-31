@@ -155,7 +155,7 @@ class PreviewBridge(AppBridge):
         if not was_active:
             self._reset_preview_sample_window()
             self._refresh_preview_models(reset_chart=True)
-        self._preview_tick_timer.setInterval(self._sample_window_config()["timerIntervalMs"])
+        self._preview_tick_timer.setInterval(self._preview_timing_config()["timerIntervalMs"])
         if not self._preview_tick_timer.isActive():
             self._preview_tick_timer.start()
         self._apply_state_status()
@@ -187,7 +187,7 @@ class PreviewBridge(AppBridge):
         self._refresh_preview_models(reset_chart=True)
 
         if was_streaming:
-            self._preview_tick_timer.setInterval(self._sample_window_config()["timerIntervalMs"])
+            self._preview_tick_timer.setInterval(self._preview_timing_config()["timerIntervalMs"])
             self._preview_tick_timer.start()
             self._apply_state_status()
             return
@@ -201,7 +201,7 @@ class PreviewBridge(AppBridge):
         frames = self._tracking_frames()
         if not frames:
             return
-        advance_per_tick = max(1, int(self._sample_window_config()["advancePerTick"]))
+        advance_per_tick = max(1, int(self._preview_timing_config()["advancePerTick"]))
         self._sample_window_position += advance_per_tick
         self._refresh_preview_models()
 
@@ -218,13 +218,11 @@ class PreviewBridge(AppBridge):
     def _reset_preview_sample_window(self) -> None:
         self._sample_window_position = 0
 
-    def _sample_window_config(self) -> dict[str, int]:
+    def _preview_timing_config(self) -> dict[str, int]:
         raw = self._scenario.get("sampleWindow", {})
         if not isinstance(raw, dict):
             raw = {}
         return {
-            "windowSize": max(1, int(raw.get("windowSize", 1))),
-            "tickCount": max(1, int(raw.get("tickCount", 1))),
             "advancePerTick": max(1, int(raw.get("advancePerTick", 1))),
             "timerIntervalMs": max(50, int(raw.get("timerIntervalMs", 400))),
         }
@@ -239,14 +237,12 @@ class PreviewBridge(AppBridge):
         self._set_remote_log_lines(lines)
 
     def _refresh_preview_models(self, *, reset_chart: bool = False) -> None:
-        config = self._sample_window_config()
-        self._runtime_chart_tick_count = max(1, int(config["tickCount"]))
-        self._runtime_chart_sample_step = DEFAULT_CHART_SAMPLE_STEP
         if reset_chart:
             self._reset_runtime_chart_clock()
         sst = self._current_preview_sst_message()
+        if not self._append_runtime_chart_frame(sst):
+            return
         self._last_sst = sst
-        self._append_runtime_chart_frame(sst)
         self._refresh_sources()
         self._last_ssl = self._current_preview_ssl_message()
         self._refresh_potentials()

@@ -47,9 +47,9 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
                 yTicks: ["90", "60", "30", "0", "-30", "-60", "-90"]
-                xTickModel: root.appBridge.chartXTicksModel
-                seriesModel: root.appBridge.elevationSeriesModel
-                xAxisLabel: "时间 (0.01s)"
+                xTickModel: root.appBridge.chartWindowModel
+                seriesModel: root.appBridge.elevationChartSeriesModel
+                xAxisLabel: "样本"
             }
         }
 
@@ -70,9 +70,9 @@ Rectangle {
                 anchors.fill: parent
                 anchors.margins: 6
                 yTicks: ["180", "120", "60", "0", "-60", "-120", "-180"]
-                xTickModel: root.appBridge.chartXTicksModel
-                seriesModel: root.appBridge.azimuthSeriesModel
-                xAxisLabel: "时间 (0.01s)"
+                xTickModel: root.appBridge.chartWindowModel
+                seriesModel: root.appBridge.azimuthChartSeriesModel
+                xAxisLabel: "样本"
             }
         }
 
