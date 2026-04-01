@@ -73,6 +73,46 @@ class TestSourceTrackingSemantics(unittest.TestCase):
         self.assertEqual(len(result.visible_targets), 8)
         self.assertEqual(len({item.color for item in result.visible_targets}), 8)
 
+    def test_recovery_at_2s_boundary_prefers_original_color(self) -> None:
+        session = SpaceTargetSession(palette=("c0", "c1", "c2"))
+
+        first = session.step([SourceObservation(source_id=10, sample=100, x=1.0, y=0.0, z=0.0)])
+        session.step([SourceObservation(source_id=20, sample=150, x=0.0, y=1.0, z=0.0)])
+
+        recovered = session.step(
+            [
+                SourceObservation(source_id=11, sample=300, x=1.0, y=0.0, z=0.0),
+                SourceObservation(source_id=20, sample=290, x=0.0, y=1.0, z=0.0),
+            ]
+        )
+
+        recovered_target = next(item for item in recovered.visible_targets if item.source_id == 11)
+
+        self.assertEqual(recovered_target.color, first.visible_targets[0].color)
+
+    def test_recovery_after_2s_allows_original_or_new_color(self) -> None:
+        session = SpaceTargetSession(palette=("c0", "c1", "c2"))
+
+        first = session.step([SourceObservation(source_id=10, sample=100, x=1.0, y=0.0, z=0.0)])
+        session.step([SourceObservation(source_id=20, sample=150, x=0.0, y=1.0, z=0.0)])
+        session.step(
+            [
+                SourceObservation(source_id=20, sample=301, x=0.0, y=1.0, z=0.0),
+                SourceObservation(source_id=30, sample=301, x=0.0, y=0.0, z=1.0),
+            ]
+        )
+
+        recovered = session.step(
+            [
+                SourceObservation(source_id=20, sample=302, x=0.0, y=1.0, z=0.0),
+                SourceObservation(source_id=11, sample=302, x=1.0, y=0.0, z=0.0),
+            ]
+        )
+
+        recovered_target = next(item for item in recovered.visible_targets if item.source_id == 11)
+
+        self.assertIn(recovered_target.color, {first.visible_targets[0].color, "c2"})
+
 
 if __name__ == "__main__":
     unittest.main()
