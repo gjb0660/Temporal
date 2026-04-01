@@ -9,15 +9,15 @@ description = "Temporal: ODAS upper-computer interaction client built with Pytho
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
-    "pyside6>=6.8.0,<7.0.0",
+    "pyside6~=6.8.0",
     "paramiko>=3.5.0,<4.0.0",
-    "tomli>=2.2.1,<3.0.0",
+    "tomli>=2.2.0,<3.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pyright>=1.1.390,<2.0.0",
-    "ruff>=0.8.0,<1.0.0",
+    "pyright",
+    "ruff",
 ]
 
 [project.scripts]
