@@ -28,7 +28,14 @@ class TestOdasStreamClient(unittest.TestCase):
         self.assertNotEqual(listener.bound_port, 0)
 
         with socket.create_connection(("127.0.0.1", listener.bound_port), timeout=1.0) as client:
-            client.sendall(b'{"src":[{"id":9}]}\n')
+            client.sendall(
+                b'{\n'
+                b'    "timeStamp": 9,\n'
+                b'    "src": [\n'
+                b'        { "id": 9, "x": 0.0, "y": 0.0, "z": 1.0 }\n'
+                b"    ]\n"
+                b"}\n"
+            )
 
         self.assertTrue(_wait_for(lambda: len(received) == 1))
         listener.stop()
@@ -46,11 +53,28 @@ class TestOdasStreamClient(unittest.TestCase):
         self.assertNotEqual(listener.bound_port, 0)
 
         with socket.create_connection(("127.0.0.1", listener.bound_port), timeout=1.0) as client:
-            client.sendall(b'{"src":[{"id":1}')
-            client.sendall(b"]}\nnot-json\n")
+            client.sendall(
+                b'{\n'
+                b'    "timeStamp": 1,\n'
+                b'    "src": [\n'
+                b'        { "id": 1, "x": 1.0, "y": 0.0'
+            )
+            client.sendall(
+                b', "z": 0.0 }\n'
+                b"    ]\n"
+                b"}\n"
+                b"not-json\n"
+            )
 
         with socket.create_connection(("127.0.0.1", listener.bound_port), timeout=1.0) as client:
-            client.sendall(b'{"src":[{"id":2}]}\n')
+            client.sendall(
+                b'{\n'
+                b'    "timeStamp": 2,\n'
+                b'    "src": [\n'
+                b'        { "id": 2, "x": 0.0, "y": 1.0, "z": 0.0 }\n'
+                b"    ]\n"
+                b"}\n"
+            )
 
         self.assertTrue(_wait_for(lambda: len(received) == 2))
         listener.stop()

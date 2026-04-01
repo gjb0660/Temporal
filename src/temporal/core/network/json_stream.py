@@ -4,7 +4,7 @@ import json
 
 
 class JsonStreamBuffer:
-    """Decode line-delimited JSON from chunked TCP data."""
+    """Decode object-framed JSON from chunked TCP data."""
 
     def __init__(self) -> None:
         self._buffer = ""
@@ -15,12 +15,23 @@ class JsonStreamBuffer:
 
         out: list[dict] = []
         while True:
-            idx = self._buffer.find("\n")
-            if idx < 0:
+            start = self._buffer.find("{")
+            if start < 0:
+                self._buffer = ""
                 break
-            raw = self._buffer[:idx].strip()
-            self._buffer = self._buffer[idx + 1 :]
-            if not raw:
+
+            if start > 0:
+                self._buffer = self._buffer[start:]
+                start = 0
+
+            parsed = self._extract_next_object_text(start)
+            if parsed is None:
+                break
+            raw, end_index = parsed
+            self._buffer = self._buffer[end_index:]
+
+            # ODAS JSON sinks render multi-line object payloads.
+            if "\n" not in raw:
                 continue
             try:
                 data = json.loads(raw)
@@ -29,3 +40,30 @@ class JsonStreamBuffer:
             if isinstance(data, dict):
                 out.append(data)
         return out
+
+    def _extract_next_object_text(self, start: int) -> tuple[str, int] | None:
+        depth = 0
+        in_string = False
+        escaped = False
+        for index in range(start, len(self._buffer)):
+            char = self._buffer[index]
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+
+            if char == '"':
+                in_string = True
+                continue
+            if char == "{":
+                depth += 1
+                continue
+            if char == "}":
+                depth -= 1
+                if depth == 0:
+                    return self._buffer[start : index + 1], index + 1
+        return None
