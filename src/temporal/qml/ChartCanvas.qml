@@ -121,6 +121,23 @@ Canvas {
         }
     }
 
+    function toPointList(rawPoints) {
+        if (rawPoints === null || rawPoints === undefined) {
+            return []
+        }
+        if (Array.isArray(rawPoints)) {
+            return rawPoints
+        }
+        if (typeof rawPoints.length === "number") {
+            const converted = []
+            for (let index = 0; index < rawPoints.length; index += 1) {
+                converted.push(rawPoints[index])
+            }
+            return converted
+        }
+        return []
+    }
+
     function normalizedSeries() {
         const normalized = []
         const count = modelCount(seriesModel)
@@ -130,29 +147,17 @@ Canvas {
         const yBounds = rangeBounds(yValues)
         for (let index = 0; index < count; index += 1) {
             const item = seriesModel.get(index)
-            const points = Array.isArray(item.points) ? item.points : (Array.isArray(item.values) ? item.values : [])
+            const points = toPointList(item.points)
             if (points.length === 0) {
                 continue
             }
-            const structuredPoints = points.some(function (point) {
-                return point && typeof point === "object"
-            })
-            const values = []
+            const normalizedPoints = []
             for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
-                const point = points[pointIndex]
-                if (structuredPoints) {
-                    values.push(normalizePoint(point, xBounds.min, xBounds.max, yBounds.min, yBounds.max))
-                    continue
-                }
-                const numericValue = Number(point)
-                values.push(Number.isFinite(numericValue) ? {
-                    x: points.length === 1 ? 0.5 : pointIndex / (points.length - 1),
-                    y: normalizeValue(numericValue, yBounds.min, yBounds.max)
-                } : null)
+                normalizedPoints.push(normalizePoint(points[pointIndex], xBounds.min, xBounds.max, yBounds.min, yBounds.max))
             }
             normalized.push({
                 color: item.color,
-                values: values
+                points: normalizedPoints
             })
         }
         return normalized
@@ -238,7 +243,7 @@ Canvas {
 
         for (let index = 0; index < visibleSeries.length; index += 1) {
             const item = visibleSeries[index]
-            plot(item.values, item.color || theme.accentPurple)
+            plot(item.points, item.color || theme.accentPurple)
         }
     }
 }

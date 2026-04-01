@@ -8,7 +8,9 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
+from PySide6.QtQml import QQmlComponent, QQmlEngine
 
 from temporal.app import AppBridge
 from temporal.core.chart_window import build_chart_window_model
@@ -230,6 +232,47 @@ class TestChartBridgeContract(unittest.TestCase):
 
         self.assertNotIn("valuesJson", qml_text)
         self.assertNotIn("JSON.parse", qml_text)
+
+    def test_chart_canvas_handles_array_like_points_from_qml_model(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 15, "x": 1.0, "y": 0.0, "z": 0.0}]})
+
+        engine = QQmlEngine()
+        engine.rootContext().setContextProperty("bridge", bridge)
+        component = QQmlComponent(engine)
+        component.setData(
+            b"""
+import QtQuick
+import "."
+
+Item {
+    QtObject {
+        id: theme
+        property color accentPurple: "#cf54ea"
+    }
+
+    ChartCanvas {
+        id: chart
+        width: 320
+        height: 140
+        theme: theme
+        yTicks: ["90", "60", "30", "0", "-30", "-60", "-90"]
+        xTickModel: bridge.chartWindowModel
+        seriesModel: bridge.elevationChartSeriesModel
+    }
+
+    property int normalizedSeriesCount: chart.normalizedSeries().length
+}
+""",
+            QUrl.fromLocalFile(str(_QML_DIR / "ChartCanvasProbe.qml")),
+        )
+        obj = component.create()
+
+        self.assertFalse(component.isError(), [error.toString() for error in component.errors()])
+        self.assertGreaterEqual(obj.property("normalizedSeriesCount"), 1)
+        obj.deleteLater()
+        engine.deleteLater()
+        self._app.processEvents()
 
     def test_center_pane_binds_new_chart_models(self) -> None:
         qml_text = (_QML_DIR / "CenterPane.qml").read_text(encoding="utf-8")
