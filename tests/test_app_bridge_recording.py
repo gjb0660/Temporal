@@ -23,6 +23,7 @@ class _FakeRecorder:
         self._active: set[int] = set()
         self.pushed: list[tuple[int, str, bytes]] = []
         self._sessions: dict[tuple[int, str], _Session] = {}
+        self.sample_rates: dict[str, int] = {"sp": 16000, "pf": 16000}
 
     def update_active_sources(self, source_ids) -> None:
         self._active = {int(source_id) for source_id in source_ids if int(source_id) > 0}
@@ -57,6 +58,9 @@ class _FakeRecorder:
         sessions.sort(key=lambda item: (item.source_id, item.mode))
         return sessions
 
+    def set_sample_rates(self, sample_rates: dict[str, int]) -> None:
+        self.sample_rates = dict(sample_rates)
+
 
 class _FakeClient:
     def __init__(self, **_kwargs) -> None:
@@ -77,6 +81,8 @@ class _FakeRemote:
         self.connect_calls = 0
         self.start_calls = 0
         self.stop_calls = 0
+        self.sample_rates = {"sp": 16000, "pf": 16000}
+        self.sample_rate_warning: str | None = None
 
     def connect(self) -> None:
         self.connected = True
@@ -104,6 +110,12 @@ class _FakeRemote:
             raise RuntimeError("SSH is not connected")
         stdout = "odaslive ready\n" if self.running else "connected\n"
         return CommandResult(code=0, stdout=stdout, stderr="")
+
+    def recording_sample_rates(self) -> dict[str, int]:
+        return dict(self.sample_rates)
+
+    def recording_sample_rate_warning(self) -> str | None:
+        return self.sample_rate_warning
 
 
 def _fake_config() -> tuple[RemoteOdasConfig, OdasStreamConfig]:
@@ -249,6 +261,29 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertEqual(bridge._remote.connect_calls, 1)
         self.assertEqual(bridge._remote.start_calls, 1)
         self.assertEqual(bridge._client.start_calls, 1)
+        self.assertEqual(bridge._recorder.sample_rates, {"sp": 16000, "pf": 16000})
+
+    def test_remote_start_applies_detected_recording_sample_rates(self) -> None:
+        bridge = self._make_bridge()
+        remote = bridge._remote
+        self.assertIsInstance(remote, _FakeRemote)
+        remote.sample_rates = {"sp": 48000, "pf": 44100}
+
+        bridge.toggleRemoteOdas()
+
+        recorder = bridge._recorder
+        self.assertIsInstance(recorder, _FakeRecorder)
+        self.assertEqual(recorder.sample_rates, {"sp": 48000, "pf": 44100})
+
+    def test_remote_start_with_sample_rate_warning_publishes_log_notice(self) -> None:
+        bridge = self._make_bridge()
+        remote = bridge._remote
+        self.assertIsInstance(remote, _FakeRemote)
+        remote.sample_rate_warning = "录音采样率自动识别失败，已回退 16000Hz"
+
+        bridge.toggleRemoteOdas()
+
+        self.assertIn("回退 16000Hz", "\n".join(bridge._remote_log_lines))
 
     def test_toggle_remote_odas_stops_remote_only(self) -> None:
         bridge = self._make_bridge()

@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import wave
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -79,6 +80,37 @@ class TestAutoRecorder(unittest.TestCase):
             path = Path(session.filepath)
             self.assertTrue(path.exists())
             self.assertGreater(path.stat().st_size, 44)
+
+    def test_set_sample_rates_applies_to_new_sessions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            recorder.set_sample_rates({"sp": 48000, "pf": 44100})
+
+            sp_session = recorder.start(10, "sp")
+            pf_session = recorder.start(10, "pf")
+            recorder.stop_all()
+
+            with wave.open(str(sp_session.filepath), "rb") as sp_file:
+                self.assertEqual(sp_file.getframerate(), 48000)
+            with wave.open(str(pf_session.filepath), "rb") as pf_file:
+                self.assertEqual(pf_file.getframerate(), 44100)
+
+    def test_sample_rate_change_does_not_rebuild_existing_session(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            first = recorder.start(11, "sp")
+            recorder.set_sample_rates({"sp": 48000})
+            second = recorder.start(11, "sp")
+            recorder.stop_all()
+
+            self.assertEqual(first.filepath, second.filepath)
+            with wave.open(str(first.filepath), "rb") as wav_file:
+                self.assertEqual(wav_file.getframerate(), 16000)
+
+            third = recorder.start(12, "sp")
+            recorder.stop(12, "sp")
+            with wave.open(str(third.filepath), "rb") as wav_file:
+                self.assertEqual(wav_file.getframerate(), 48000)
 
     def test_sessions_snapshot_returns_sorted_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

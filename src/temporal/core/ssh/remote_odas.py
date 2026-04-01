@@ -110,6 +110,13 @@ def _extract_cfg_port(body: str) -> int | None:
     return int(match.group(1))
 
 
+def _extract_cfg_int(body: str, key: str) -> int | None:
+    match = re.search(rf"\b{re.escape(key)}\s*=\s*(\d+)", body)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
 def _extract_wrapper_cfg_path(wrapper_text: str) -> str | None:
     match = re.search(
         r"""(?x)
@@ -195,6 +202,8 @@ class RemoteOdasController:
         self._shell_command_shell = self._build_command_shell()
         self._shell_pid_shell = self._build_pid_shell()
         self._helper_shell = self._build_helper_shell()
+        self._recording_sample_rates: dict[str, int] = {"sp": 16000, "pf": 16000}
+        self._recording_sample_rate_warning: str | None = None
 
     def connect(self) -> None:
         with self._lock:
@@ -721,6 +730,34 @@ temporal_run() {
             return self._preflight_failed("preflight: odas config path missing")
         return _resolve_cfg_path(raw_cfg_path, runtime)
 
+    def _resolve_recording_sample_rates(self, cfg_text: str) -> tuple[dict[str, int], str | None]:
+        cleaned_cfg = _strip_cfg_comments(cfg_text)
+        defaults = {"sp": 16000, "pf": 16000}
+        separated = _extract_cfg_block_body(cleaned_cfg, "separated")
+        postfiltered = _extract_cfg_block_body(cleaned_cfg, "postfiltered")
+        warning_reasons: list[str] = []
+        if separated is None:
+            warning_reasons.append("separated.fS 缺失")
+        if postfiltered is None:
+            warning_reasons.append("postfiltered.fS 缺失")
+
+        sp_rate = _extract_cfg_int(separated or "", "fS")
+        pf_rate = _extract_cfg_int(postfiltered or "", "fS")
+        if sp_rate is None:
+            warning_reasons.append("separated.fS 无法解析")
+        if pf_rate is None:
+            warning_reasons.append("postfiltered.fS 无法解析")
+
+        sample_rates = {
+            "sp": sp_rate if isinstance(sp_rate, int) and sp_rate > 0 else defaults["sp"],
+            "pf": pf_rate if isinstance(pf_rate, int) and pf_rate > 0 else defaults["pf"],
+        }
+        if warning_reasons:
+            return sample_rates, "录音采样率自动识别失败，已回退 16000Hz（" + "；".join(
+                sorted(set(warning_reasons))
+            ) + "）"
+        return sample_rates, None
+
     def _validate_static_preflight(self) -> CommandResult:
         metadata_result = self._metadata_result()
         if metadata_result.code != 0:
@@ -735,7 +772,19 @@ temporal_run() {
         sink_error = _sink_targets_match(cfg_result.stdout, self._streams)
         if sink_error is not None:
             return self._preflight_failed(sink_error)
+        sample_rates, warning = self._resolve_recording_sample_rates(cfg_result.stdout)
+        with self._lock:
+            self._recording_sample_rates = sample_rates
+            self._recording_sample_rate_warning = warning
         return CommandResult(code=0, stdout="", stderr="")
+
+    def recording_sample_rates(self) -> dict[str, int]:
+        with self._lock:
+            return dict(self._recording_sample_rates)
+
+    def recording_sample_rate_warning(self) -> str | None:
+        with self._lock:
+            return self._recording_sample_rate_warning
 
     def start_odaslive(self) -> CommandResult:
         preflight = self._validate_static_preflight()

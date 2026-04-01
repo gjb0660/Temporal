@@ -63,7 +63,7 @@ def _runtime_metadata_result(
     )
 
 
-def _valid_cfg(host: str = "10.10.0.8") -> str:
+def _valid_cfg(host: str = "10.10.0.8", sep_fs: int = 16000, pf_fs: int = 16000) -> str:
     return "\n".join(
         [
             "tracked: {",
@@ -83,6 +83,7 @@ def _valid_cfg(host: str = "10.10.0.8") -> str:
             "  };",
             "};",
             "separated: {",
+            f"  fS = {sep_fs};",
             "  interface: {",
             '    type = "socket";',
             f'    ip = "{host}";',
@@ -90,6 +91,7 @@ def _valid_cfg(host: str = "10.10.0.8") -> str:
             "  };",
             "};",
             "postfiltered: {",
+            f"  fS = {pf_fs};",
             "  interface: {",
             '    type = "socket";',
             f'    ip = "{host}";',
@@ -231,6 +233,33 @@ class _NoBootstrapShellChannel(_FakeShellChannel):
 
 
 class TestRemoteOdasController(unittest.TestCase):
+    def test_resolve_recording_sample_rates_from_cfg(self) -> None:
+        controller = RemoteOdasController(_make_config(), _make_streams())
+
+        sample_rates, warning = controller._resolve_recording_sample_rates(
+            _valid_cfg(sep_fs=48000, pf_fs=44100)
+        )
+
+        self.assertEqual(sample_rates, {"sp": 48000, "pf": 44100})
+        self.assertIsNone(warning)
+
+    def test_resolve_recording_sample_rates_falls_back_with_warning(self) -> None:
+        controller = RemoteOdasController(_make_config(), _make_streams())
+
+        sample_rates, warning = controller._resolve_recording_sample_rates(
+            "\n".join(
+                [
+                    "separated: { interface: { ip = \"10.10.0.8\"; port = 10000; }; };",
+                    "postfiltered: { interface: { ip = \"10.10.0.8\"; port = 10010; }; };",
+                ]
+            )
+        )
+
+        self.assertEqual(sample_rates, {"sp": 16000, "pf": 16000})
+        self.assertIsNotNone(warning)
+        assert warning is not None
+        self.assertIn("回退 16000Hz", warning)
+
     def test_should_validate_sink_host_is_false_for_wildcard(self) -> None:
         controller = RemoteOdasController(_make_config(), _make_streams(listen_host="0.0.0.0"))
         self.assertFalse(controller._should_validate_sink_host())
@@ -506,11 +535,56 @@ class TestRemoteOdasController(unittest.TestCase):
             result = controller.start_odaslive()
 
         self.assertEqual(result.code, 0)
+        self.assertEqual(controller.recording_sample_rates(), {"sp": 16000, "pf": 16000})
+        self.assertIsNone(controller.recording_sample_rate_warning())
         helper_calls = [shlex.split(item.strip())[2] for item in shell.sent[1:]]
         self.assertEqual(
             helper_calls,
             ["temporal_metadata", "temporal_cat_file", "temporal_cat_file", "temporal_start"],
         )
+
+    def test_start_odaslive_records_sample_rate_warning_without_failing(self) -> None:
+        cfg_without_fs = "\n".join(
+            [
+                "tracked: { interface: { ip = \"10.10.0.8\"; port = 9000; }; };",
+                "potential: { interface: { ip = \"10.10.0.8\"; port = 9001; }; };",
+                "separated: { interface: { ip = \"10.10.0.8\"; port = 10000; }; };",
+                "postfiltered: { interface: { ip = \"10.10.0.8\"; port = 10010; }; };",
+            ]
+        )
+
+        def response_fn(name: str, args: list[str]) -> CommandResult:
+            if name == "temporal_metadata":
+                return _runtime_metadata_result()
+            if name == "temporal_cat_file" and args[0].endswith("odas_loop.sh"):
+                return CommandResult(
+                    code=0,
+                    stdout='#!/bin/sh\nexec odaslive -c "./configs/odas.cfg"\n',
+                    stderr="",
+                )
+            if name == "temporal_cat_file" and args[0].endswith("configs/odas.cfg"):
+                return CommandResult(code=0, stdout=cfg_without_fs, stderr="")
+            if name == "temporal_start":
+                return CommandResult(code=0, stdout="4242\n", stderr="")
+            return CommandResult(code=1, stdout="", stderr="unexpected helper")
+
+        shell = _FakeShellChannel(response_fn)
+        fake_client = _FakeSSHClient([shell])
+        controller = RemoteOdasController(_make_config(), _make_streams(listen_host="10.10.0.8"))
+
+        with patch(
+            "temporal.core.ssh.remote_odas.paramiko.SSHClient",
+            return_value=fake_client,
+        ):
+            controller.connect()
+            result = controller.start_odaslive()
+
+        self.assertEqual(result.code, 0)
+        self.assertEqual(controller.recording_sample_rates(), {"sp": 16000, "pf": 16000})
+        warning = controller.recording_sample_rate_warning()
+        self.assertIsNotNone(warning)
+        assert warning is not None
+        self.assertIn("回退 16000Hz", warning)
 
     def test_start_odaslive_surfaces_pid_persistence_failure(self) -> None:
         def response_fn(name: str, args: list[str]) -> CommandResult:

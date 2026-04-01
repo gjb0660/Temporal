@@ -18,6 +18,7 @@ class RecorderSession:
 
 class AutoRecorder:
     """Source-driven recorder: start on source appear, stop on disappear."""
+    _DEFAULT_SAMPLE_RATE = 16000
 
     def __init__(
         self,
@@ -32,6 +33,10 @@ class AutoRecorder:
         self._last_seen: dict[int, datetime] = {}
         self._inactive_timeout_sec = max(0.1, inactive_timeout_sec)
         self._now_fn = now_fn or datetime.now
+        self._sample_rates: dict[str, int] = {
+            "sp": self._DEFAULT_SAMPLE_RATE,
+            "pf": self._DEFAULT_SAMPLE_RATE,
+        }
         self._lock = threading.RLock()
 
     def start(self, source_id: int, mode: str) -> RecorderSession:
@@ -47,12 +52,23 @@ class AutoRecorder:
             writer = wave.open(str(path), "wb")
             writer.setnchannels(1)
             writer.setsampwidth(2)
-            writer.setframerate(16000)
+            writer.setframerate(self._sample_rates.get(mode, self._DEFAULT_SAMPLE_RATE))
 
             session = RecorderSession(source_id=source_id, mode=mode, started_at=now, filepath=path)
             self._writers[key] = writer
             self._sessions[key] = session
             return session
+
+    def set_sample_rates(self, sample_rates: dict[str, int]) -> None:
+        with self._lock:
+            for mode in ("sp", "pf"):
+                value = sample_rates.get(mode)
+                if isinstance(value, int) and value > 0:
+                    self._sample_rates[mode] = value
+
+    def sample_rates(self) -> dict[str, int]:
+        with self._lock:
+            return dict(self._sample_rates)
 
     def update_active_sources(
         self, source_ids: Iterable[int], modes: tuple[str, ...] = ("sp", "pf")

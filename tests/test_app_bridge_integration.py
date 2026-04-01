@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+import wave
 from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -59,6 +60,8 @@ class _FakeRemoteOdasController:
         self.status_exception: Exception | None = None
         self.log_exception: Exception | None = None
         self.status_calls = 0
+        self.sample_rates = {"sp": 16000, "pf": 16000}
+        self.sample_rate_warning: str | None = None
 
     def connect(self) -> None:
         self.connected = True
@@ -94,6 +97,12 @@ class _FakeRemoteOdasController:
         if self.log_exception is not None:
             raise self.log_exception
         return CommandResult(code=0, stdout=self.log_output, stderr="")
+
+    def recording_sample_rates(self) -> dict[str, int]:
+        return dict(self.sample_rates)
+
+    def recording_sample_rate_warning(self) -> str | None:
+        return self.sample_rate_warning
 
 
 class _BootstrapFailingRemoteOdasController(_FakeRemoteOdasController):
@@ -167,6 +176,54 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertGreaterEqual(len(files), 4)
             self.assertEqual(bridge.potentialCount, 2)
             self.assertEqual(bridge.recordingSourceCount, 0)
+
+    def test_remote_start_applies_sample_rates_to_new_wav_headers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.sample_rates = {"sp": 48000, "pf": 44100}
+
+            bridge.startRemoteOdas()
+            self._drain_startup(bridge)
+            bridge._on_sst({"src": [{"id": 2}]})
+            chunk = b"\x01\x00\x02\x00\x03\x00\x04\x00"
+            bridge._on_sep_audio(chunk)
+            bridge._on_pf_audio(chunk)
+            bridge.stopStreams()
+
+            sp_files = sorted(Path(temp_dir).glob("ODAS_*_sp.wav"))
+            pf_files = sorted(Path(temp_dir).glob("ODAS_*_pf.wav"))
+            self.assertTrue(sp_files)
+            self.assertTrue(pf_files)
+            with wave.open(str(sp_files[0]), "rb") as sp_wav:
+                self.assertEqual(sp_wav.getframerate(), 48000)
+            with wave.open(str(pf_files[0]), "rb") as pf_wav:
+                self.assertEqual(pf_wav.getframerate(), 44100)
+
+    def test_remote_start_sample_rate_warning_keeps_fallback_rate(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.sample_rate_warning = "录音采样率自动识别失败，已回退 16000Hz"
+
+            bridge.startRemoteOdas()
+            self.assertIn("回退 16000Hz", "\n".join(bridge._remote_log_lines))
+            self._drain_startup(bridge)
+            bridge._on_sst({"src": [{"id": 4}]})
+            chunk = b"\x01\x00\x02\x00\x03\x00\x04\x00"
+            bridge._on_sep_audio(chunk)
+            bridge.stopStreams()
+
+            sp_files = sorted(Path(temp_dir).glob("ODAS_*_sp.wav"))
+            self.assertTrue(sp_files)
+            with wave.open(str(sp_files[0]), "rb") as sp_wav:
+                self.assertEqual(sp_wav.getframerate(), 16000)
 
     def test_timeout_recovery_creates_new_sessions(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

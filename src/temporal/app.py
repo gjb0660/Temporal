@@ -96,6 +96,7 @@ class AppBridge(QObject):
         self._source_items: list[str] = []
         self._source_positions: list[dict[str, float | int]] = []
         self._remote_log_lines = list(self._EMPTY_REMOTE_LOG)
+        self._recording_sample_rate_warning = ""
         self._potential_count = 0
         self._recording_source_count = 0
         self._recording_sessions: list[str] = []
@@ -329,6 +330,7 @@ class AppBridge(QObject):
             self._set_startup_failure_status(self._pick_startup_failure_reason(result))
             return
 
+        self._apply_recording_sample_rates()
         self._startup_failure_hint = result.stderr.strip() or result.stdout.strip()
         self._startup_attempts_remaining = self._STARTUP_VERIFY_ATTEMPTS
         self._set_odas_running(False)
@@ -621,6 +623,11 @@ class AppBridge(QObject):
 
     def _set_remote_log_lines(self, lines: list[str]) -> None:
         clean_lines = lines[-120:] if lines else ["远程日志为空，等待 odaslive 输出..."]
+        if (
+            self._recording_sample_rate_warning
+            and self._recording_sample_rate_warning not in clean_lines
+        ):
+            clean_lines = [*clean_lines, self._recording_sample_rate_warning][-120:]
         if clean_lines == self._remote_log_lines:
             return
         self._remote_log_lines = clean_lines
@@ -861,6 +868,29 @@ class AppBridge(QObject):
             return
         items = [f"Source {item.source_id} [{item.mode}] {item.filepath.name}" for item in sessions]
         self._set_recording_sessions(items)
+
+    def _apply_recording_sample_rates(self) -> None:
+        sample_rates_fn = getattr(self._remote, "recording_sample_rates", None)
+        warning_fn = getattr(self._remote, "recording_sample_rate_warning", None)
+        recorder_update_fn = getattr(self._recorder, "set_sample_rates", None)
+
+        sample_rates = {"sp": 16000, "pf": 16000}
+        if callable(sample_rates_fn):
+            remote_rates = sample_rates_fn()
+            if isinstance(remote_rates, dict):
+                for mode in ("sp", "pf"):
+                    value = remote_rates.get(mode)
+                    if isinstance(value, int) and value > 0:
+                        sample_rates[mode] = value
+        if callable(recorder_update_fn):
+            recorder_update_fn(sample_rates)
+
+        warning = warning_fn() if callable(warning_fn) else None
+        if isinstance(warning, str) and warning.strip():
+            self._recording_sample_rate_warning = warning.strip()
+            self._set_remote_log_lines(self._remote_log_lines)
+        else:
+            self._recording_sample_rate_warning = ""
 
     def _refresh_sources(self) -> None:
         source_ids = extract_source_ids(self._last_sst)
