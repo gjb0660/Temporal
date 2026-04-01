@@ -1,16 +1,17 @@
 ---
 title: ui-system-refactor-chart-canvas
 tracker: refactor
-status: exploring
+status: active
 owner: codex/ui
-updated: 2026-04-01
+updated: 2026-04-02
 ---
 
 ## Goal
 
-重写 `ChartCanvas`，并显式移除 chart 子系统的历史兼容包袱。
-以第一性原理收敛“时间窗语义、颜色语义、缺口语义、渲染职责边界”，
-形成可直接验收的零兼容实现基线。
+锁定 chart 后端技术路线，先用第一性原理定义“必须成立的稳定性与语义目标”，
+再用奥卡姆剃刀收敛到最小可持续方案：
+长期目标态为 `QtGraphs`，短期过渡态为 `Canvas`（仅风险控制用途），
+并禁用 `QtCharts`。
 
 ## Non-Goals
 
@@ -23,113 +24,110 @@ updated: 2026-04-01
 
 - `specs/contracts/ui/chart-canvas.md` 已冻结图表不变量：双轴趋势图、空网格安全、
   source 颜色一致、只读语义、`0.01s` 横轴、`1600` 固定窗口与 `200` 主刻度。
-- 当前 `ChartCanvas.qml` 在 `onPaint` 内解析 `valuesJson`，渲染层承担数据解码职责。
-- 当前 shared projection `build_chart_series(...)` 对 source 缺帧不补位；
-  series 长度由“出现过多少帧”决定，而非“窗口帧长度”决定。
-- `odas_web` 的 `graph.js` 在 source inactive 时写入 `y: null`，
-  其语义是“保留时间轴位置并显示断点”。
-- runtime 与 preview 当前已经共享 `ui_projection` 路径，
-  可作为单一路径收敛新输入契约。
-- 本次先完成了 `specs/knowledge/references/odas-web-chart-canvas-analysis.md`，
-  明确了可迁移事实与边界。
-- 当前实现方案参数已经锁定：backend 为 `QtCharts`、scope 为 tracked-only 双图、
-  source scale 上限 `<=8`、刷新节流固定 `20 FPS`。
-- 窗口与刻度参数已经锁定：滚动窗区间 `[latest-1600, latest]`，负刻度可见，
-  且窗口内所有 `sample % 200 == 0` 的刻度均需绘制刻度线与标签。
-- 实际会话观测显示同一说话人连续发言时可能触发 `sourceId` 递增，
-  `sourceId` 不再适合作为颜色身份主键。
-- 当前 `ui-system` 是展示语义 owner，`preview-mode` 只应适配共享展示语义，
-  不应反向约束 `ui-system` 的设计收敛。
-- 苏格拉底式假设挑战 1：我们真正要保护的是“视觉像旧版”，
-  还是“行为语义可验证且可长期演进”？
-- 苏格拉底式假设挑战 2：让 QML 解析业务 JSON 是否真是最简方案，
-  还是把复杂度错误放在了最难测的层？
-- 苏格拉底式假设挑战 3：source 缺帧时自动压缩为连续线，
-  是否掩盖了真实数据不连续性？
+- Qt 官方文档已标注：`Qt Charts` 自 Qt 6.10 起 deprecated，
+  新项目建议使用 `Qt Graphs`。
+- Qt 官方文档已标注：使用 `Qt Charts` 的 Qt Quick 工程，
+  需将默认 `QGuiApplication` 替换为 `QApplication`。
+- 当前仓库入口仍使用 `QGuiApplication`：
+  `src/temporal/main.py` 与 `src/temporal/app.py` 均以 `QGuiApplication` 启动。
+- 2026-04-02 本地复现实验（Windows + PySide6 6.8.3 + offscreen）显示：
+  以 `QGuiApplication` 加载 `Main.qml` 可复现 `access violation`（exit `-1073741819`）；
+  切换为 `QApplication` 后同路径可正常完成加载（roots=`1`，exit=`0`）。
+- Qt 官方 Canvas 文档明确提示：
+  对 `Canvas.Image` 路径，应避免大画布、频繁更新与动画；
+  并建议优先考虑 `QQuickPaintedItem`（C++/QPainter）而非 JS/Context2D。
+- Qt Graphs 迁移文档明确存在 6.8 代际差异；
+  其列出的缺口（如标题/图例等）需逐项比对当前 contract 是否依赖。
+- 当前 chart contract 语义以趋势折线与固定时间窗为核心，
+  不依赖 `QtCharts` 特有的 widget 体系或高级交互语义。
+- 当前实现事实是 `ChartCanvas.qml` 使用 `Canvas/onPaint`，
+  且横轴网格与标签仍按“刻度索引等分”绘制，而非按 sample 值映射。
+- 当前已观测到 3 个回归风险：
+  1) 刻度与折线缺少“画卷式”左移效果；
+  2) `latest` 非 200 整除时，左侧点位可能出现越界；
+  3) preview 固定 200 sample 步长会掩盖非整除边界问题。
+- 当前仓库版本窗口为 `PySide6 6.8.x`（当前锁定 `6.8.3`）。
+- 苏格拉底式假设挑战 1：我们要优化的是“现在看起来可用”，
+  还是“跨版本仍可验证并可维护”？
+- 苏格拉底式假设挑战 2：若一阶问题是启动崩溃前提，
+  是否应先消除该前提，再讨论后端美学偏好？
+- 苏格拉底式假设挑战 3：在禁用 `QtCharts` 的前提下，
+  我们是否接受 `Canvas` 仅作为短期过渡并承担可控性能约束？
 
 ## Decision
 
 - 采用奥卡姆剃刀：`ChartCanvas` 仅负责绘制，不再承担业务推导或 JSON 解码。
-- 渲染后端采用 `QtCharts`，并保持 tracked-only 双图（elevation / azimuth）。
-- 建立单一输入契约：bridge/projection 输出“已对齐时间窗”的结构化点列，
-  其中 `x` 为数值 sample，`y` 为角度值，缺帧以可空值表达 gap；
-  不再保留 `valuesJson + chartXTicksModel(string)` 旧接口形状。
-- 新接口命名固定为：
-  `chartWindowModel`、`elevationChartSeriesModel`、`azimuthChartSeriesModel`。
-- 缺帧表达显式化：source 在某窗口帧无数据时，必须以 gap 语义传递到渲染层，
-  并通过分段折线保持断点可见，不允许静默索引压缩或跨 gap 连线。
-- 刷新采用固定 `20 FPS` 节流；source 并发展示能力按 `<=8` 路收口。
-- source 超过 8 路时，先执行 Top8 选择，再应用勾选过滤：
-  Top8 规则为“空间目标最近出现时间降序”，并列按当前帧 `sourceId` 升序。
-- X 轴窗口采用硬约束：固定长度 `1600`，滚动区间 `[latest-1600, latest]`，
-  负刻度必须显示，且窗口内所有 `200` 整除刻度都要绘制刻度线与标签。
-- latest 刻度必须始终标注；当 latest 本身可被 `200` 整除时，禁止重复刻度线/标签。
-- 颜色语义采用“空间目标连续映射 + 分配池分配”：
-  单连接会话内同一空间目标颜色稳定；重连后全量重置映射。
-- 空间目标关联算法固定为：方位角 + 仰角 + 最近时间特征，
-  全局最小角距匹配，角距阈值 `<=20°`，连续性窗口 `2` 秒。
-- 颜色分配策略固定为：匹配成功继承历史颜色；
-  无匹配新目标优先复用释放池，否则按固定调色池顺序分配颜色。
-- 默认配置要求调色池长度覆盖可见上限（`>=8`）；
-  若异常配置导致颜色槽位不足，先执行 Top8 选择再进行颜色分配，
-  槽位耗尽后可丢弃超限目标并发出告警。
-- 颜色分配只依赖“空间目标映射 + 分配序号”，不依赖 `sourceId` 数值范围。
-- `preview-mode` 必须适配 `ui-system` 的共享展示语义：
-  移除 `sampleWindow.tickCount/windowSize/tickStride` 对 chart 语义的配置入口。
-- 缺失 `timeStamp` 的帧视为无效帧并直接丢弃：
-  不入窗口、不推进 sample、不更新 latest，且不保留 sample fallback 兼容路径。
-- 视觉风格以 `odas_web` 为基线，优先保证趋势可读性与状态稳定感。
-- 保持 contract 行为边界不变：不新增交互，不改变双图结构，不改变时钟语义。
-- runtime 与 preview 同步切换到同一新契约，禁止并行双轨实现。
+- 路线三元锁定：
+  目标态为 `QtGraphs`，过渡态为 `Canvas`（仅风险控制用途），
+  禁止态为 `QtCharts`。
+- 过渡态前置条件（必须先满足）：
+  启动路径必须移除 `QtCharts` 运行依赖，不得保留
+  `QGuiApplication + QtCharts` 崩溃链路。
+- 过渡态使用边界：
+  `Canvas` 仅作为短期风险缓冲，继续执行固定窗口、固定主刻度、
+  `<=8` 可见序列与节流刷新约束，不在过渡期扩展交互能力。
+- 在 `Canvas` 过渡态下，横轴实现语义进一步冻结：
+  点与刻度共享窗口域 `[latest-1600, latest]` 映射，
+  禁止以刻度索引等分替代 sample 值映射。
+- preview 时钟语义冻结为 `sampleStride=19` 与 `timerIntervalMs=190`；
+  场景数据移除 `sampleWindow` 配置入口，帧可循环但 `timeStamp` 不回跳。
+- 输入契约去兼容化：
+  图表渲染仅消费 `points`，不再保留 `values` 回退路径。
+- 目标态切换触发条件（全部满足才可移除过渡态）：
+  1) 版本窗口允许进入 Qt 6.10+ 策略；
+  2) `QtGraphs` 路径通过 chart contract 全量语义回归；
+  3) runtime/preview parity 回归通过。
+- `QtCharts` 禁用策略固定：
+  过渡与目标阶段均不得恢复 `QtCharts` 依赖，除非明确开启新一轮 spec 决策。
+- 继续保持共享输入契约与语义边界不变：
+  `chartWindowModel`、`elevationChartSeriesModel`、`azimuthChartSeriesModel`、
+  gap 断点、固定窗口与 Top8 颜色语义保持冻结。
 
 ## Acceptance
 
-1. 新 `ChartCanvas` 不再在 `onPaint` 中解析 `valuesJson`，渲染输入为直接可绘制结构。
-2. 同一时间窗内，points 必须与窗口帧长度对齐；
-   不要求与 ticks 同长度，source 缺帧时可观察到 gap，而非线段压缩。
-3. 颜色语义继续由 bridge 单一路径输出，row/3D/chart 保持一致。
-4. `0.01s`、固定 `1600` 滚动窗口、`200` 整除主刻度、latest 去重标注、
-   重连归零语义全部保持不变。
-5. runtime 与 preview 对同一场景输入的 chart 行为保持 parity。
-6. 相关单元测试覆盖新契约边界，且现有 chart 行为回归测试通过。
-7. `latest=350` 时窗口含负刻度，`...,-200,0,200` 的刻度线与标签可见。
-8. `latest=1660` 时窗口覆盖多个 `200` 整除点，主刻度完整可见。
-9. `latest=1600` 时 latest 与主刻度重合，不出现重复刻度线或重复标签。
-10. source 缺帧场景中折线断点可见，不跨 gap 连线。
-11. 单连接会话内同一空间目标颜色保持稳定，且当前可见 `<=8` 路不撞色。
-12. 默认配置下可见 `<=8` 路颜色槽位充足且映射稳定；
-    异常小调色池配置下先执行 Top8，再在槽位耗尽时丢弃超限目标并发出告警。
-13. source 超过 8 路时，按“空间目标最近出现时间降序 + 当前帧 `sourceId` 升序平局”选前 8。
-14. `preview-mode` 不再通过 `sampleWindow.tickCount/windowSize/tickStride` 配置 chart 语义，
-    且其展示语义与 `ui-system` 保持一致。
-15. 缺失 `timeStamp` 帧不会触发 chart sample fallback 递增。
-16. 连续讲话导致 `sourceId` 变化时，若空间目标匹配仍成立，颜色保持不变。
-17. 目标静默时间 `<=2.0` 秒后恢复时优先复用原颜色；
-    超过 `2.0` 秒窗口时允许复用原色或分配新色。
+1. 本 feature 的 Facts 明确记录官方弃用事实、迁移事实与本地崩溃复现实验，
+   且包含具体日期与环境前提。
+2. 本 feature 的 Decision 明确写出“目标态/过渡态/禁止态”三元路线，
+   结论为“目标 `QtGraphs`，过渡 `Canvas`，禁用 `QtCharts`”。
+3. 过渡态前置条件在 spec 中可验证：必须先消除当前可复现崩溃前提，
+   不得继续接受 `QGuiApplication + QtCharts` 路径或 `QtCharts` 运行依赖。
+4. 过渡态退出条件在 spec 中可验证：版本窗口、contract 语义回归、
+   runtime/preview parity 三项全部满足后才允许移除过渡态。
+5. chart contract 核心语义保持不变：时间窗、gap、颜色一致性与只读边界不退化。
+6. `ui-system` 上层 owner spec 与本 feature 结论一致，不出现“QtCharts 可用”冲突表述。
+7. 存在一份知识归档文档，记录三路对比矩阵、证据来源与结论边界，
+   可供后续实现阶段直接引用。
+8. 后续实现预置验收已写入本 feature：
+   迁移完成前启动路径不再触发当前崩溃前提；
+   迁移后保持 chart contract 与 runtime/preview parity 通过。
+9. `latest=1661`（非 200 整除）场景下，图表左侧点位不越界，
+   刻度线/标签与折线随时间保持同速左移。
+10. preview 运行时满足固定质数步长（19）与 190ms 推进；
+    数据循环时 `timeStamp` 仍单调递增。
 
 ## Plan
 
-1. 定义并冻结 ChartCanvas 新输入契约（含 gap 表达、长度对齐规则）。
-2. 重构 shared projection 与 bridge 输出，移除渲染层 JSON 解码依赖。
-3. 迁移 `ChartCanvas` 到 `QtCharts` 并落地分段折线 gap 渲染。
-4. 重写 `src/temporal/qml/ChartCanvas.qml`，仅保留绘制职责与 `20 FPS` 节流刷新。
-5. 校验 `CenterPane.qml` 绑定与 contract 一致性，避免行为漂移。
-6. 增补/调整测试，冻结以下场景：`latest=350`、`latest=1660`、
-   `latest=1600` 去重、source gap 断点与 runtime/preview parity。
-7. 将颜色映射、Top8 选择、无 `timeStamp` 处理改为零兼容行为，
-   并删除旧接口形状相关断言。
-8. 增加空间目标连续映射测试：分段讲话换 `sourceId` 保色、
-   双目标交错不串色、静默窗口内外恢复策略。
+1. 更新本 feature 的 Facts/Decision/Acceptance，完成后端路线锁定。
+2. 新增调查知识归档，固化官方证据与本地复现实验。
+3. 对齐 `ui-system` owner 规范，确保上层语义与本 feature 一致。
+4. 复核 `chart-canvas` contract 是否冲突；若无冲突保持 contract 后端无关。
+5. 为后续代码阶段预置迁移门槛与回归门槛，避免再次出现路线摇摆。
 
 ## Progress
 
-- [x] 已完成 `odas_web` 图表实现调研并提取可迁移事实。
-- [x] 已完成第一性原理与奥卡姆剃刀约束收敛。
-- [x] 已将“假设挑战”落入本 feature 的 Facts 与 Decision。
-- [x] 已进入代码实现阶段，并先以静态断言冻结 `QtCharts` 后端、移除 `Canvas/onPaint` 与 `20 FPS` 节流门。
-- [x] 已补齐 C 子任务的颜色连续性边界测试（`<=2.0s` 优先原色，`>2.0s` 允许原色或新色）。
+- [x] 已完成 `QtCharts vs QtGraphs vs Canvas` 官方资料与本地实验调查。
+- [x] 已将第一性原理、奥卡姆剃刀与苏格拉底假设挑战写入 Facts/Decision。
+- [x] 已在本 feature 锁定“目标态/过渡态/禁止态”路线结论。
+- [x] 已定义过渡态前置条件与退出触发条件。
 
 ## Todo
 
-- [ ] 在实现前补充一份最小输入契约示例（含正常帧、缺帧、重连归零三组样例）。
-- [ ] 在进入编码前对照 `specs/contracts/ui/chart-canvas.md` 做一次逐条不变量复核。
+- [ ] 进入代码阶段前，把“启动路径崩溃前提消除”拆成独立执行子任务并补充回归测试。
+- [ ] 进入迁移阶段前，逐条映射 `QtGraphs` 在目标版本下的 contract 覆盖率与差异处理策略。
+- [ ] 过渡 `Canvas` 阶段补充高频刷新边界验证，避免性能风险突破既定上限。
+
+## Assumptions
+
+- 版本窗口短期维持 `PySide6 6.8.x`。
+- `QtCharts` 在当前路线中被禁用，不作为过渡态或长期路线。
+- `Canvas` 仅作为短期过渡态；进入目标态后不保留并行双轨。
