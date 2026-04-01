@@ -35,7 +35,7 @@ updated: 2026-04-01
 - 保持 preview 对 `ui-system` 的语义对齐目标，并将展示投影统一委托给 shared projection layer。
 - 保持 preview 与 runtime 除数据来源外的 chart 语义一致，不在 QML 层引入分支逻辑。
 - preview 必须适配 `ui-system` 的共享展示语义变更，MUST NOT 以 preview 现有实现反向约束 `ui-system` 设计。
-- preview 不再拥有 `sampleWindow.tickCount/windowSize` 这类 chart 语义配置入口。
+- preview 不再拥有 `sampleWindow.tickCount/windowSize/tickStride` 这类 chart 语义配置入口。
 - preview 对外展示 `sourceId` 时，仅用于标签可读性，颜色必须跟随 `ui-system` 的空间连续映射规则。
 
 ## Acceptance

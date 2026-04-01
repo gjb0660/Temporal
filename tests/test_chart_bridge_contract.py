@@ -15,6 +15,7 @@ from temporal.core.chart_window import build_chart_window_model
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.preview_bridge import PreviewBridge
+from temporal.preview_data import get_preview_scenario
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -154,11 +155,6 @@ class TestChartBridgeContract(unittest.TestCase):
             "status": "Temporal 就绪",
             "remoteLogLines": ["等待连接远程 odaslive..."],
             "sampleWindow": {
-                "sampleStart": 0,
-                "sampleStep": 200,
-                "windowSize": 1,
-                "tickCount": 99,
-                "tickStride": 1,
                 "advancePerTick": 1,
                 "timerIntervalMs": 400,
             },
@@ -192,11 +188,6 @@ class TestChartBridgeContract(unittest.TestCase):
             "status": "Temporal 就绪",
             "remoteLogLines": ["等待连接远程 odaslive..."],
             "sampleWindow": {
-                "sampleStart": 0,
-                "sampleStep": 200,
-                "windowSize": 1,
-                "tickCount": 1,
-                "tickStride": 1,
                 "advancePerTick": 1,
                 "timerIntervalMs": 400,
             },
@@ -213,13 +204,8 @@ class TestChartBridgeContract(unittest.TestCase):
         baseline_azimuth = _model_items(preview.azimuthChartSeriesModel)
 
         preview._scenario["sampleWindow"] = {
-            "sampleStart": 0,
-            "sampleStep": 200,
-            "windowSize": 999,
-            "tickCount": 999,
-            "tickStride": 1,
-            "advancePerTick": 1,
-            "timerIntervalMs": 400,
+            "advancePerTick": 3,
+            "timerIntervalMs": 250,
         }
         preview._reset_preview_sample_window()
         preview._refresh_preview_models(reset_chart=True)
@@ -227,6 +213,17 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertEqual(_model_items(preview.chartWindowModel), baseline_window)
         self.assertEqual(_model_items(preview.elevationChartSeriesModel), baseline_elevation)
         self.assertEqual(_model_items(preview.azimuthChartSeriesModel), baseline_azimuth)
+
+    def test_preview_scenarios_expose_only_clock_sample_window_fields(self) -> None:
+        scenario = get_preview_scenario("referenceSingle")
+
+        self.assertEqual(
+            scenario["sampleWindow"],
+            {
+                "advancePerTick": 2,
+                "timerIntervalMs": 400,
+            },
+        )
 
     def test_chart_canvas_qml_does_not_parse_json_contract(self) -> None:
         qml_text = (_QML_DIR / "ChartCanvas.qml").read_text(encoding="utf-8")

@@ -75,7 +75,7 @@ updated: 2026-04-01
   槽位耗尽后可丢弃超限目标并发出告警。
 - 颜色分配只依赖“空间目标映射 + 分配序号”，不依赖 `sourceId` 数值范围。
 - `preview-mode` 必须适配 `ui-system` 的共享展示语义：
-  移除 `sampleWindow.tickCount/windowSize` 对 chart 语义的配置入口。
+  移除 `sampleWindow.tickCount/windowSize/tickStride` 对 chart 语义的配置入口。
 - 缺失 `timeStamp` 的帧视为无效帧并直接丢弃：
   不入窗口、不推进 sample、不更新 latest，且不保留 sample fallback 兼容路径。
 - 视觉风格以 `odas_web` 为基线，优先保证趋势可读性与状态稳定感。
@@ -85,8 +85,8 @@ updated: 2026-04-01
 ## Acceptance
 
 1. 新 `ChartCanvas` 不再在 `onPaint` 中解析 `valuesJson`，渲染输入为直接可绘制结构。
-2. 同一时间窗内，`x` 刻度与每条 source 序列长度一一对应；
-   source 缺帧时可观察到 gap，而非线段压缩。
+2. 同一时间窗内，points 必须与窗口帧长度对齐；
+   不要求与 ticks 同长度，source 缺帧时可观察到 gap，而非线段压缩。
 3. 颜色语义继续由 bridge 单一路径输出，row/3D/chart 保持一致。
 4. `0.01s`、固定 `1600` 滚动窗口、`200` 整除主刻度、latest 去重标注、
    重连归零语义全部保持不变。
@@ -100,7 +100,7 @@ updated: 2026-04-01
 12. 默认配置下可见 `<=8` 路颜色槽位充足且映射稳定；
     异常小调色池配置下先执行 Top8，再在槽位耗尽时丢弃超限目标并发出告警。
 13. source 超过 8 路时，按“空间目标最近出现时间降序 + 当前帧 `sourceId` 升序平局”选前 8。
-14. `preview-mode` 不再通过 `sampleWindow.tickCount/windowSize` 配置 chart 语义，
+14. `preview-mode` 不再通过 `sampleWindow.tickCount/windowSize/tickStride` 配置 chart 语义，
     且其展示语义与 `ui-system` 保持一致。
 15. 缺失 `timeStamp` 帧不会触发 chart sample fallback 递增。
 16. 连续讲话导致 `sourceId` 变化时，若空间目标匹配仍成立，颜色保持不变。

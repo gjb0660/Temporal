@@ -31,7 +31,12 @@ def _frame_sample(frame: dict[str, Any]) -> int | None:
 
 def _normalize_sources(frame: dict[str, Any]) -> list[dict[str, float | int]]:
     sources: list[dict[str, float | int]] = []
-    for source in frame.get("sources", []):
+    source_items = frame.get("sources")
+    if not isinstance(source_items, list):
+        source_items = frame.get("src")
+    if not isinstance(source_items, list):
+        source_items = []
+    for source in source_items:
         if not isinstance(source, dict):
             continue
         source_id = _coerce_int(source.get("id"))
@@ -51,8 +56,6 @@ def _normalize_sources(frame: dict[str, Any]) -> list[dict[str, float | int]]:
 def normalize_chart_frames(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     frames: list[dict[str, Any]] = []
     for frame in messages:
-        if not isinstance(frame, dict):
-            continue
         sample = _frame_sample(frame)
         if sample is None:
             continue
@@ -76,9 +79,11 @@ def _visible_window_frames(
         return [], 0, 0
     latest = int(frames[-1]["sample"])
     window_start = latest - max(0, int(window_size))
-    return [
-        frame for frame in frames if window_start <= int(frame["sample"]) <= latest
-    ], window_start, latest
+    return (
+        [frame for frame in frames if window_start <= int(frame["sample"]) <= latest],
+        window_start,
+        latest,
+    )
 
 
 def _build_tick(value: int, latest: int, tick_step: int) -> dict[str, Any]:
@@ -151,12 +156,10 @@ def build_chart_series_model(
     if not window_frames:
         return []
 
-    source_lookup = {
-        int(source_id): dict(row)
-        for source_id, row in visible_rows.items()
-        if isinstance(source_id, int)
-    }
-    visible_ids = [int(source_id) for source_id in visible_source_ids if int(source_id) in source_lookup]
+    source_lookup = {int(source_id): dict(row) for source_id, row in visible_rows.items()}
+    visible_ids = [
+        int(source_id) for source_id in visible_source_ids if int(source_id) in source_lookup
+    ]
     if not visible_ids:
         return []
 
@@ -165,11 +168,7 @@ def build_chart_series_model(
         row = source_lookup[source_id]
         points: list[dict[str, float | int | None]] = []
         for frame in window_frames:
-            frame_sources = {
-                int(source["id"]): source
-                for source in frame.get("sources", [])
-                if isinstance(source, dict) and isinstance(source.get("id"), int)
-            }
+            frame_sources = {int(source["id"]): source for source in _normalize_sources(frame)}
             source = frame_sources.get(source_id)
             points.append(
                 {

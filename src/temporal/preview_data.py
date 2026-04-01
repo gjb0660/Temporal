@@ -14,9 +14,6 @@ PREVIEW_SCENARIO_KEYS = (
 )
 
 _DEFAULT_SAMPLE_WINDOW = {
-    "windowSize": 10,
-    "tickCount": 10,
-    "tickStride": 1,
     "advancePerTick": 2,
     "timerIntervalMs": 400,
 }
@@ -30,9 +27,8 @@ def _normalize_vector(x: float, y: float, z: float) -> tuple[float, float, float
 def _build_tracking_frames(
     anchors: list[dict[str, Any]],
     phase_offsets: dict[int, float],
-    sample_window: dict[str, int],
 ) -> list[dict[str, Any]]:
-    frame_count = max(24, sample_window["windowSize"] * 2)
+    frame_count = 24
     frames: list[dict[str, Any]] = []
 
     for frame_index in range(frame_count):
@@ -79,7 +75,7 @@ def _scenario_entry(
             }
             for anchor in anchors
         ],
-        "trackingFrames": _build_tracking_frames(anchors, phase_offsets, sample_window),
+        "trackingFrames": _build_tracking_frames(anchors, phase_offsets),
     }
 
 
