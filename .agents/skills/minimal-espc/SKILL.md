@@ -31,6 +31,7 @@ Use this skill when:
 - changing behavior or acceptance-relevant code
 - switching between exploration, specification, planning, coding, or review
 - spec drift, ambiguity, or uncertainty appears
+- complex, high-drift tasks may require conditional delegated supervision
 
 Do not proceed as code-ready if this skill has not been applied.
 
@@ -52,15 +53,20 @@ Do not proceed as code-ready if this skill has not been applied.
    - Determine the current stage and exit condition
    - If facts are insufficient, stay in exploration
    - If plan or acceptance is missing, do not treat code stage as ready
+   - Use [execution-flow](./references/execution-flow.md) as needed
 
 4. Enforce spec-code sync.
    - Keep spec and code aligned
    - Update spec before continuing when facts invalidate the current decision
    - Do not continue through drift
+   - Use [spec-entry](./references/spec-entry.md) as needed
 
-5. Use references as needed.
-   - `references/spec-entry.md`
-   - `references/execution-flow.md`
+5. Apply Delegated TDD Supervision conditionally.
+   - Trigger only when both are true:
+     - `cross-layer` change: at least two layers among spec or code
+     - `contract/Acceptance` semantics are changing
+   - Follow [delegated-mode](./references/delegated-tdd-supervision.md) details
+   - Otherwise keep the default single-agent path
 
 ## Output Contract
 
@@ -70,9 +76,21 @@ Return a compact status block:
 - `category`: feature / contract / knowledge / missing
 - `stage`: named / missing
 - `sync-risk`: yes / no
+- `delegation`: on / off
+
+If `delegation` is `on`,
+state additional compact status block for each subagent:
+
+- `workspace`: shared / isolated-worktree
+- `semantic-gate`: pass / fail
+- `pollution-gate`: pass / fail
+- `atomic-submit`: pass / fail
+- `cleanup`: pass / fail
 
 If any field is `missing` or `yes`,
 do not proceed as if code stage is ready.
+If `delegation` is `on`,
+code-ready is true only when all above are `pass`.
 
 ## Constraints
 
@@ -80,3 +98,6 @@ do not proceed as if code stage is ready.
 - Do not reinterpret repository constraints
 - Do not skip domain index resolution
 - Keep normal-use output compact
+- Do not trigger delegated mode by default
+- When delegated mode is on,
+  keep final delivery as one supervising-agent atomic commit
