@@ -3,6 +3,7 @@ import QtQuick
 Canvas {
     id: root
 
+    readonly property int windowSampleCount: 1600
     required property QtObject theme
     property var yTicks: []
     property var xTickModel: null
@@ -60,11 +61,19 @@ Canvas {
         return model && typeof model.count === "number" ? model.count : 0
     }
 
-    function readTicks() {
+    function readTickEntries() {
         const ticks = []
         const count = modelCount(xTickModel)
         for (let index = 0; index < count; index += 1) {
-            ticks.push(String(xTickModel.get(index).value))
+            const item = xTickModel.get(index)
+            const value = Number(item.value)
+            if (!Number.isFinite(value)) {
+                continue
+            }
+            ticks.push({
+                value: value,
+                label: item.label === undefined ? String(item.value) : String(item.label)
+            })
         }
         return ticks
     }
@@ -106,7 +115,7 @@ Canvas {
         return (value - minValue) / (maxValue - minValue)
     }
 
-    function normalizePoint(point, xMin, xMax, yMin, yMax) {
+    function normalizePoint(point, windowStart, windowEnd, yMin, yMax) {
         if (!point || point.y === null || point.y === undefined) {
             return null
         }
@@ -115,8 +124,11 @@ Canvas {
         if (!Number.isFinite(xValue) || !Number.isFinite(yValue)) {
             return null
         }
+        if (xValue < windowStart || xValue > windowEnd) {
+            return null
+        }
         return {
-            x: normalizeValue(xValue, xMin, xMax),
+            x: normalizeValue(xValue, windowStart, windowEnd),
             y: normalizeValue(yValue, yMin, yMax)
         }
     }
@@ -138,11 +150,34 @@ Canvas {
         return []
     }
 
-    function normalizedSeries() {
+    function resolveLatestSample(tickEntries) {
+        let latest = null
+        for (let index = 0; index < tickEntries.length; index += 1) {
+            const tickValue = Number(tickEntries[index].value)
+            if (!Number.isFinite(tickValue)) {
+                continue
+            }
+            latest = latest === null ? tickValue : Math.max(latest, tickValue)
+        }
+        const count = modelCount(seriesModel)
+        for (let seriesIndex = 0; seriesIndex < count; seriesIndex += 1) {
+            const item = seriesModel.get(seriesIndex)
+            const points = toPointList(item.points)
+            for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
+                const point = points[pointIndex]
+                const xValue = Number(point && point.x)
+                if (!Number.isFinite(xValue)) {
+                    continue
+                }
+                latest = latest === null ? xValue : Math.max(latest, xValue)
+            }
+        }
+        return latest === null ? 0 : latest
+    }
+
+    function normalizedSeries(windowStart, windowEnd) {
         const normalized = []
         const count = modelCount(seriesModel)
-        const xValues = parseTickValues(readTicks())
-        const xBounds = rangeBounds(xValues)
         const yValues = parseTickValues(yTicks)
         const yBounds = rangeBounds(yValues)
         for (let index = 0; index < count; index += 1) {
@@ -153,7 +188,15 @@ Canvas {
             }
             const normalizedPoints = []
             for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
-                normalizedPoints.push(normalizePoint(points[pointIndex], xBounds.min, xBounds.max, yBounds.min, yBounds.max))
+                normalizedPoints.push(
+                    normalizePoint(
+                        points[pointIndex],
+                        windowStart,
+                        windowEnd,
+                        yBounds.min,
+                        yBounds.max
+                    )
+                )
             }
             normalized.push({
                 color: item.color,
@@ -173,8 +216,15 @@ Canvas {
         const bottomPad = 34
         const plotW = w - leftPad - rightPad
         const plotH = h - topPad - bottomPad
-        const xTicks = readTicks()
-        const visibleSeries = normalizedSeries()
+        const tickEntries = readTickEntries()
+        const latest = resolveLatestSample(tickEntries)
+        const windowStart = latest - root.windowSampleCount
+        const windowEnd = latest
+        const visibleSeries = normalizedSeries(windowStart, windowEnd)
+
+        function xCoordinate(sampleValue) {
+            return leftPad + normalizeValue(sampleValue, windowStart, windowEnd) * plotW
+        }
 
         ctx.reset()
         ctx.fillStyle = "#ffffff"
@@ -192,8 +242,12 @@ Canvas {
             ctx.lineTo(leftPad + plotW, y)
             ctx.stroke()
         }
-        for (let col = 0; col <= 8; col += 1) {
-            const x = leftPad + col * plotW / 8
+        for (let tickIndex = 0; tickIndex < tickEntries.length; tickIndex += 1) {
+            const tick = tickEntries[tickIndex]
+            if (tick.value < windowStart || tick.value > windowEnd) {
+                continue
+            }
+            const x = xCoordinate(tick.value)
             ctx.beginPath()
             ctx.moveTo(x, topPad)
             ctx.lineTo(x, topPad + plotH)
@@ -207,9 +261,13 @@ Canvas {
         }
 
         ctx.textAlign = "center"
-        for (let index = 0; index < xTicks.length; index += 1) {
-            const x = leftPad + index * plotW / Math.max(1, xTicks.length - 1)
-            ctx.fillText(String(xTicks[index]), x, topPad + plotH + 16)
+        for (let index = 0; index < tickEntries.length; index += 1) {
+            const tick = tickEntries[index]
+            if (tick.value < windowStart || tick.value > windowEnd) {
+                continue
+            }
+            const x = xCoordinate(tick.value)
+            ctx.fillText(tick.label, x, topPad + plotH + 16)
         }
         ctx.fillText(xAxisLabel, leftPad + plotW / 2, h - 4)
 

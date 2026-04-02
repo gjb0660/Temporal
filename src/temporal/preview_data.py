@@ -13,11 +13,6 @@ PREVIEW_SCENARIO_KEYS = (
     "emptyState",
 )
 
-_DEFAULT_SAMPLE_WINDOW = {
-    "advancePerTick": 2,
-    "timerIntervalMs": 400,
-}
-
 
 def _normalize_vector(x: float, y: float, z: float) -> tuple[float, float, float]:
     length = max(0.0001, (x * x + y * y + z * z) ** 0.5)
@@ -60,13 +55,11 @@ def _scenario_entry(
     anchors: list[dict[str, Any]],
     phase_offsets: dict[int, float],
 ) -> dict[str, Any]:
-    sample_window = dict(_DEFAULT_SAMPLE_WINDOW)
     return {
         "key": key,
         "displayName": display_name,
         "status": "Temporal 就绪",
         "remoteLogLines": list(remote_log_lines),
-        "sampleWindow": sample_window,
         "sources": [
             {
                 "id": int(anchor["id"]),
@@ -190,7 +183,6 @@ _PREVIEW_CATALOG: dict[str, dict[str, Any]] = {
         "displayName": "空状态",
         "status": "Temporal 就绪",
         "remoteLogLines": ["等待连接远程 odaslive...", "当前场景：空状态"],
-        "sampleWindow": dict(_DEFAULT_SAMPLE_WINDOW),
         "sources": [],
         "trackingFrames": [],
     },

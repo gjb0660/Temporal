@@ -74,6 +74,23 @@ class TestChartWindowSemantics(unittest.TestCase):
         self.assertTrue(ticks[-1]["isLatest"])
         self.assertFalse(ticks[-1]["isMajor"])
 
+    def test_latest_1661_keeps_1600_window_and_unique_latest_label(self) -> None:
+        model = build_chart_window_model(
+            [{"timeStamp": 1661, "sources": [{"id": 15, "x": 0.0, "y": 1.0, "z": 0.0}]}]
+        )
+
+        ticks = model["ticks"]
+
+        self.assertEqual(model["windowStart"], 61)
+        self.assertEqual(model["windowEnd"], 1661)
+        self.assertEqual(
+            [tick["value"] for tick in ticks],
+            [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1661],
+        )
+        self.assertEqual(sum(1 for tick in ticks if tick["value"] == 1661), 1)
+        self.assertTrue(ticks[-1]["isLatest"])
+        self.assertFalse(ticks[-1]["isMajor"])
+
     def test_gap_preserves_null_points_and_physical_angles(self) -> None:
         messages = [
             {

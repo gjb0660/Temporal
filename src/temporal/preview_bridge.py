@@ -6,7 +6,6 @@ from typing import Any
 from PySide6.QtCore import Property, QTimer, Signal, Slot
 
 from temporal.app import AppBridge
-from temporal.core.chart_time import DEFAULT_CHART_SAMPLE_STEP
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.core.ssh.remote_odas import CommandResult
@@ -100,6 +99,9 @@ def _preview_config() -> TemporalConfig:
 
 
 class PreviewBridge(AppBridge):
+    _PREVIEW_SAMPLE_STRIDE = 19
+    _PREVIEW_TIMER_INTERVAL_MS = 190
+
     previewModeChanged = Signal()
     previewScenarioKeyChanged = Signal()
     previewScenarioKeysChanged = Signal()
@@ -118,7 +120,8 @@ class PreviewBridge(AppBridge):
         self._preview_scenario_keys = preview_scenario_keys()
         self._preview_scenario_key = DEFAULT_PREVIEW_SCENARIO_KEY
         self._scenario = get_preview_scenario(self._preview_scenario_key)
-        self._sample_window_position = 0
+        self._preview_sample_cursor = 0
+        self._preview_frame_cursor = 0
         self._preview_tick_timer = QTimer(self)
         self._preview_tick_timer.timeout.connect(self.advancePreviewTick)
 
@@ -155,7 +158,7 @@ class PreviewBridge(AppBridge):
         if not was_active:
             self._reset_preview_sample_window()
             self._refresh_preview_models(reset_chart=True)
-        self._preview_tick_timer.setInterval(self._preview_timing_config()["timerIntervalMs"])
+        self._preview_tick_timer.setInterval(self._PREVIEW_TIMER_INTERVAL_MS)
         if not self._preview_tick_timer.isActive():
             self._preview_tick_timer.start()
         self._apply_state_status()
@@ -187,7 +190,7 @@ class PreviewBridge(AppBridge):
         self._refresh_preview_models(reset_chart=True)
 
         if was_streaming:
-            self._preview_tick_timer.setInterval(self._preview_timing_config()["timerIntervalMs"])
+            self._preview_tick_timer.setInterval(self._PREVIEW_TIMER_INTERVAL_MS)
             self._preview_tick_timer.start()
             self._apply_state_status()
             return
@@ -201,8 +204,8 @@ class PreviewBridge(AppBridge):
         frames = self._tracking_frames()
         if not frames:
             return
-        advance_per_tick = max(1, int(self._preview_timing_config()["advancePerTick"]))
-        self._sample_window_position += advance_per_tick
+        self._preview_frame_cursor += 1
+        self._preview_sample_cursor += self._PREVIEW_SAMPLE_STRIDE
         self._refresh_preview_models()
 
     def _scenario_sources(self) -> list[dict[str, Any]]:
@@ -216,16 +219,8 @@ class PreviewBridge(AppBridge):
         self._selected_source_ids = {int(source["id"]) for source in self._scenario_sources()}
 
     def _reset_preview_sample_window(self) -> None:
-        self._sample_window_position = 0
-
-    def _preview_timing_config(self) -> dict[str, int]:
-        raw = self._scenario.get("sampleWindow", {})
-        if not isinstance(raw, dict):
-            raw = {}
-        return {
-            "advancePerTick": max(1, int(raw.get("advancePerTick", 1))),
-            "timerIntervalMs": max(50, int(raw.get("timerIntervalMs", 400))),
-        }
+        self._preview_sample_cursor = 0
+        self._preview_frame_cursor = 0
 
     def _scenario_remote_lines(self) -> list[str]:
         lines = self._scenario.get("remoteLogLines", ["等待连接远程 odaslive..."])
@@ -251,10 +246,10 @@ class PreviewBridge(AppBridge):
         frames = self._tracking_frames()
         if not frames:
             return {
-                "timeStamp": self._sample_window_position * DEFAULT_CHART_SAMPLE_STEP,
+                "timeStamp": self._preview_sample_cursor,
                 "src": [],
             }
-        frame = frames[self._sample_window_position % len(frames)]
+        frame = frames[self._preview_frame_cursor % len(frames)]
         sources = [
             {
                 "id": int(source.get("id", 0)),
@@ -266,7 +261,7 @@ class PreviewBridge(AppBridge):
             if isinstance(source, dict)
         ]
         return {
-            "timeStamp": self._sample_window_position * DEFAULT_CHART_SAMPLE_STEP,
+            "timeStamp": self._preview_sample_cursor,
             "src": sources,
         }
 

@@ -44,7 +44,7 @@ class QmlListModel(QAbstractListModel):
     def roleNames(self) -> dict[int, bytes]:
         return {role_id: role_name.encode("utf-8") for role_id, role_name in self._role_ids.items()}
 
-    @Slot(int, result="QVariant")
+    @Slot(int, result="QVariant")  # type: ignore[reportArgumentType]
     def get(self, index: int) -> dict[str, Any]:
         if index < 0 or index >= len(self._items):
             return {}

@@ -266,6 +266,37 @@ class TestPreviewBridge(unittest.TestCase):
 
         self.assertNotEqual(_model_items(bridge.sourcePositionsModel), before_positions)
 
+    def test_preview_tick_uses_fixed_stride_and_interval(self) -> None:
+        bridge = PreviewBridge()
+        bridge.setPreviewScenario("referenceSingle")
+        bridge.toggleStreams()
+
+        self.assertEqual(bridge._preview_tick_timer.interval(), 190)
+
+        start_timestamp = int(bridge._last_sst.get("timeStamp", -1))
+        bridge.advancePreviewTick()
+        second_timestamp = int(bridge._last_sst.get("timeStamp", -1))
+        bridge.advancePreviewTick()
+        third_timestamp = int(bridge._last_sst.get("timeStamp", -1))
+
+        self.assertEqual(second_timestamp - start_timestamp, 19)
+        self.assertEqual(third_timestamp - second_timestamp, 19)
+
+    def test_preview_timestamp_stays_monotonic_when_frames_loop(self) -> None:
+        bridge = PreviewBridge()
+        bridge.setPreviewScenario("referenceSingle")
+        bridge.toggleStreams()
+
+        timestamps: list[int] = []
+        for _ in range(40):
+            bridge.advancePreviewTick()
+            timestamps.append(int(bridge._last_sst.get("timeStamp", -1)))
+
+        self.assertTrue(all(later > earlier for earlier, later in zip(timestamps, timestamps[1:])))
+        self.assertTrue(
+            all((later - earlier) == 19 for earlier, later in zip(timestamps, timestamps[1:]))
+        )
+
     def test_global_filters_update_sidebar_and_visible_outputs(self) -> None:
         bridge = PreviewBridge()
         bridge.setPreviewScenario("hemisphereSpread")

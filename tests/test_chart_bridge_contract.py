@@ -156,10 +156,6 @@ class TestChartBridgeContract(unittest.TestCase):
             "displayName": "Parity",
             "status": "Temporal 就绪",
             "remoteLogLines": ["等待连接远程 odaslive..."],
-            "sampleWindow": {
-                "advancePerTick": 1,
-                "timerIntervalMs": 400,
-            },
             "sources": [{"id": 15, "color": "#cf54ea", "energy": 0.88}],
             "trackingFrames": [
                 {"sample": 0, "sources": [{"id": 15, "x": 1.0, "y": 0.0, "z": 0.0}]}
@@ -182,56 +178,17 @@ class TestChartBridgeContract(unittest.TestCase):
             _model_items(preview.azimuthChartSeriesModel),
         )
 
-    def test_preview_sample_window_does_not_change_chart_semantics(self) -> None:
-        preview = PreviewBridge()
-        preview._scenario = {
-            "key": "window",
-            "displayName": "Window",
-            "status": "Temporal 就绪",
-            "remoteLogLines": ["等待连接远程 odaslive..."],
-            "sampleWindow": {
-                "advancePerTick": 1,
-                "timerIntervalMs": 400,
-            },
-            "sources": [{"id": 15, "color": "#cf54ea", "energy": 0.88}],
-            "trackingFrames": [
-                {"sample": 0, "sources": [{"id": 15, "x": 1.0, "y": 0.0, "z": 0.0}]}
-            ],
-        }
-        preview._reset_selected_sources()
-        preview._reset_preview_sample_window()
-        preview._refresh_preview_models(reset_chart=True)
-        baseline_window = _model_items(preview.chartWindowModel)
-        baseline_elevation = _model_items(preview.elevationChartSeriesModel)
-        baseline_azimuth = _model_items(preview.azimuthChartSeriesModel)
-
-        preview._scenario["sampleWindow"] = {
-            "advancePerTick": 3,
-            "timerIntervalMs": 250,
-        }
-        preview._reset_preview_sample_window()
-        preview._refresh_preview_models(reset_chart=True)
-
-        self.assertEqual(_model_items(preview.chartWindowModel), baseline_window)
-        self.assertEqual(_model_items(preview.elevationChartSeriesModel), baseline_elevation)
-        self.assertEqual(_model_items(preview.azimuthChartSeriesModel), baseline_azimuth)
-
-    def test_preview_scenarios_expose_only_clock_sample_window_fields(self) -> None:
+    def test_preview_scenarios_do_not_expose_sample_window_field(self) -> None:
         scenario = get_preview_scenario("referenceSingle")
 
-        self.assertEqual(
-            scenario["sampleWindow"],
-            {
-                "advancePerTick": 2,
-                "timerIntervalMs": 400,
-            },
-        )
+        self.assertNotIn("sampleWindow", scenario)
 
     def test_chart_canvas_qml_does_not_parse_json_contract(self) -> None:
         qml_text = (_QML_DIR / "ChartCanvas.qml").read_text(encoding="utf-8")
 
         self.assertNotIn("valuesJson", qml_text)
         self.assertNotIn("JSON.parse", qml_text)
+        self.assertNotIn("item.values", qml_text)
 
     def test_chart_canvas_handles_array_like_points_from_qml_model(self) -> None:
         bridge = self._make_runtime_bridge()
