@@ -121,6 +121,7 @@ Knowledge spec 建议遵循标准结构：
 - Markdown 格式
 - 英文标题（# / ##）
 - 本地语言正文（如中文）
+- grep 友好，避免机械折行
 
 **Examples**:
 

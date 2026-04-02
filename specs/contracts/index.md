@@ -159,6 +159,7 @@ Contract spec 须遵循标准结构：
 - YAML frontmatter metadata
 - 英文标题（# / ##）
 - 本地语言正文（如中文）
+- grep 友好，避免机械折行
 
 **Template**:
 
