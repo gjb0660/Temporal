@@ -5,8 +5,7 @@
 Source level: direct source fact
 
 ODAS 的 authoritative 参考来自 `Y:\workspace\ODAS\odas` 源码快照。
-`CMakeLists.txt` 定义了一个共享库 `odas`，以及两个 demo
-可执行：`odaslive` 和 `odasserver`。
+`CMakeLists.txt` 定义了一个共享库 `odas`，以及两个 demo 可执行：`odaslive` 和 `odasserver`。
 
 - `odaslive` 入口位于 `demo/odaslive/main.c`
 - 配置装配位于 `demo/odaslive/configs.c`
@@ -37,8 +36,7 @@ Source level: direct source fact
 Source level: inference from source
 
 从 `configs.c` 的装配顺序可以看出，`odaslive` 的主链路是：
-`raw -> mapping -> resample -> STFT -> noise -> SSL -> target injector
--> SST -> SSS -> ISTFT -> resample -> volume -> sinks/classify`。
+`raw -> mapping -> resample -> STFT -> noise -> SSL -> target injector -> SST -> SSS -> ISTFT -> resample -> volume -> sinks/classify`。
 这不是 README 级摘要，而是当前 demo runtime 的实际拼装顺序。
 
 ## Runtime Direction
@@ -55,8 +53,7 @@ Source level: direct source fact
 
 Source level: inference from source
 
-因此，只要 ODAS 配置把 raw 输入、JSON 输出、或 SSS/PF 输出
-设成 socket，外部系统就必须先启动 server。
+因此，只要 ODAS 配置把 raw 输入、JSON 输出或 SSS/PF 输出设成 socket，外部系统就必须先启动 server。
 这直接解释了为什么 `odas_web` 要先监听 9000/9001/10000/10010，
 再等待 ODAS 连接进来。
 
@@ -88,8 +85,7 @@ Source level: direct source fact
 - `src[*].z`: `float`
 - `src[*].E`: `float`
 
-文档里不应再写 `id`、`confidence`、`activity` 等未在该 sink
-中输出的字段。
+文档里不应再写 `id`、`confidence`、`activity` 等未在该 sink 中输出的字段。
 
 ### SST Tracked JSON
 
@@ -126,8 +122,7 @@ Source level: direct source fact
 - `src[*].z`: `float`
 - `src[*].activity`: `float`
 
-文档里不应继续把 `vx`、`vy`、`vz` 或独立 `energy` 写成
-tracked JSON 固定字段，因为当前 sink 实现没有输出这些值。
+文档里不应继续把 `vx`、`vy`、`vz` 或独立 `energy` 写成 tracked JSON 固定字段，因为当前 sink 实现没有输出这些值。
 
 ### SSS And PF PCM Framing
 
@@ -155,8 +150,7 @@ Source level: direct source fact
 
 Source level: direct source fact
 
-`demo/odaslive/parameters.c` 明确把多个 runtime 容量都绑定到
-`sst.N_inactive` 的数组长度：
+`demo/odaslive/parameters.c` 明确把多个 runtime 容量都绑定到 `sst.N_inactive` 的数组长度：
 
 - `parameters_msg_tracks_sst_config`:
   `nTracks = parameters_count(fileConfig, "sst.N_inactive")`
@@ -225,21 +219,16 @@ Source level: inference from source
 
 对 Temporal 最重要的上游约束有四项：
 
-- JSON 协议只应按 `timeStamp` 和 `src` 数组解析，
-  并严格使用 ODAS 当前 sink 实现中的字段集合
-- socket 模式下，Temporal 必须把自己当成 server，
-  由 ODAS 主动连入
+- JSON 协议只应按 `timeStamp` 和 `src` 数组解析，并严格使用 ODAS 当前 sink 实现中的字段集合
+- socket 模式下，Temporal 必须把自己当成 server，由 ODAS 主动连入
 - SSS/PF 音频必须按交错 PCM 读取，不能假设单路独占 socket
-- 可视化和录音的 source/channel 槽位数应来自配置，
-  不能把 `4` 写死成协议常量
+- 可视化和录音的 source/channel 槽位数应来自配置，不能把 `4` 写死成协议常量
 
 Source level: inference from source
 
-因此，知识库应把 `IP:port`、`hopSize`、`fS`、`nChannels`
-分成两层记录：
+因此，知识库应把 `IP:port`、`hopSize`、`fS`、`nChannels` 分成两层记录：
 
 - ODAS 通用协议形状
 - 当前本地配置实例
 
-只有这样，后续对接新阵列或新配置时，
-Temporal 才不会把本地样例误当成上游不变量。
+只有这样，后续对接新阵列或新配置时，Temporal 才不会把本地样例误当成上游不变量。

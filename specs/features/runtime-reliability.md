@@ -21,16 +21,14 @@ updated: 2026-03-30
 - listener 启动、远端启动校验、过滤联动与 shell 语义属于高风险边界。
 - 本地质量门禁与运行文档仍需持续对齐当前系统事实。
 - `routing-session` 与 `recording` 当前已有路由、容量约束与会话可见性的行为级测试覆盖。
-- production `AppBridge` 已补齐 chart series 时间窗投影与过滤联动测试，
-  preview/runtime 展示 parity 已冻结为 shared projection layer 契约。
+- production `AppBridge` 已补齐 chart series 时间窗投影与过滤联动测试；preview/runtime 展示 parity 已冻结为 shared projection layer 契约。
 
 ## Decision
 
 - 以行为级测试优先，冻结异步、shell、生命周期与 UI 可见状态的真实契约。
 - 优先补齐 public slot、listener startup、remote startup、config 负路径与音频边界测试。
 - 让 targeted unittest、静态检查与运行验证共同构成 reliability 收口路径，而不是再维持独立 delivery feature。
-- 将 runtime chart parity 与 preview/runtime projection parity 明确纳入当前 reliability owner，
-  而不是继续留在 UI 文档层隐含存在。
+- 将 runtime chart parity 与 preview/runtime projection parity 明确纳入当前 reliability owner，而不是继续留在 UI 文档层隐含存在。
 
 ## Acceptance
 

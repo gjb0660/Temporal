@@ -12,8 +12,7 @@ version: 0.1
 
 ## Invariants
 
-- 依赖治理 MUST 以 `project.dependencies` 和 `project.optional-dependencies`
-  中**直接声明**的 package 为范围，MUST NOT 以传递依赖作为约束真源。
+- 依赖治理 MUST 以 `project.dependencies` 和 `project.optional-dependencies` 中**直接声明**的 package 为范围；MUST NOT 以传递依赖作为约束真源。
 - runtime 依赖中的以下 package MUST 保持**版本约束**：
   - `pyside6~=6.8.0`
   - `paramiko>=3.5.0,<4.0.0`
@@ -21,7 +20,7 @@ version: 0.1
 - dev 的以下 package MUST 保持**无版本约束**：
   - `pyright`
   - `ruff`
-- build 的以下 package MUST 在 `build-system.requires` 中被显式声明
+- build 的以下 package MUST 在 `build-system.requires` 中被显式声明：
   - `setuptools>=68`
   - `wheel`
 

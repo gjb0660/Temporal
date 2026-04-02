@@ -31,8 +31,7 @@ updated: 2026-03-31
   `running = (odaslive.pid 存在) and (pid 为纯数字) and (kill -0 pid 成功)`。
 - 完全移除 `load_valid_pid` 对 `cmdline/cwd/exe/args` 的门控依赖。
 - `temporal_start` 启动后必须写入 `odaslive.pid`，并进行回读一致性校验；失败显式返回非 0。
-- `temporal_stop` 先尝试按进程组停止（`kill -TERM -- "-$pid"`），
-  失败回退 `kill -TERM "$pid"`，确认停止后清理 pid 文件。
+- `temporal_stop` 先尝试按进程组停止（`kill -TERM -- "-$pid"`），失败回退 `kill -TERM "$pid"`，确认停止后清理 pid 文件。
 - runtime 在日志读取异常但控制通道未断时仍执行 `_sync_remote_odas_state(update_status=True)`。
 - preview 补齐 `odasStarting` 只读属性（恒 `False`）与 notify，稳定共享绑定语义。
 
@@ -55,11 +54,10 @@ updated: 2026-03-31
 - [x] 已确认 rootless 下 `/proc/$pid/cwd`、`/proc/$pid/exe` 不可靠。
 - [x] 已完成 pid-only helper 重构并移除 legacy 识别门控。
 - [x] 已完成 bridge 兼容补强与测试更新。
-- [x] 已通过 `tests.test_remote_odas`、`tests.test_app_bridge_integration`、
-  `tests.test_preview_bridge` 与全量 `unittest discover`（112 tests）。
-- [x] 已通过 `uv run ruff check src tests`、
-  `uv run pyright --project pyproject.toml`（0 errors, 1 warning）、
-  `npx markdownlint specs/features/remote-control-start-state-desync.md`。
+- [x] 已通过 `tests.test_remote_odas`、`tests.test_app_bridge_integration` 与 `tests.test_preview_bridge`。
+- [x] 已通过全量 `unittest discover`（112 tests）。
+- [x] 已通过 `uv run ruff check src tests` 与 `uv run pyright --project pyproject.toml`（0 errors, 1 warning）。
+- [x] 已通过 `npx markdownlint specs/features/remote-control-start-state-desync.md`。
 
 ## Todo
 

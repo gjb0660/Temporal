@@ -12,17 +12,11 @@ version: 0.2
 
 ## Invariants
 
-- 左侧栏 MUST 同时包含上方日志区和下方控制区，且日志区 MUST 保持比控制区
-  更高的视觉权重。
-- 控制区 MUST 只暴露一枚远程 ODAS 主动作按钮和一枚监听动作按钮，MUST
-  NOT 回退为复杂按钮矩阵。
-- 两枚按钮的文字和启用状态 MUST 直接反映 bridge 当前状态；`启动中`
-  语义 MUST 通过禁用主按钮阻止重复触发。
-- 业务动作 MUST 通过 `appBridge.toggleRemoteOdas()` 和
-  `appBridge.toggleStreams()` 路由；左侧栏 MUST NOT 自行拼接远端状态机
-  或 SSH 控制逻辑。
-- 详细日志 MUST 保留在日志区，状态区 MUST 只呈现人类可读摘要，MUST
-  NOT 用原始 shell 细节替代状态说明。
+- 左侧栏 MUST 同时包含上方日志区和下方控制区，且日志区 MUST 保持比控制区更高的视觉权重。
+- 控制区 MUST 只暴露一枚远程 ODAS 主动作按钮和一枚监听动作按钮；MUST NOT 回退为复杂按钮矩阵。
+- 两枚按钮的文字和启用状态 MUST 直接反映 bridge 当前状态；`启动中` 语义 MUST 通过禁用主按钮阻止重复触发。
+- 业务动作 MUST 通过 `appBridge.toggleRemoteOdas()` 和 `appBridge.toggleStreams()` 路由；左侧栏 MUST NOT 自行拼接远端状态机或 SSH 控制逻辑。
+- 详细日志 MUST 保留在日志区，状态区 MUST 只呈现人类可读摘要；MUST NOT 用原始 shell 细节替代状态说明。
 - 日志文本 MUST 支持滚动、换行和复制，以便用户持续观察远端运行反馈。
 
 ## Variation Space
@@ -33,8 +27,7 @@ version: 0.2
 
 ## Rationale
 
-- 左侧栏承担的是“先观察、再控制”的入口语义；日志优先于控制可以避免
-  只剩按钮而失去可观测性。
+- 左侧栏承担的是“先观察、再控制”的入口语义；日志优先于控制可以避免只剩按钮而失去可观测性。
 - 将控制状态直接绑定 bridge 真值，可以避免 UI 自建状态机带来的漂移。
 
 ## Anti-Patterns

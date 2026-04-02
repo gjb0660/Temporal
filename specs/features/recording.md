@@ -20,10 +20,8 @@ updated: 2026-04-01
 - 录音文件命名必须满足 `ODAS_{source_id}_{timestamp}_{sp|pf}.wav`。
 - 录音启停由声源出现、消失与超时状态驱动。
 - 录音激活还必须满足 source 具备可路由的 SSS 通道容量。
-- 录音 WAV 采样率来自远端 `odas.cfg`：
-  `separated.fS -> sp`，`postfiltered.fS -> pf`。
-- 当远端 `fS` 缺失或不可解析时，录音采样率回退到 `16000`，
-  且通过 bridge 透出可见告警。
+- 录音 WAV 采样率来自远端 `odas.cfg`：`separated.fS -> sp`，`postfiltered.fS -> pf`。
+- 当远端 `fS` 缺失或不可解析时，录音采样率回退到 `16000`，且通过 bridge 透出可见告警。
 - 采样率变更仅作用于后续新建录音会话，不重建当前已打开 writer。
 - UI 需要读取录音状态摘要，但不应拥有录音控制真源。
 - 该能力在本轮 feature cutover 前已经完成核心交付。

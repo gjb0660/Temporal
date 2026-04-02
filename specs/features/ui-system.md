@@ -19,38 +19,27 @@ updated: 2026-03-31
 
 - 主界面当前是三栏结构，并已形成控制区、图表区、3D 区的稳定信息层级。
 - `preview-mode` 与 production 共享同名 `appBridge` 契约与同一投影实现层。
-- runtime 已稳定投影 `sourceRowsModel`、`sourcePositionsModel`、
-  `elevationSeriesModel`、`azimuthSeriesModel` 与筛选状态。
-- runtime/preview 的语义分工是：preview 负责 scenario 数据推进，
-  runtime 负责 SST 输入与窗口维护；展示投影共享。
-- 当前可视化语义已固定：row/3D 基于 current frame，chart 基于共享时间窗，
-  三者共享同一过滤语义。
-- chart 时间语义已固定为：首帧归零、重连后重新归零、单位 0.01s、
-  200 主刻度 + 最新时间尾刻度。
-- source 颜色由 bridge 状态化分配器输出（连接内独立分配、重连重置），
-  且 row/3D/chart 共享同一映射。
+- runtime 已稳定投影 `sourceRowsModel`、`sourcePositionsModel`、`elevationSeriesModel`、`azimuthSeriesModel` 与筛选状态。
+- runtime/preview 的语义分工已固定：preview 负责 scenario 数据推进，runtime 负责 SST 输入与窗口维护；展示投影共享。
+- 当前可视化语义已固定：row/3D 基于 current frame，chart 基于共享时间窗，三者共享同一过滤语义。
+- chart 时间语义已固定为：首帧归零、重连后重新归零、单位 0.01s、200 主刻度加最新时间尾刻度。
+- source 颜色由 bridge 状态化分配器输出，连接内独立分配、重连重置，且 row/3D/chart 共享同一映射。
 - 颜色前 4 色与 odas_web 基准调色板一致，扩展颜色使用固定表。
 
 ## Decision
 
-- `ui-system` 继续作为共享展示语义 owner，统一维护布局、投影、过滤、
-  空态与时序展示边界。
-- QML 只消费 bridge 输出，不复制业务推导；runtime/preview 继续在同一
-  projection 层演进。
-- row/chart/3D 的过滤与空态契约保持冻结，后续演进只能走 shared projection
-  单路径收敛。
-- 颜色语义由 bridge allocator 单一维护，MUST NOT 在 projection/QML
-  引入并行颜色业务语义或业务 fallback。
-- runtime 在 bridge 层保持单一行为真源，MUST NOT 并行维护两套筛选、
-  模型刷新与状态推导逻辑。
+- `ui-system` 继续作为共享展示语义 owner，统一维护布局、投影、过滤、空态与时序展示边界。
+- QML 只消费 bridge 输出，不复制业务推导；runtime/preview 继续在同一 projection 层演进。
+- row/chart/3D 的过滤与空态契约保持冻结，后续演进只能走 shared projection 单路径收敛。
+- 颜色语义由 bridge allocator 单一维护；MUST NOT 在 projection/QML 引入并行颜色业务语义或业务 fallback。
+- runtime 在 bridge 层保持单一行为真源；MUST NOT 并行维护两套筛选、模型刷新与状态推导逻辑。
 
 ## Acceptance
 
 1. 三栏布局在默认尺寸与较窄窗口下保持稳定层级。
 2. 左侧控制区只呈现必要的操作按钮与对应状态。
 3. 3D 声源区、标题层级与整体主题满足既定视觉目标。
-4. 右栏 row 与 3D 共享 current frame 语义，chart 使用共享时间窗序列，
-   三者共享同一过滤语义。
+4. 右栏 row 与 3D 共享 current frame 语义，chart 使用共享时间窗序列，三者共享同一过滤语义。
 5. 取消最后一个勾选 source 后，row 集合保持稳定，只有图表与 3D 变空。
 6. chart 在连接首帧显示 `0`，发生重连后重新从 `0` 起算。
 

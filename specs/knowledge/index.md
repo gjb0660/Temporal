@@ -74,31 +74,22 @@ Knowledge MAY 在以下位置被引用：
 
 ### `domain`
 
-一个稳定的知识领域（knowledge domain）
-表达**一类可长期复用的认知模型或知识集合**
+一个稳定的知识领域（knowledge domain），表达**一类可长期复用的认知模型或知识集合**。
 典型包括：
 
-1. 系统级认知：表达 **系统如何运作的认知模型**， 例如：
-    - architecture, execution-model, consistency, lifecycle
-2. 外部知识域：表达 **外部系统/库的稳定知识集合**，例如：
-    - odas, ffmpeg, webrtc
-3. 工程方法论：表达 **跨 feature 的通用规律**，例如：
-    - testing, performance, reliability
+1. 系统级认知：表达 **系统如何运作的认知模型**，例如 `architecture`、`execution-model`、`consistency`、`lifecycle`。
+2. 外部知识域：表达 **外部系统/库的稳定知识集合**，例如 `odas`、`ffmpeg`、`webrtc`。
+3. 工程方法论：表达 **跨 feature 的通用规律**，例如 `testing`、`performance`、`reliability`。
 
 ### `concept`
 
-一个可独立引用的稳定子概念（sub-concept）
-表达domain 内**一个相对独立的知识切面**
+一个可独立引用的稳定子概念（sub-concept），表达 domain 内**一个相对独立的知识切面**。
 典型包括：
 
-1. 结构性切面（Structure）：描述系统或领域的组成方式，例如：
-    - overview, protocol, layering
-2. 行为/机制（Mechanism）：描述运行方式或机制，例如：
-    - model, state-machine
-3. 约束/特性（Constraint / Property）：描述不可忽略的关键约束或特性，例如：
-    - bottleneck, pattern
-4. 集成语义（Integration Semantics）：描述系统之间的交互方式，例如：
-    - integration, pipeline
+1. 结构性切面（Structure）：描述系统或领域的组成方式，例如 `overview`、`protocol`、`layering`。
+2. 行为/机制（Mechanism）：描述运行方式或机制，例如 `model`、`state-machine`。
+3. 约束/特性（Constraint / Property）：描述不可忽略的关键约束或特性，例如 `bottleneck`、`pattern`。
+4. 集成语义（Integration Semantics）：描述系统之间的交互方式，例如 `integration`、`pipeline`。
 
 > 如果无法明确 concept 的边界，则应当合并回 `<domain>.md`
 
