@@ -297,6 +297,30 @@ class TestPreviewBridge(unittest.TestCase):
             all((later - earlier) == 19 for earlier, later in zip(timestamps, timestamps[1:]))
         )
 
+    def test_hemisphere_spread_keeps_four_visible_sources_over_200_ticks(self) -> None:
+        bridge = PreviewBridge()
+        bridge.setPreviewScenario("hemisphereSpread")
+        bridge.toggleStreams()
+
+        expected_ids = {7, 15, 21, 31}
+        for tick in range(200):
+            bridge.advancePreviewTick()
+            rows = _model_items(bridge.sourceRowsModel)
+            points = _model_items(bridge.sourcePositionsModel)
+
+            self.assertEqual(len(rows), 4, msg=f"tick={tick} row-count")
+            self.assertEqual(len(points), 4, msg=f"tick={tick} point-count")
+            self.assertEqual(
+                {int(row["sourceId"]) for row in rows},
+                expected_ids,
+                msg=f"tick={tick} row-source-ids",
+            )
+            self.assertEqual(
+                {int(point["id"]) for point in points},
+                expected_ids,
+                msg=f"tick={tick} point-source-ids",
+            )
+
     def test_global_filters_update_sidebar_and_visible_outputs(self) -> None:
         bridge = PreviewBridge()
         bridge.setPreviewScenario("hemisphereSpread")

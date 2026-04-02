@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from itertools import permutations
 from math import acos, degrees, sqrt
 from typing import Any, Iterable, Sequence, cast
 
@@ -37,6 +36,13 @@ class TrackingResult:
     dropped_source_ids: list[int]
 
 
+@dataclass(frozen=True, slots=True)
+class _AssignmentState:
+    matched_count: int
+    total_cost: float
+    signature: tuple[int, ...]
+
+
 def _coerce_observation(item: SourceObservation | dict[str, object]) -> SourceObservation:
     if isinstance(item, SourceObservation):
         return item
@@ -54,11 +60,18 @@ def select_top8_observations(
     *,
     limit: int = 8,
 ) -> list[SourceObservation]:
+    ranked = _rank_observations(observations)
+    return ranked[: max(0, int(limit))]
+
+
+def _rank_observations(
+    observations: Iterable[SourceObservation | dict[str, object]],
+) -> list[SourceObservation]:
     ranked = sorted(
         (_coerce_observation(item) for item in observations),
         key=lambda item: (-int(item.sample), int(item.source_id)),
     )
-    return ranked[: max(0, int(limit))]
+    return ranked
 
 
 def _vector_norm(x: float, y: float, z: float) -> float:
@@ -87,41 +100,66 @@ def _best_visible_assignment(
     if not targets or not observations:
         return {}
 
-    target_indices = list(range(len(targets)))
-    observation_indices = list(range(len(observations)))
-    best_assignment: dict[int, int] = {}
-    best_cost = float("inf")
+    safe_window_samples = int(window_samples)
+    safe_threshold_degrees = float(threshold_degrees)
+    observation_count = len(observations)
+    empty_signature = tuple(-1 for _ in range(observation_count))
 
-    for target_count in range(1, min(len(target_indices), len(observation_indices)) + 1):
-        for target_perm in permutations(target_indices, target_count):
-            for obs_perm in permutations(observation_indices, target_count):
-                used_targets = set()
-                total_cost = 0.0
-                valid = True
-                assignment: dict[int, int] = {}
+    def is_better(
+        candidate: _AssignmentState,
+        current: _AssignmentState | None,
+    ) -> bool:
+        if current is None:
+            return True
+        if candidate.matched_count != current.matched_count:
+            return candidate.matched_count > current.matched_count
+        if abs(candidate.total_cost - current.total_cost) > 1e-9:
+            return candidate.total_cost < current.total_cost
+        return candidate.signature < current.signature
 
-                for target_index, observation_index in zip(target_perm, obs_perm, strict=True):
-                    if target_index in used_targets:
-                        valid = False
-                        break
-                    target = targets[target_index]
-                    observation = observations[observation_index]
-                    if abs(int(observation.sample) - int(target.sample)) > int(window_samples):
-                        valid = False
-                        break
-                    angle = _angular_distance(target, observation)
-                    if angle > float(threshold_degrees):
-                        valid = False
-                        break
-                    used_targets.add(target_index)
-                    assignment[observation_index] = target_index
-                    total_cost += angle
+    dp: dict[int, _AssignmentState] = {
+        0: _AssignmentState(matched_count=0, total_cost=0.0, signature=empty_signature)
+    }
 
-                if valid and total_cost < best_cost:
-                    best_cost = total_cost
-                    best_assignment = assignment
+    # Objective order (first principles): maximize matched cardinality, then minimize angle cost.
+    for target_index, target in enumerate(targets):
+        next_dp = dict(dp)
+        for observation_mask, state in dp.items():
+            for observation_index, observation in enumerate(observations):
+                if observation_mask & (1 << observation_index):
+                    continue
+                if abs(int(observation.sample) - int(target.sample)) > safe_window_samples:
+                    continue
+                angle = _angular_distance(target, observation)
+                if angle > safe_threshold_degrees:
+                    continue
 
-    return best_assignment
+                updated_signature = list(state.signature)
+                updated_signature[observation_index] = target_index
+                updated_state = _AssignmentState(
+                    matched_count=state.matched_count + 1,
+                    total_cost=state.total_cost + angle,
+                    signature=tuple(updated_signature),
+                )
+                updated_mask = observation_mask | (1 << observation_index)
+                current_state = next_dp.get(updated_mask)
+                if is_better(updated_state, current_state):
+                    next_dp[updated_mask] = updated_state
+        dp = next_dp
+
+    best_state: _AssignmentState | None = None
+    for state in dp.values():
+        if is_better(state, best_state):
+            best_state = state
+
+    if best_state is None:
+        return {}
+
+    return {
+        observation_index: target_index
+        for observation_index, target_index in enumerate(best_state.signature)
+        if target_index >= 0
+    }
 
 
 class SpaceTargetSession:
@@ -140,7 +178,8 @@ class SpaceTargetSession:
         self._next_target_id = 1
 
     def step(self, observations: Iterable[SourceObservation | dict[str, object]]) -> TrackingResult:
-        selected = select_top8_observations(observations)
+        ranked_observations = _rank_observations(observations)
+        selected = ranked_observations[:8]
         if not selected:
             return TrackingResult(visible_targets=[], dropped_source_ids=[])
 
@@ -153,17 +192,11 @@ class SpaceTargetSession:
         for target_id in expired_target_ids:
             self._targets.pop(target_id, None)
 
-        dropped_source_ids = [
-            observation.source_id
-            for observation in sorted(
-                (_coerce_observation(item) for item in observations),
-                key=lambda item: (-int(item.sample), int(item.source_id)),
-            )[len(selected) :]
-        ]
+        dropped_source_ids = [observation.source_id for observation in ranked_observations[len(selected) :]]
 
         visible_targets: list[TrackedTarget] = []
         matched_target_ids: set[int] = set()
-        active_targets = list(self._targets.values())
+        active_targets = sorted(self._targets.values(), key=lambda target: int(target.target_id))
         active_colors = {target.color for target in active_targets}
         available_colors = [color for color in self._palette if color not in active_colors]
         overflow_dropped = 0

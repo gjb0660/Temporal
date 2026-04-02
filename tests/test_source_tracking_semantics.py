@@ -4,11 +4,84 @@ from temporal.core.source_palette import SOURCE_COLOR_PALETTE
 from temporal.core.source_tracking import (
     SourceObservation,
     SpaceTargetSession,
+    TrackedTarget,
+    _best_visible_assignment,
     select_top8_observations,
 )
+from temporal.preview_data import get_preview_scenario
 
 
 class TestSourceTrackingSemantics(unittest.TestCase):
+    def test_assignment_prioritizes_max_cardinality_before_cost(self) -> None:
+        scenario = get_preview_scenario("hemisphereSpread")
+        first_frame = scenario["trackingFrames"][0]["sources"]
+        second_frame = scenario["trackingFrames"][1]["sources"]
+
+        targets = [
+            TrackedTarget(
+                target_id=index + 1,
+                source_id=int(source["id"]),
+                sample=0,
+                color=f"c{index}",
+                x=float(source["x"]),
+                y=float(source["y"]),
+                z=float(source["z"]),
+            )
+            for index, source in enumerate(first_frame)
+        ]
+        observations = [
+            SourceObservation(
+                source_id=int(source["id"]),
+                sample=19,
+                x=float(source["x"]),
+                y=float(source["y"]),
+                z=float(source["z"]),
+            )
+            for source in second_frame
+        ]
+
+        assignment = _best_visible_assignment(
+            targets,
+            observations,
+            threshold_degrees=20.0,
+            window_samples=200,
+        )
+
+        self.assertEqual(len(assignment), 4)
+        self.assertEqual(set(assignment.keys()), {0, 1, 2, 3})
+
+    def test_hemisphere_spread_stays_stable_without_drops_for_200_ticks(self) -> None:
+        scenario = get_preview_scenario("hemisphereSpread")
+        expected_source_ids = {int(source["id"]) for source in scenario["sources"]}
+        frames = scenario["trackingFrames"]
+        session = SpaceTargetSession()
+
+        for tick in range(200):
+            frame = frames[tick % len(frames)]
+            observations = [
+                SourceObservation(
+                    source_id=int(source["id"]),
+                    sample=tick * 19,
+                    x=float(source["x"]),
+                    y=float(source["y"]),
+                    z=float(source["z"]),
+                )
+                for source in frame["sources"]
+            ]
+            result = session.step(observations)
+
+            self.assertEqual(
+                len(result.visible_targets),
+                len(expected_source_ids),
+                msg=f"tick={tick} visible-target-count",
+            )
+            self.assertEqual(
+                {item.source_id for item in result.visible_targets},
+                expected_source_ids,
+                msg=f"tick={tick} visible-source-ids",
+            )
+            self.assertEqual(result.dropped_source_ids, [], msg=f"tick={tick} dropped-source-ids")
+
     def test_continuity_keeps_identity_within_window(self) -> None:
         session = SpaceTargetSession(palette=("c0", "c1"))
 

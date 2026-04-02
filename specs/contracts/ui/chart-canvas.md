@@ -17,6 +17,7 @@ version: 0.4
 - 图表输入 MUST 使用结构化 `points` 数值模型（`x=sample`, `y=value|null`），MUST NOT 回退到 `values` 或 `valuesJson`。
 - 每条折线 MUST 使用与输入空间目标身份一致的颜色语义，MUST NOT 在组件内部重新发明颜色规则。
 - 图表最多渲染 8 条可见序列；当候选空间目标超过 8 条时，上游 MUST 先按“空间目标最近出现时间”降序选择前 8，若出现时间并列则按当前帧 `sourceId` 升序打破平局。
+- 当同帧候选数量 `<=8` 且默认调色池容量满足可见上限时，上游 `dropped_source_ids` MUST 为空，MUST NOT 因匹配策略误删。
 - 单连接会话内，空间目标连续映射到颜色的关系 MUST 保持稳定；当前可见的 `<=8` 条序列之间 MUST NOT 出现重复颜色。
 - 颜色映射 MUST 与 `sourceId` 数值范围解耦；`sourceId` MAY 继续用于标签展示，但 MUST NOT 作为颜色绑定主键。
 - 当同一空间目标在静默 `<=2.0s` 后恢复时，上游 MUST 优先复用原颜色；当静默 `>2.0s` 时，上游 MAY 复用原颜色或分配新颜色。

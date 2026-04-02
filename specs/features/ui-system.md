@@ -49,6 +49,7 @@ updated: 2026-04-02
 6. chart 在连接首帧显示 `0`，发生重连后重新从 `0` 起算。
 7. chart 行为满足 `specs/contracts/ui/chart-canvas.md` 的固定 1600 滚动窗口与主刻度约束，不再依赖旧的“尾刻度最新值”语义。
 8. `ui-system` 与 `ui-system-refactor-chart-canvas` 的后端路线结论保持一致，不出现“QtCharts 可用”冲突陈述。
+9. preview 多点场景（如 `hemisphereSpread`）连续运行时，在同帧候选 `<=8` 且默认调色池容量满足可见上限前提下，不应误触发 Top8 删除路径。
 
 ## Plan
 
