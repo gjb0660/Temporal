@@ -15,7 +15,8 @@ version: 0.1
 - 录音启动语义 MUST 由 source 出现或进入活跃状态触发。
 - 录音停止语义 MUST 由 source 消失或 inactive timeout 触发。
 - 同一录音语义 MUST NOT 同时维护多套互相独立的停止规则。
-- 生命周期判断 MUST 围绕 source 活跃性表达，MUST NOT 被无关的手写状态机替代。
+- 生命周期判断 MUST 围绕 source 活跃性表达。
+- 生命周期判断 MUST NOT 被无关的手写状态机替代。
 
 ## Variation Space
 

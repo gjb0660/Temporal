@@ -10,8 +10,7 @@ ODAS 的 authoritative 参考来自 `Y:\workspace\ODAS\odas` 源码快照。
 - `odaslive` 入口位于 `demo/odaslive/main.c`
 - 配置装配位于 `demo/odaslive/configs.c`
 - 配置解析位于 `demo/odaslive/parameters.c`
-- 处理对象与线程装配位于 `demo/odaslive/objects.c`
-  和 `demo/odaslive/threads.c`
+- 处理对象与线程装配位于 `demo/odaslive/objects.c` 和 `demo/odaslive/threads.c`
 
 Source level: direct source fact
 
@@ -46,8 +45,7 @@ Source level: direct source fact
 当配置里的 `interface.type = "socket"` 时，ODAS 侧不是监听端，
 而是 TCP client。这个结论来自两类源码：
 
-- `src/source/src_hops.c` 的 `src_hops_open_interface_socket`
-  调用 `connect(...)`
+- `src/source/src_hops.c` 的 `src_hops_open_interface_socket` 调用 `connect(...)`
 - `src/sink/snk_pots.c`、`src/sink/snk_tracks.c`、
   `src/sink/snk_hops.c` 的 socket open 逻辑也都调用 `connect(...)`
 
@@ -165,8 +163,7 @@ Source level: inference from source
 
 - tracked source 最大槽位数由配置驱动
 - separated/postfiltered 输出通道数也由同一配置驱动
-- “4 路 source / 4 路音频”只是某些配置实例的结果，
-  不是 ODAS 协议本身的固定常量
+- “4 路 source / 4 路音频”只是某些配置实例的结果，不是 ODAS 协议本身的固定常量
 
 ## Local Config Profiles
 

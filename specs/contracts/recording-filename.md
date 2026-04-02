@@ -15,7 +15,8 @@ version: 0.1
 - 录音文件名 MUST 使用 `ODAS_{source_id}_{timestamp}_{sp|pf}.wav` 格式。
 - 录音输出 MUST 保留可解析的 source identity 与 timestamp。
 - 同一录音语义 MUST NOT 同时维护多套互相独立的命名规则。
-- 文件名中的语义字段 MUST 对后续追溯可用，MUST NOT 退化为仅供显示的人类标签。
+- 文件名中的语义字段 MUST 对后续追溯可用。
+- 文件名中的语义字段 MUST NOT 退化为仅供显示的人类标签。
 
 ## Variation Space
 

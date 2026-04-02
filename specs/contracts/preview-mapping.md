@@ -13,9 +13,11 @@ version: 0.2
 ## Invariants
 
 - 空间目标连续性到 color 的视觉映射 MUST 保持稳定。
-- filters MUST 可逆，且 MUST NOT 产生隐藏副作用。
+- filters MUST 可逆。
+- filters MUST NOT 产生隐藏副作用。
 - 布局调整 MUST 保持既有信息层级，不得引入隐蔽控制路径或跨区域重复操作入口。
-- 视觉变化 MUST 保持空间目标身份可追踪，MUST NOT 让同一空间目标在无显式语义切换时表现为不同对象。
+- 视觉变化 MUST 保持空间目标身份可追踪。
+- 视觉变化 MUST NOT 让同一空间目标在无显式语义切换时表现为不同对象。
 - 同一空间目标在短暂停顿后（2 秒连续性窗口内）恢复时，SHOULD 尽量保持原有颜色语义。
 
 ## Variation Space

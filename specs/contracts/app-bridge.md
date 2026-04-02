@@ -12,10 +12,12 @@ version: 0.2
 
 ## Invariants
 
-- QML MUST 作为展示层存在，MUST NOT 实现协议逻辑。
+- QML MUST 作为展示层存在。
+- QML MUST NOT 实现协议逻辑。
 - QML MUST NOT 承担业务状态编排职责。
 - UI 触发的服务动作 MUST 经由 `appBridge` 暴露的 slots/signals 路由。
-- QML 与后端之间的交互边界 MUST 通过显式 bridge 接口表达，MUST NOT 通过隐藏控制路径、隐式全局状态或直接后端访问绕过。
+- QML 与后端之间的交互边界 MUST 通过显式 bridge 接口表达。
+- QML 与后端之间的交互边界 MUST NOT 通过隐藏控制路径、隐式全局状态或直接后端访问绕过。
 
 ## Variation Space
 

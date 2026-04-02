@@ -14,8 +14,10 @@ version: 0.1
 
 - `AppBridge` 与 `PreviewBridge` 各自 MUST 保持单一内部状态真源。
 - 同一 UI contract 的内部状态 MUST NOT 同时维护 raw list state 与 `QmlListModel` 两套真源。
-- 面向展示的派生状态 MUST 从权威状态推导，MUST NOT 与权威状态独立漂移。
-- 对同一语义状态的写入路径 MUST 保持单一，MUST NOT 允许多个彼此独立的更新入口并行存在。
+- 面向展示的派生状态 MUST 从权威状态推导。
+- 面向展示的派生状态 MUST NOT 与权威状态独立漂移。
+- 对同一语义状态的写入路径 MUST 保持单一。
+- 对同一语义状态 MUST NOT 允许多个彼此独立的更新入口并行存在。
 
 ## Variation Space
 

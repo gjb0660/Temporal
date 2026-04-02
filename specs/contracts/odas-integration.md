@@ -22,17 +22,21 @@ version: 0.1
 - 解析层 MUST 满足传输安全性：
   - MUST 正确处理拼接的 payload（concatenated payloads）
   - MUST 正确处理分片的 payload（fragmented payloads）
-- 下游生命周期语义 MUST 由宿主系统定义，MUST NOT 从 ODAS 原始字段中隐式推断。
+- 下游生命周期语义 MUST 由宿主系统定义。
+- 下游生命周期语义 MUST NOT 从 ODAS 原始字段中隐式推断。
 - ODAS 配置文件 MUST 作为 enabled sinks、endpoint targets 和传输行为的单一真源（SSOT）。
-- 解析层 MUST 保持轻语义（interpretation-light），MUST NOT 嵌入产品策略。
+- 解析层 MUST 保持轻语义（interpretation-light）。
+- 解析层 MUST NOT 嵌入产品策略。
 - 集成逻辑 MUST 能容忍缺失、非激活或占位型 source 条目，而不破坏语义分层。
-- ODAS 集成边界 MUST 保持可替换性，下游模块 MUST 依赖内部稳定抽象，而不是直接依赖 ODAS payload 结构。
+- ODAS 集成边界 MUST 保持可替换性。
+- 下游模块 MUST 依赖内部稳定抽象，而不是直接依赖 ODAS payload 结构。
 - 基于该边界派生的其他契约 MUST NOT 假设 UI、存储、录音或编排行为，除非这些行为在独立契约中明确定义。
 
 ## Variation Space
 
 - 系统 MAY 选择不同的内部抽象模型来表示 ODAS 输出，只要语义分层保持不变。
-- 系统 MAY 将原始 ODAS payload 转换为标准化内部模型，但 MUST NOT 在传输/解析边界中隐式引入产品语义。
+- 系统 MAY 将原始 ODAS payload 转换为标准化内部模型。
+- 系统 MUST NOT 在传输/解析边界中隐式引入产品语义。
 - buffering、framing、retry、reconnection 和 backpressure 策略 MAY 自由实现，但 MUST 保证流安全与语义正确性。
 - 系统 MAY 支持 ODAS 输出类型的任意子集，但 MUST 对未支持的类型显式失败，而不是静默误读。
 - 下游生命周期策略、阈值、录音规则与可视化方式 MAY 自由变化，但 MUST 在本契约之外定义。

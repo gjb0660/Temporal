@@ -112,8 +112,7 @@ Source level: direct source fact
 清空语义由 `clearChart` 事件统一执行：
 
 - tracked/potential 数据数组清零
-- tracking 与 potential 各自维护 10 秒 watchdog；
-  超时触发清空并取消对应 timer
+- tracking 与 potential 各自维护 10 秒 watchdog；超时触发清空并取消对应 timer
 
 `odas_launcher.js` 在连接切换后也会异步触发 `clearChart`。
 

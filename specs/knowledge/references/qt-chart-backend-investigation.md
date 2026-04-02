@@ -27,12 +27,9 @@
 ## 4. Official Evidence
 
 - `Qt Charts` 文档标注自 Qt 6.10 起 deprecated，并建议新项目使用 `Qt Graphs`。
-- 同页标注：Qt Quick 模板默认 `QGuiApplication` 需要替换为 `QApplication`
-  才能满足 `Qt Charts` 渲染前提。
-- `Qt Graphs Migration from Qt Charts` 提供了明确迁移路径，
-  但指出了 6.8 代际差异（例如标题/图例等缺口需按实际需求核对）。
-- `Canvas` 文档明确提示：对 `Canvas.Image` 路径应避免“大画布 + 频繁更新 + 动画”，
-  且建议优先考虑 `QQuickPaintedItem`（C++/QPainter）而非 JS/Context2D。
+- 同页标注：Qt Quick 模板默认 `QGuiApplication` 需要替换为 `QApplication`，才能满足 `Qt Charts` 渲染前提。
+- `Qt Graphs Migration from Qt Charts` 提供了明确迁移路径，但指出了 6.8 代际差异，例如标题、图例等缺口仍需按实际需求核对。
+- `Canvas` 文档明确提示：对 `Canvas.Image` 路径应避免“大画布 + 频繁更新 + 动画”，且建议优先考虑 `QQuickPaintedItem`（C++/QPainter）而非 JS/Context2D。
 
 ## 5. Local Reproduction Evidence
 
@@ -48,33 +45,37 @@
 
 ## 6. Option Comparison Matrix
 
-1. QtCharts
-   生命周期信号：官方已 deprecated（Qt 6.10+）
-   contract 拟合：高（当前已落地）
-   稳定性风险：中到高（当前入口前提可触发崩溃）
-   工程成本：低到中
-   结论：禁用
+### QtCharts
 
-2. QtGraphs
-   生命周期信号：官方推荐替代路线
-   contract 拟合：中到高（需迁移与回归）
-   稳定性风险：中（需处理版本差异）
-   工程成本：中
-   结论：长期目标态
+- 生命周期信号是官方已 deprecated（Qt 6.10+）。
+- contract 拟合高，当前已落地。
+- 稳定性风险中到高，当前入口前提可触发崩溃。
+- 工程成本低到中。
+- 结论：禁用。
 
-3. Canvas (QML/JS)
-   生命周期信号：未弃用但官方有高频更新警示
-   contract 拟合：中（可实现但易把复杂度放入 JS 渲染）
-   稳定性风险：中到高（高频更新路径不占优）
-   工程成本：中到高
-   结论：短期过渡态（受限使用）
+### QtGraphs
 
-4. QQuickPaintedItem (C++)
-   生命周期信号：可行但属自研渲染路径
-   contract 拟合：中（需自建绘制与桥接）
-   稳定性风险：中（性能与线程细节需精细控制）
-   工程成本：高
-   结论：非当前优先项
+- 生命周期信号是官方推荐替代路线。
+- contract 拟合中到高，但需要迁移与回归。
+- 稳定性风险中等，且需要处理版本差异。
+- 工程成本中等。
+- 结论：长期目标态。
+
+### Canvas (QML/JS)
+
+- 生命周期信号是未弃用，但官方有高频更新警示。
+- contract 拟合中等，可实现但易把复杂度放入 JS 渲染。
+- 稳定性风险中到高，高频更新路径不占优。
+- 工程成本中到高。
+- 结论：短期过渡态（受限使用）。
+
+### QQuickPaintedItem (C++)
+
+- 生命周期信号是可行，但属自研渲染路径。
+- contract 拟合中等，需要自建绘制与桥接。
+- 稳定性风险中等，性能与线程细节需精细控制。
+- 工程成本高。
+- 结论：非当前优先项。
 
 ## 7. Decision Boundaries
 
@@ -86,8 +87,7 @@
   1. 版本窗口允许进入 Qt 6.10+ 策略
   2. `QtGraphs` 满足 chart contract 语义回归
   3. runtime/preview parity 回归通过
-- 重新评估 `Canvas` 的唯一入口：
-  出现新的可验证反证数据，能够推翻本调查中的官方与实验事实。
+- 重新评估 `Canvas` 的唯一入口是出现新的可验证反证数据，且该数据能够推翻本调查中的官方与实验事实。
 
 ## 8. References
 

@@ -13,9 +13,11 @@ version: 0.1
 ## Invariants
 
 - SSH 控制接口 MUST 明确暴露 `connect`、`start`、`stop`、`status` 语义。
-- 控制失败 MUST 以显式错误暴露，MUST NOT 静默吞掉失败。
+- 控制失败 MUST 以显式错误暴露。
+- 控制失败 MUST NOT 静默吞掉失败。
 - 单实例远程进程控制 MUST 使用显式实例标识，MUST NOT 依赖进程名匹配作为实例身份。
-- 当流由 `start()` 启动时，监听就绪状态 MUST 同步可观测；在 bind/listen 成功前，系统 MUST NOT 报告流已激活。
+- 当流由 `start()` 启动时，监听就绪状态 MUST 同步可观测。
+- 在 bind/listen 成功前，系统 MUST NOT 报告流已激活。
 - UI 暴露的 SSH 连接状态 MUST 反映真实控制通道健康状态，而不是历史成功状态。
 - 当 `odas.command` 使用 wrapper script 时，远程 `stop` MUST 终止被控进程组，而不是仅终止 wrapper 入口 pid。
 
