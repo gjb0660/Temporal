@@ -1,21 +1,11 @@
 import tempfile
 import unittest
 import wave
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
+from temporal.app.fake_runtime import FakeClock
 from temporal.core.recording.auto_recorder import AutoRecorder
-
-
-class _FakeClock:
-    def __init__(self, start: datetime) -> None:
-        self.current = start
-
-    def now(self) -> datetime:
-        return self.current
-
-    def advance(self, seconds: float) -> None:
-        self.current = self.current + timedelta(seconds=seconds)
 
 
 class TestAutoRecorder(unittest.TestCase):
@@ -32,7 +22,7 @@ class TestAutoRecorder(unittest.TestCase):
 
     def test_update_active_sources_starts_recording(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            clock = FakeClock(datetime(2026, 3, 18, 12, 0, 0))
             recorder = AutoRecorder(output_dir=temp_dir, now_fn=clock.now)
 
             recorder.update_active_sources([2])
@@ -43,7 +33,7 @@ class TestAutoRecorder(unittest.TestCase):
 
     def test_sweep_inactive_stops_after_timeout(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            clock = FakeClock(datetime(2026, 3, 18, 12, 0, 0))
             recorder = AutoRecorder(
                 output_dir=temp_dir,
                 inactive_timeout_sec=1.0,
@@ -61,7 +51,7 @@ class TestAutoRecorder(unittest.TestCase):
 
     def test_active_sources_tracks_seen_ids(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            clock = FakeClock(datetime(2026, 3, 18, 12, 0, 0))
             recorder = AutoRecorder(output_dir=temp_dir, now_fn=clock.now)
 
             recorder.update_active_sources([3, 5])
@@ -114,7 +104,7 @@ class TestAutoRecorder(unittest.TestCase):
 
     def test_sessions_snapshot_returns_sorted_items(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            clock = FakeClock(datetime(2026, 3, 18, 12, 0, 0))
             recorder = AutoRecorder(output_dir=temp_dir, now_fn=clock.now)
 
             recorder.start(3, "pf")
@@ -127,7 +117,7 @@ class TestAutoRecorder(unittest.TestCase):
 
     def test_timeout_refresh_prevents_jitter_stop(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            clock = FakeClock(datetime(2026, 3, 18, 12, 0, 0))
             recorder = AutoRecorder(
                 output_dir=temp_dir,
                 inactive_timeout_sec=1.0,
@@ -148,7 +138,7 @@ class TestAutoRecorder(unittest.TestCase):
 
     def test_timeout_stop_then_reconnect_restarts_sessions(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            clock = _FakeClock(datetime(2026, 3, 18, 12, 0, 0))
+            clock = FakeClock(datetime(2026, 3, 18, 12, 0, 0))
             recorder = AutoRecorder(
                 output_dir=temp_dir,
                 inactive_timeout_sec=1.0,

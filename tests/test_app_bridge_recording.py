@@ -1,12 +1,11 @@
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
-from unittest.mock import patch
 
 from temporal.app.bridge import AppBridge
+from temporal.app.fake_runtime import FakeRecorder, FakeRemote, fake_app_bridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
-from temporal.core.ssh.remote_odas import CommandResult
 
 
 @dataclass
@@ -16,8 +15,9 @@ class _Session:
     filepath: Path
 
 
-class _FakeRecorder:
+class _FakeRecorder(FakeRecorder):
     def __init__(self, _output_dir) -> None:
+        super().__init__(_output_dir)
         self._active: set[int] = set()
         self.pushed: list[tuple[int, str, bytes]] = []
         self._sessions: dict[tuple[int, str], _Session] = {}
@@ -60,63 +60,7 @@ class _FakeRecorder:
         self.sample_rates = dict(sample_rates)
 
 
-class _FakeClient:
-    def __init__(self, **_kwargs) -> None:
-        self.start_calls = 0
-        self.stop_calls = 0
-
-    def start(self) -> None:
-        self.start_calls += 1
-
-    def stop(self) -> None:
-        self.stop_calls += 1
-
-
-class _FakeRemote:
-    def __init__(self, _config, _streams) -> None:
-        self.connected = False
-        self.running = False
-        self.connect_calls = 0
-        self.start_calls = 0
-        self.stop_calls = 0
-        self.sample_rates = {"sp": 16000, "pf": 16000}
-        self.sample_rate_warning: str | None = None
-
-    def connect(self) -> None:
-        self.connected = True
-        self.connect_calls += 1
-
-    def is_connected(self) -> bool:
-        return self.connected
-
-    def start_odaslive(self) -> CommandResult:
-        self.running = True
-        self.start_calls += 1
-        return CommandResult(code=0, stdout="123\n", stderr="")
-
-    def stop_odaslive(self) -> CommandResult:
-        self.running = False
-        self.stop_calls += 1
-        return CommandResult(code=0, stdout="", stderr="")
-
-    def status(self) -> CommandResult:
-        stdout = "123\n" if self.running else ""
-        return CommandResult(code=0, stdout=stdout, stderr="")
-
-    def read_log_tail(self, _lines: int = 80) -> CommandResult:
-        if not self.connected:
-            raise RuntimeError("SSH is not connected")
-        stdout = "odaslive ready\n" if self.running else "connected\n"
-        return CommandResult(code=0, stdout=stdout, stderr="")
-
-    def recording_sample_rates(self) -> dict[str, int]:
-        return dict(self.sample_rates)
-
-    def recording_sample_rate_warning(self) -> str | None:
-        return self.sample_rate_warning
-
-
-def _fake_config() -> tuple[RemoteOdasConfig, OdasStreamConfig]:
+def _fake_config() -> TemporalConfig:
     remote = RemoteOdasConfig(
         host="172.21.16.222",
         port=22,
@@ -133,22 +77,16 @@ def _fake_config() -> tuple[RemoteOdasConfig, OdasStreamConfig]:
         sss_sep=OdasEndpoint(host="192.168.1.50", port=10000),
         sss_pf=OdasEndpoint(host="192.168.1.50", port=10010),
     )
-    return remote, streams
+    return TemporalConfig(remote=remote, streams=streams)
 
 
 class TestAppBridgeRecording(unittest.TestCase):
     def _make_bridge(self) -> AppBridge:
-        remote, streams = _fake_config()
-        with (
-            patch("temporal.app.bridge.AutoRecorder", _FakeRecorder),
-            patch(
-                "temporal.app.bridge.load_config",
-                return_value=TemporalConfig(remote=remote, streams=streams),
-            ),
-            patch("temporal.app.bridge.OdasClient", _FakeClient),
-            patch("temporal.app.bridge.RemoteOdasController", _FakeRemote),
-        ):
-            return AppBridge()
+        return fake_app_bridge(
+            cfg=_fake_config(),
+            remote_cls=FakeRemote,
+            recorder_cls=_FakeRecorder,
+        )
 
     def test_sst_updates_recording_count(self) -> None:
         bridge = self._make_bridge()
@@ -230,7 +168,7 @@ class TestAppBridgeRecording(unittest.TestCase):
     def test_remote_start_applies_detected_recording_sample_rates(self) -> None:
         bridge = self._make_bridge()
         remote = bridge._remote
-        self.assertIsInstance(remote, _FakeRemote)
+        self.assertIsInstance(remote, FakeRemote)
         remote.sample_rates = {"sp": 48000, "pf": 44100}
 
         bridge.toggleRemoteOdas()
@@ -242,7 +180,7 @@ class TestAppBridgeRecording(unittest.TestCase):
     def test_remote_start_with_sample_rate_warning_publishes_log_notice(self) -> None:
         bridge = self._make_bridge()
         remote = bridge._remote
-        self.assertIsInstance(remote, _FakeRemote)
+        self.assertIsInstance(remote, FakeRemote)
         remote.sample_rate_warning = "录音采样率自动识别失败，已回退 16000Hz"
 
         bridge.toggleRemoteOdas()

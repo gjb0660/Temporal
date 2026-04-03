@@ -1,41 +1,17 @@
 import tempfile
 import unittest
 import wave
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch
 
 from temporal.app.bridge import AppBridge
-from temporal.core.config_loader import TemporalConfig
-from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
+from temporal.app.fake_runtime import FakeClient, FakeClock, FakeRemote, fake_app_bridge
 from temporal.core.recording.auto_recorder import AutoRecorder
 from temporal.core.ssh.remote_odas import CommandResult
 
 
-class _FakeClock:
-    def __init__(self, start: datetime) -> None:
-        self.current = start
-
-    def now(self) -> datetime:
-        return self.current
-
-    def advance(self, seconds: float) -> None:
-        self.current = self.current + timedelta(seconds=seconds)
-
-
-class _FakeOdasClient:
-    def __init__(self, **_kwargs) -> None:
-        self.started = False
-        self.start_calls = 0
-        self.stop_calls = 0
-
-    def start(self) -> None:
-        self.started = True
-        self.start_calls += 1
-
-    def stop(self) -> None:
-        self.started = False
-        self.stop_calls += 1
+class _FakeOdasClient(FakeClient):
+    pass
 
 
 class _FailingOdasClient(_FakeOdasClient):
@@ -44,12 +20,9 @@ class _FailingOdasClient(_FakeOdasClient):
         raise OSError("bind failed")
 
 
-class _FakeRemoteOdasController:
-    def __init__(self, _cfg: RemoteOdasConfig, _streams: OdasStreamConfig) -> None:
-        self.connected = False
-        self.connect_calls = 0
-        self.start_calls = 0
-        self.stop_calls = 0
+class _FakeRemoteOdasController(FakeRemote):
+    def __init__(self, cfg: object, streams: object) -> None:
+        super().__init__(cfg, streams)
         self.start_result = CommandResult(code=0, stdout="4242\n", stderr="")
         self.stop_result = CommandResult(code=0, stdout="", stderr="")
         self.log_output = "startup ok\nready\n"
@@ -60,24 +33,16 @@ class _FakeRemoteOdasController:
         self.status_exception: Exception | None = None
         self.log_exception: Exception | None = None
         self.status_calls = 0
-        self.sample_rates = {"sp": 16000, "pf": 16000}
-        self.sample_rate_warning: str | None = None
-
-    def connect(self) -> None:
-        self.connected = True
-        self.connect_calls += 1
-
-    def is_connected(self) -> bool:
-        return self.connected
 
     def start_odaslive(self) -> CommandResult:
-        self.start_calls += 1
+        super().start_odaslive()
         self.status_sequence = list(self.start_status_sequence)
         return self.start_result
 
     def stop_odaslive(self) -> CommandResult:
         self.stop_calls += 1
         if not self.keep_running_after_stop:
+            self.running = False
             self.status_output = ""
             self.status_sequence = []
         return self.stop_result
@@ -98,37 +63,11 @@ class _FakeRemoteOdasController:
             raise self.log_exception
         return CommandResult(code=0, stdout=self.log_output, stderr="")
 
-    def recording_sample_rates(self) -> dict[str, int]:
-        return dict(self.sample_rates)
-
-    def recording_sample_rate_warning(self) -> str | None:
-        return self.sample_rate_warning
-
 
 class _BootstrapFailingRemoteOdasController(_FakeRemoteOdasController):
     def connect(self) -> None:
         self.connect_calls += 1
         raise RuntimeError("SSH control shell timed out")
-
-
-def _fake_config() -> tuple[RemoteOdasConfig, OdasStreamConfig]:
-    remote = RemoteOdasConfig(
-        host="172.21.16.222",
-        port=22,
-        username="odas",
-        private_key="~/.ssh/id_rsa",
-        odas_command="./odas_loop.sh",
-        odas_args=[],
-        odas_cwd="workspace/ODAS/odas",
-        odas_log="odaslive.log",
-    )
-    streams = OdasStreamConfig(
-        sst=OdasEndpoint(host="192.168.1.50", port=9000),
-        ssl=OdasEndpoint(host="192.168.1.50", port=9001),
-        sss_sep=OdasEndpoint(host="192.168.1.50", port=10000),
-        sss_pf=OdasEndpoint(host="192.168.1.50", port=10010),
-    )
-    return remote, streams
 
 
 class TestAppBridgeIntegration(unittest.TestCase):
@@ -139,17 +78,11 @@ class TestAppBridgeIntegration(unittest.TestCase):
         client_cls: type[_FakeOdasClient] = _FakeOdasClient,
         remote_cls: type[_FakeRemoteOdasController] = _FakeRemoteOdasController,
     ) -> AppBridge:
-        remote, streams = _fake_config()
-        with (
-            patch(
-                "temporal.app.bridge.load_config",
-                return_value=TemporalConfig(remote=remote, streams=streams),
-            ),
-            patch("temporal.app.bridge.OdasClient", client_cls),
-            patch("temporal.app.bridge.RemoteOdasController", remote_cls),
-            patch("temporal.app.bridge.AutoRecorder", return_value=recorder),
-        ):
-            return AppBridge()
+        return fake_app_bridge(
+            client_cls=client_cls,
+            remote_cls=remote_cls,
+            recorder_instance=recorder,
+        )
 
     def _drain_startup(self, bridge: AppBridge) -> None:
         while bridge.odasStarting:
@@ -227,7 +160,7 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
     def test_timeout_recovery_creates_new_sessions(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            clock = _FakeClock(datetime(2026, 3, 19, 12, 0, 0))
+            clock = FakeClock(datetime(2026, 3, 19, 12, 0, 0))
             recorder = AutoRecorder(
                 output_dir=temp_dir,
                 inactive_timeout_sec=1.0,

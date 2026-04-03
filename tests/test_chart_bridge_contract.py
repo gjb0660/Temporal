@@ -3,7 +3,6 @@ import unittest
 from math import cos, radians, sin
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import patch
 
 # pyright: reportMissingImports=false
 
@@ -14,54 +13,13 @@ from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
 from temporal.app.bridge import AppBridge
+from temporal.app.fake_runtime import fake_app_bridge
 from temporal.core.chart_window import build_chart_window_model
-from temporal.core.config_loader import TemporalConfig
-from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.preview_bridge import PreviewBridge
 from temporal.preview_data import get_preview_scenario
 
-
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _QML_DIR = _REPO_ROOT / "src" / "temporal" / "qml"
-
-
-class _FakeRecorder:
-    def __init__(self, _output_dir) -> None:
-        pass
-
-    def stop_all(self) -> None:
-        return
-
-    def sessions_snapshot(self):
-        return []
-
-    def update_active_sources(self, _source_ids) -> None:
-        return
-
-    def sweep_inactive(self):
-        return []
-
-    def active_sources(self) -> set[int]:
-        return set()
-
-    def push(self, _source_id: int, _mode: str, _pcm_chunk: bytes) -> None:
-        return
-
-
-class _FakeClient:
-    def __init__(self, **_kwargs) -> None:
-        pass
-
-    def start(self) -> None:
-        return
-
-    def stop(self) -> None:
-        return
-
-
-class _FakeRemote:
-    def __init__(self, _config, _streams) -> None:
-        pass
 
 
 def _ensure_app() -> QGuiApplication:
@@ -69,24 +27,6 @@ def _ensure_app() -> QGuiApplication:
     if app is not None:
         return cast(QGuiApplication, app)
     return QGuiApplication([])
-
-
-def _fake_config() -> TemporalConfig:
-    remote = RemoteOdasConfig(
-        host="127.0.0.1",
-        port=22,
-        username="odas",
-        private_key="~/.ssh/id_rsa",
-        odas_args=["-c", "/opt/odas/config/odas.cfg"],
-        odas_log="/tmp/odaslive.log",
-    )
-    streams = OdasStreamConfig(
-        sst=OdasEndpoint(host="127.0.0.1", port=9000),
-        ssl=OdasEndpoint(host="127.0.0.1", port=9001),
-        sss_sep=OdasEndpoint(host="127.0.0.1", port=10000),
-        sss_pf=OdasEndpoint(host="127.0.0.1", port=10010),
-    )
-    return TemporalConfig(remote=remote, streams=streams)
 
 
 def _model_items(model) -> list[dict[str, Any]]:
@@ -99,13 +39,7 @@ class TestChartBridgeContract(unittest.TestCase):
         cls._app = _ensure_app()
 
     def _make_runtime_bridge(self) -> AppBridge:
-        with (
-            patch("temporal.app.bridge.load_config", return_value=_fake_config()),
-            patch("temporal.app.bridge.OdasClient", _FakeClient),
-            patch("temporal.app.bridge.RemoteOdasController", _FakeRemote),
-            patch("temporal.app.bridge.AutoRecorder", _FakeRecorder),
-        ):
-            return AppBridge()
+        return fake_app_bridge()
 
     def test_runtime_bridge_exposes_new_chart_models(self) -> None:
         bridge = self._make_runtime_bridge()
