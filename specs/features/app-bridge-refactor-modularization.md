@@ -155,7 +155,7 @@ updated: 2026-04-03
 - [x] Stage 1B：业务域抽离（四子域边界稳定）。
 - [x] Stage 1C：调用方与测试迁移收口（恢复四套主回归可跑）。
 - [x] Stage 2：Preview 组合化（保持继承外观）。
-- [ ] Stage 3：线程安全收敛（queued signal 回主线程）。
+- [x] Stage 3：线程安全收敛（queued signal 回主线程）。
 - [ ] Stage 4：接口瘦身收口（仅处理静态零引用且非 contract 公开面）。
 - [ ] Stage 5：执行四套主回归与门禁验证（不新增测试 case，不改 QML）。
 

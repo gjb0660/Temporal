@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Property, QObject, QTimer, Signal, Slot
+from PySide6.QtCore import Property, QObject, QThread, QTimer, Signal, Slot, Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -62,6 +62,10 @@ class AppBridge(QObject):
     potentialsEnabledChanged = Signal()
     potentialRangeChanged = Signal()
     previewStateChanged = Signal()
+    _sstIngressRequested = Signal(object)
+    _sslIngressRequested = Signal(object)
+    _sepAudioIngressRequested = Signal(object)
+    _pfAudioIngressRequested = Signal(object)
 
     def __init__(
         self,
@@ -117,6 +121,13 @@ class AppBridge(QObject):
         )
         self._space_target_session = SpaceTargetSession()
         self._source_color_allocator = SourceColorAllocator()
+
+        self._sstIngressRequested.connect(self._handle_sst_ingress, Qt.QueuedConnection)
+        self._sslIngressRequested.connect(self._handle_ssl_ingress, Qt.QueuedConnection)
+        self._sepAudioIngressRequested.connect(
+            self._handle_sep_audio_ingress, Qt.QueuedConnection
+        )
+        self._pfAudioIngressRequested.connect(self._handle_pf_audio_ingress, Qt.QueuedConnection)
 
         self._log_timer = QTimer(self)
         self._log_timer.setInterval(1500)
@@ -326,16 +337,48 @@ class AppBridge(QObject):
         return
 
     def _on_sst(self, message: dict) -> None:
-        stream_projection.on_sst(self, message)
+        if QThread.currentThread() is self.thread():
+            self._handle_sst_ingress(message)
+            return
+        self._sstIngressRequested.emit(message)
 
     def _on_ssl(self, message: dict) -> None:
-        stream_projection.on_ssl(self, message)
+        if QThread.currentThread() is self.thread():
+            self._handle_ssl_ingress(message)
+            return
+        self._sslIngressRequested.emit(message)
 
     def _on_sep_audio(self, chunk: bytes) -> None:
-        stream_projection.on_sep_audio(self, chunk)
+        if QThread.currentThread() is self.thread():
+            self._handle_sep_audio_ingress(chunk)
+            return
+        self._sepAudioIngressRequested.emit(chunk)
 
     def _on_pf_audio(self, chunk: bytes) -> None:
-        stream_projection.on_pf_audio(self, chunk)
+        if QThread.currentThread() is self.thread():
+            self._handle_pf_audio_ingress(chunk)
+            return
+        self._pfAudioIngressRequested.emit(chunk)
+
+    @Slot(object)
+    def _handle_sst_ingress(self, message: object) -> None:
+        if isinstance(message, dict):
+            stream_projection.on_sst(self, message)
+
+    @Slot(object)
+    def _handle_ssl_ingress(self, message: object) -> None:
+        if isinstance(message, dict):
+            stream_projection.on_ssl(self, message)
+
+    @Slot(object)
+    def _handle_sep_audio_ingress(self, chunk: object) -> None:
+        if isinstance(chunk, (bytes, bytearray, memoryview)):
+            stream_projection.on_sep_audio(self, bytes(chunk))
+
+    @Slot(object)
+    def _handle_pf_audio_ingress(self, chunk: object) -> None:
+        if isinstance(chunk, (bytes, bytearray, memoryview)):
+            stream_projection.on_pf_audio(self, bytes(chunk))
 
     def _route_audio_chunk(self, chunk: bytes, mode: str) -> None:
         if not self._channel_source_map:
