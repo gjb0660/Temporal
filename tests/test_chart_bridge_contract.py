@@ -1,5 +1,6 @@
 import os
 import unittest
+from math import cos, radians, sin
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import patch
@@ -132,6 +133,235 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertFalse(hasattr(bridge, "chartXTicksModel"))
         self.assertFalse(hasattr(bridge, "elevationSeriesModel"))
         self.assertFalse(hasattr(bridge, "azimuthSeriesModel"))
+
+    def test_runtime_keeps_disappeared_source_rows_and_series_until_window_expires(self) -> None:
+        bridge = self._make_runtime_bridge()
+
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge._on_sst({"timeStamp": 19, "src": []})
+
+        self.assertEqual(bridge.sourceRowsModel.count, 1)
+        self.assertEqual(bridge.sourceRowsModel.get(0)["sourceId"], 7)
+        self.assertFalse(bridge.sourceRowsModel.get(0)["active"])
+        self.assertEqual(bridge.elevationChartSeriesModel.count, 1)
+        points = bridge.elevationChartSeriesModel.get(0)["points"]
+        self.assertEqual(len(points), 2)
+        self.assertIsNone(points[-1]["y"])
+
+        bridge._on_sst({"timeStamp": 1700, "src": []})
+
+        self.assertEqual(bridge.sourceRowsModel.count, 0)
+        self.assertEqual(bridge.elevationChartSeriesModel.count, 0)
+        self.assertEqual(bridge.azimuthChartSeriesModel.count, 0)
+
+    def test_sources_toggle_hides_visible_outputs_but_keeps_rows(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst(
+            {
+                "timeStamp": 0,
+                "src": [
+                    {"id": 7, "x": 1.0, "y": 0.0, "z": 0.0},
+                    {"id": 15, "x": 0.0, "y": 1.0, "z": 0.0},
+                ],
+            }
+        )
+
+        bridge.setSourcesEnabled(False)
+
+        self.assertEqual(bridge.sourceRowsModel.count, 2)
+        self.assertEqual([bridge.sourceRowsModel.get(i)["sourceId"] for i in range(2)], [7, 15])
+        self.assertEqual(bridge.sourcePositionsModel.count, 0)
+        self.assertEqual(bridge.elevationChartSeriesModel.count, 0)
+        self.assertEqual(bridge.azimuthChartSeriesModel.count, 0)
+
+    def test_runtime_inactive_history_row_keeps_stable_color(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        baseline_color = str(bridge.sourceRowsModel.get(0)["badgeColor"])
+
+        bridge._on_sst({"timeStamp": 19, "src": []})
+        bridge._on_sst({"timeStamp": 38, "src": []})
+
+        self.assertEqual(bridge.sourceRowsModel.count, 1)
+        self.assertEqual(bridge.sourceRowsModel.get(0)["sourceId"], 7)
+        self.assertFalse(bridge.sourceRowsModel.get(0)["active"])
+        self.assertEqual(str(bridge.sourceRowsModel.get(0)["badgeColor"]), baseline_color)
+
+    def test_runtime_merges_source_id_drift_into_single_row_with_stable_color(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst(
+            {
+                "timeStamp": 0,
+                "src": [
+                    {"id": 7, "x": 1.0, "y": 0.0, "z": 0.0},
+                    {"id": 15, "x": 0.0, "y": 1.0, "z": 0.0},
+                ],
+            }
+        )
+        color_7 = next(
+            str(item["badgeColor"])
+            for item in _model_items(bridge.sourceRowsModel)
+            if int(item["sourceId"]) == 7
+        )
+
+        bridge._on_sst(
+            {
+                "timeStamp": 19,
+                "src": [
+                    {"id": 17, "x": 1.0, "y": 0.0, "z": 0.0},
+                    {"id": 15, "x": 0.0, "y": 1.0, "z": 0.0},
+                ],
+            }
+        )
+
+        rows = _model_items(bridge.sourceRowsModel)
+        self.assertEqual([int(item["sourceId"]) for item in rows], [15, 17])
+        self.assertTrue(all(int(item["sourceId"]) != 7 for item in rows))
+        color_17 = next(str(item["badgeColor"]) for item in rows if int(item["sourceId"]) == 17)
+        self.assertEqual(color_17, color_7)
+
+    def test_runtime_keeps_history_window_colors_unique_for_old_and_new_targets(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 3, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge._on_sst({"timeStamp": 220, "src": [{"id": 4, "x": 0.0, "y": 1.0, "z": 0.0}]})
+
+        rows = _model_items(bridge.sourceRowsModel)
+        self.assertEqual([int(item["sourceId"]) for item in rows], [3, 4])
+        self.assertEqual(len({str(item["badgeColor"]) for item in rows}), len(rows))
+        self.assertEqual([bool(item["active"]) for item in rows], [False, True])
+
+    def test_runtime_active_flag_uses_target_identity_when_source_id_reused(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge._on_sst({"timeStamp": 220, "src": [{"id": 7, "x": 0.0, "y": 1.0, "z": 0.0}]})
+
+        rows = _model_items(bridge.sourceRowsModel)
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(int(item["sourceId"]) == 7 for item in rows))
+        self.assertEqual(sum(1 for item in rows if bool(item["active"])), 1)
+
+    def test_runtime_history_rows_are_capped_to_palette_size_without_color_conflicts(self) -> None:
+        bridge = self._make_runtime_bridge()
+        for index in range(13):
+            angle = radians(float(index * 30))
+            bridge._on_sst(
+                {
+                    "timeStamp": index * 19,
+                    "src": [
+                        {
+                            "id": index + 1,
+                            "x": cos(angle),
+                            "y": sin(angle),
+                            "z": 0.0,
+                        }
+                    ],
+                }
+            )
+
+        rows = _model_items(bridge.sourceRowsModel)
+        self.assertEqual(len(rows), 12)
+        self.assertNotIn(1, {int(item["sourceId"]) for item in rows})
+        self.assertEqual(len({str(item["badgeColor"]) for item in rows}), 12)
+        self.assertEqual(sum(1 for item in rows if bool(item["active"])), 1)
+
+    def test_runtime_preview_parity_for_source_id_drift_and_color_stability(self) -> None:
+        runtime = self._make_runtime_bridge()
+        runtime._on_sst(
+            {
+                "timeStamp": 0,
+                "src": [
+                    {"id": 7, "x": 1.0, "y": 0.0, "z": 0.0},
+                    {"id": 15, "x": 0.0, "y": 1.0, "z": 0.0},
+                ],
+            }
+        )
+        runtime._on_sst(
+            {
+                "timeStamp": 19,
+                "src": [
+                    {"id": 17, "x": 1.0, "y": 0.0, "z": 0.0},
+                    {"id": 15, "x": 0.0, "y": 1.0, "z": 0.0},
+                ],
+            }
+        )
+
+        preview = PreviewBridge()
+        preview._scenario = {
+            "key": "idDriftParity",
+            "displayName": "idDriftParity",
+            "status": "Temporal 就绪",
+            "remoteLogLines": ["等待连接远程 odaslive..."],
+            "sources": [
+                {"id": 7, "color": "#cf54ea", "energy": 0.9},
+                {"id": 15, "color": "#4dc6d8", "energy": 0.9},
+            ],
+            "trackingFrames": [
+                {
+                    "sample": 0,
+                    "sources": [
+                        {"id": 7, "x": 1.0, "y": 0.0, "z": 0.0},
+                        {"id": 15, "x": 0.0, "y": 1.0, "z": 0.0},
+                    ],
+                },
+                {
+                    "sample": 19,
+                    "sources": [
+                        {"id": 17, "x": 1.0, "y": 0.0, "z": 0.0},
+                        {"id": 15, "x": 0.0, "y": 1.0, "z": 0.0},
+                    ],
+                },
+            ],
+        }
+        preview._reset_selected_sources()
+        preview._reset_preview_sample_window()
+        preview.toggleStreams()
+        preview.advancePreviewTick()
+
+        runtime_rows = [
+            (int(item["sourceId"]), str(item["badgeColor"]), bool(item["active"]))
+            for item in _model_items(runtime.sourceRowsModel)
+        ]
+        preview_rows = [
+            (int(item["sourceId"]), str(item["badgeColor"]), bool(item["active"]))
+            for item in _model_items(preview.sourceRowsModel)
+        ]
+        self.assertEqual(runtime_rows, preview_rows)
+
+    def test_runtime_preview_parity_for_history_window_color_uniqueness(self) -> None:
+        runtime = self._make_runtime_bridge()
+        runtime._on_sst({"timeStamp": 0, "src": [{"id": 3, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        runtime._on_sst({"timeStamp": 220, "src": [{"id": 4, "x": 0.0, "y": 1.0, "z": 0.0}]})
+
+        preview = PreviewBridge()
+        preview._scenario = {
+            "key": "historyColorUniqueness",
+            "displayName": "historyColorUniqueness",
+            "status": "Temporal 就绪",
+            "remoteLogLines": ["等待连接远程 odaslive..."],
+            "sources": [
+                {"id": 3, "color": "#cf54ea", "energy": 0.9},
+                {"id": 4, "color": "#4dc6d8", "energy": 0.9},
+            ],
+            "trackingFrames": [
+                {"sample": 0, "sources": [{"id": 3, "x": 1.0, "y": 0.0, "z": 0.0}]},
+                {"sample": 220, "sources": [{"id": 4, "x": 0.0, "y": 1.0, "z": 0.0}]},
+            ],
+        }
+        preview._reset_selected_sources()
+        preview._reset_preview_sample_window()
+        preview.toggleStreams()
+        preview.advancePreviewTick()
+
+        runtime_rows = [
+            (int(item["sourceId"]), str(item["badgeColor"]), bool(item["active"]))
+            for item in _model_items(runtime.sourceRowsModel)
+        ]
+        preview_rows = [
+            (int(item["sourceId"]), str(item["badgeColor"]), bool(item["active"]))
+            for item in _model_items(preview.sourceRowsModel)
+        ]
+        self.assertEqual(runtime_rows, preview_rows)
+        self.assertEqual(len({row[1] for row in runtime_rows}), len(runtime_rows))
 
     def test_missing_timestamp_frame_is_ignored(self) -> None:
         bridge = self._make_runtime_bridge()

@@ -3,7 +3,7 @@ title: ui-system
 tracker: primary-feature
 status: active
 owner: codex/ui
-updated: 2026-04-02
+updated: 2026-04-04
 ---
 
 ## Goal
@@ -24,6 +24,11 @@ updated: 2026-04-02
 - 当前可视化语义已固定：row/3D 基于 current frame，chart 基于共享时间窗，三者共享同一过滤语义。
 - 图表固定窗口、主刻度与颜色一致性等稳定约束已由 `specs/contracts/ui/chart-canvas.md` 承接。
 - 图表后端路线结论已由 `ui-system-refactor-chart-canvas` 承接，`ui-system` 只消费其上层展示边界。
+- row 的对象目录语义与可见过滤语义已解耦：row 可保留共享历史窗口内的历史 source，chart/3D 仅消费当前可见子集。
+- runtime 已收口目标身份账本：`target_id -> stable_color` 与 `source_id -> target_id` 别名映射由 bridge 单一路径维护。
+- source 颜色由 bridge 输出并按空间目标连续性保持稳定映射，row/3D/chart 共享同一映射；颜色身份主键为 `targetId`。
+- `sourceId` 在输入侧可作为短期跟踪标识展示，但不再作为展示身份主键。
+- bridge 已稳定输出历史行保留、颜色稳定与按活跃优先/最新历史优先裁剪所需的共享 row 语义，供右栏与跨视图展示一致消费。
 
 ## Decision
 
@@ -31,6 +36,9 @@ updated: 2026-04-02
 - QML 只消费 bridge 输出，不复制业务推导；runtime/preview 继续在同一 projection 层演进。
 - row/chart/3D 的过滤与空态契约保持冻结，后续演进只能走 shared projection 单路径收敛。
 - 颜色语义与图表时间窗只通过共享 bridge/projection 输出消费，不在 QML 或下游 feature 中复制业务语义。
+- 颜色语义由 bridge 颜色账本单一路径维护；MUST NOT 在 projection/QML 引入并行颜色业务语义或业务 fallback。
+- 当同一空间目标在连续性窗口内更换 `sourceId` 时，bridge 仅保留最新 `sourceId` 行展示，颜色持续复用同一目标颜色。
+- 行状态（`active`/灰态）由 `targetId` 判定；MUST NOT 按展示 `sourceId` 推导。
 - runtime 在 bridge 层保持单一行为真源；MUST NOT 并行维护两套筛选、模型刷新与状态推导逻辑。
 - 图表后端路线与迁移门槛由 `ui-system-refactor-chart-canvas` 单独拥有；`ui-system` 不重复承载其实现裁决。
 
@@ -41,9 +49,13 @@ updated: 2026-04-02
 3. 3D 声源区、标题层级与整体主题满足既定视觉目标。
 4. 右栏 row 与 3D 共享 current frame 语义，chart 使用共享时间窗序列，三者共享同一过滤语义。
 5. 取消最后一个勾选 source 后，row 集合保持稳定，只有图表与 3D 变空。
-6. chart 在连接首帧显示 `0`，发生重连后重新从 `0` 起算。
-7. chart 行为持续满足 `specs/contracts/ui/chart-canvas.md`，且 `ui-system` 不再复写其中的稳定约束。
-8. `ui-system` 与 `ui-system-refactor-chart-canvas` 的 owner 边界保持一致，不出现路线冲突或重复裁决。
+6. 关闭“筛选器-声源”总开关后，row 集合保持稳定且可继续勾选，只有图表与 3D 变空。
+7. row 的历史保留语义与 chart / 3D 的当前可见集保持分离；source 在当前帧消失后，row 与 chart 点迹在共享历史窗口内继续保留，超出窗口后自动移除。
+8. chart 在连接首帧显示 `0`，发生重连后重新从 `0` 起算。
+9. chart 行为持续满足 `specs/contracts/ui/chart-canvas.md`，且 `ui-system` 不再复写其中的稳定约束。
+10. 同一目标短时重现且 `sourceId` 漂移时，row / chart / 3D 颜色保持稳定并与 runtime / preview 一致。
+11. 历史窗口内列表行颜色不重复；当历史目标超过调色板容量时，行集合按“活跃优先 + 最新历史优先”裁剪并与 runtime / preview 一致。
+12. `ui-system` 与 `ui-system-refactor-chart-canvas` 的 owner 边界保持一致，不出现路线冲突或重复裁决。
 
 ## Plan
 
@@ -62,7 +74,7 @@ updated: 2026-04-02
 - [x] 已冻结 row 稳定、3D 过滤与空态判定的首批行为语义。
 - [x] 已在 runtime `AppBridge` 收口 elevation/azimuth chart series 投影。
 - [x] 已抽离 shared projection layer，并由 runtime 与 preview 共同消费。
-- [x] 已同步 chart 后端路线 owner 语义（目标 QtGraphs，过渡 Canvas，禁用 QtCharts）。
+- [x] 已同步 chart 后端路线 owner 边界，`ui-system` 不再重复裁决实现路线。
 
 ## Todo
 

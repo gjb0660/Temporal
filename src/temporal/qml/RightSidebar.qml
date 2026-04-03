@@ -38,6 +38,7 @@ Rectangle {
                 required property int sourceId
                 required property string label
                 required property bool checked
+                required property bool active
                 required property string badge
                 required property string badgeColor
 
@@ -47,6 +48,7 @@ Rectangle {
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 22
+                    opacity: sourceRow.active ? 1.0 : 0.55
 
                     AppSideCheckBox {
                         theme: root.theme
