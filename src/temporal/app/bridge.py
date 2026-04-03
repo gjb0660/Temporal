@@ -31,6 +31,7 @@ from temporal.core.ui_projection import (
     compute_visible_source_ids,
 )
 from temporal.qml_list_model import QmlListModel
+from . import recording_audio, remote_lifecycle, status_state, stream_projection
 
 
 class AppBridge(QObject):
@@ -72,7 +73,7 @@ class AppBridge(QObject):
     ) -> None:
         super().__init__()
         self._status = "Temporal 就绪"
-        self._root = Path(__file__).resolve().parents[2]
+        self._root = Path(__file__).resolve().parents[3]
         self._cfg_path = resolve_default_config_path(self._root)
         self._cfg = cfg or load_config(self._cfg_path)
         self._remote = remote or RemoteOdasController(self._cfg.remote, self._cfg.streams)
@@ -270,235 +271,71 @@ class AppBridge(QObject):
 
     @Slot(str)
     def setStatus(self, status: str) -> None:
-        if self._status == status:
-            return
-        self._status = status
-        self.statusChanged.emit()
+        status_state.set_status(self, status)
 
     @Slot()
     def connectRemote(self) -> None:
-        try:
-            self._remote.connect()
-        except Exception as exc:
-            self._cancel_odas_startup()
-            self._set_remote_connected(False)
-            self._set_odas_running(False)
-            reason = self._humanize_control_channel_error(str(exc))
-            self.setStatus(reason)
-            self._set_remote_log_lines([reason])
-            return
-
-        self._refresh_remote_connection_state()
-        if not self._log_timer.isActive():
-            self._log_timer.start()
-        self._poll_remote_log()
-        self._sync_remote_odas_state()
-        self._apply_state_status()
+        remote_lifecycle.connect_remote(self)
 
     @Slot()
     def startRemoteOdas(self) -> None:
-        if not self._refresh_remote_connection_state():
-            self.setStatus("请先连接远程 SSH")
-            return
-        if self._odas_starting:
-            self.setStatus("远程 odaslive 启动中")
-            return
-
-        if not self._remote_connected:
-            self.connectRemote()
-            if not self._remote_connected:
-                return
-
-        if not self._streams_active:
-            self.startStreams()
-            if not self._streams_active:
-                return
-
-        try:
-            result = self._remote.start_odaslive()
-        except Exception as exc:
-            self._cancel_odas_startup()
-            self._set_odas_running(False)
-            self.setStatus(f"启动失败: {self._humanize_control_channel_error(str(exc))}")
-            return
-
-        self._poll_remote_log()
-        if result.code != 0:
-            self._cancel_odas_startup()
-            self._set_odas_running(False)
-            self._set_startup_failure_status(self._pick_startup_failure_reason(result))
-            return
-
-        self._apply_recording_sample_rates()
-        self._startup_failure_hint = result.stderr.strip() or result.stdout.strip()
-        self._startup_attempts_remaining = self._STARTUP_VERIFY_ATTEMPTS
-        self._set_odas_running(False)
-        self._set_odas_starting(True)
-        self.setStatus("远程 odaslive 启动中")
-        self._verify_odas_startup()
+        remote_lifecycle.start_remote_odas(self)
 
     @Slot()
     def stopRemoteOdas(self) -> None:
-        if not self._refresh_remote_connection_state():
-            self.setStatus("SSH 未连接")
-            return
-
-        try:
-            result = self._remote.stop_odaslive()
-        except Exception as exc:
-            self.setStatus(f"停止失败: {self._humanize_control_channel_error(str(exc))}")
-            return
-
-        self._cancel_odas_startup()
-        if result.code == 0:
-            running = self._sync_remote_odas_state(update_status=False)
-            if running is None:
-                self.setStatus("停止失败: 远程控制通道已断开")
-            elif running:
-                self.setStatus("远程 odaslive 停止失败")
-            else:
-                self._apply_state_status()
-        else:
-            self._sync_remote_odas_state()
-            self.setStatus(result.stderr.strip() or "远程 odaslive 停止失败")
-        if self._remote_connected:
-            self._poll_remote_log()
+        remote_lifecycle.stop_remote_odas(self)
 
     @Slot()
     def toggleRemoteOdas(self) -> None:
-        if self._odas_starting:
-            self.setStatus("远程 odaslive 启动中")
-            return
-        if self._odas_running:
-            if not self._refresh_remote_connection_state():
-                self.connectRemote()
-                if not self._refresh_remote_connection_state():
-                    return
-            self.stopRemoteOdas()
-            return
-        if not self._remote_connected:
-            self.connectRemote()
-            if not self._remote_connected:
-                return
-        self.startRemoteOdas()
+        remote_lifecycle.toggle_remote_odas(self)
 
     @Slot()
     def startStreams(self) -> None:
-        if self._streams_active:
-            self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
-            return
-
-        try:
-            self._client.start()
-        except Exception as exc:
-            self._set_streams_active(False)
-            self.setStatus(f"本地监听启动失败: {exc}")
-            return
-
-        self._reset_runtime_chart_clock()
-        self._set_streams_active(True)
-        self._apply_state_status()
+        stream_projection.start_streams(self)
 
     @Slot()
     def stopStreams(self) -> None:
-        self._client.stop()
-        self._recorder.stop_all()
-        self._source_channel_map.clear()
-        self._channel_source_map.clear()
-        self._reset_runtime_chart_clock()
-        self._set_streams_active(False)
-        self._set_recording_source_count(0)
-        self._set_recording_sessions([])
-        self._apply_state_status()
+        stream_projection.stop_streams(self)
 
     @Slot()
     def toggleStreams(self) -> None:
-        if self._streams_active:
-            self.stopStreams()
-            return
-        self.startStreams()
+        stream_projection.toggle_streams(self)
 
     @Slot(bool)
     def setSourcesEnabled(self, enabled: bool) -> None:
-        if self._sources_enabled == enabled:
-            return
-        self._sources_enabled = enabled
-        self.sourcesEnabledChanged.emit()
-        self._refresh_sources()
-        self._update_stream_status("声源筛选已更新")
+        stream_projection.set_sources_enabled(self, enabled)
 
     @Slot(int, bool)
     def setSourceSelected(self, source_id: int, selected: bool) -> None:
-        if source_id not in self._source_ids:
-            return
-
-        changed = False
-        if selected and source_id not in self._selected_source_ids:
-            self._selected_source_ids.add(source_id)
-            changed = True
-        if not selected and source_id in self._selected_source_ids:
-            self._selected_source_ids.remove(source_id)
-            changed = True
-
-        if not changed:
-            return
-
-        self._refresh_sources()
-        self._update_stream_status("声源选择已更新")
+        stream_projection.set_source_selected(self, source_id, selected)
 
     @Slot(int, result=bool)
     def isSourceSelected(self, source_id: int) -> bool:
-        return source_id in self._selected_source_ids
+        return stream_projection.is_source_selected(self, source_id)
 
     @Slot(bool)
     def setPotentialsEnabled(self, enabled: bool) -> None:
-        if self._potentials_enabled == enabled:
-            return
-        self._potentials_enabled = enabled
-        self.potentialsEnabledChanged.emit()
-        self._refresh_potentials()
-        self._update_stream_status("候选点筛选已更新")
+        stream_projection.set_potentials_enabled(self, enabled)
 
     @Slot(float, float)
     def setPotentialEnergyRange(self, minimum: float, maximum: float) -> None:
-        low = min(minimum, maximum)
-        high = max(minimum, maximum)
-        if self._potential_min == low and self._potential_max == high:
-            return
-        self._potential_min = low
-        self._potential_max = high
-        self.potentialRangeChanged.emit()
-        self._refresh_potentials()
-        self._update_stream_status("候选能量范围已更新")
+        stream_projection.set_potential_energy_range(self, minimum, maximum)
 
     @Slot(str)
     def setPreviewScenario(self, _key: str) -> None:
         return
 
     def _on_sst(self, message: dict) -> None:
-        self._last_sst = message
-        refresh_chart = self._append_runtime_chart_frame(message)
-        self._refresh_sources(refresh_chart=refresh_chart)
-        self._update_source_channel_map(self._source_ids)
-        mapped_source_ids = [
-            source_id for source_id in self._source_ids if source_id in self._source_channel_map
-        ]
-        self._recorder.update_active_sources(mapped_source_ids)
-        self._recorder.sweep_inactive()
-        self._set_recording_source_count(len(self._recorder.active_sources()))
-        self._refresh_recording_sessions()
-        self._update_stream_status("SST 数据已更新")
+        stream_projection.on_sst(self, message)
 
     def _on_ssl(self, message: dict) -> None:
-        self._last_ssl = message
-        self._refresh_potentials()
-        self._update_stream_status("SSL 数据已更新")
+        stream_projection.on_ssl(self, message)
 
     def _on_sep_audio(self, chunk: bytes) -> None:
-        self._route_audio_chunk(chunk, mode="sp")
+        stream_projection.on_sep_audio(self, chunk)
 
     def _on_pf_audio(self, chunk: bytes) -> None:
-        self._route_audio_chunk(chunk, mode="pf")
+        stream_projection.on_pf_audio(self, chunk)
 
     def _route_audio_chunk(self, chunk: bytes, mode: str) -> None:
         if not self._channel_source_map:
@@ -794,102 +631,16 @@ class AppBridge(QObject):
         self.setStatus(f"启动失败: {humanized}")
 
     def _verify_odas_startup(self) -> None:
-        if not self._odas_starting:
-            return
-
-        try:
-            result = self._remote.status()
-        except Exception as exc:
-            self._cancel_odas_startup()
-            self._refresh_remote_connection_state()
-            self._set_odas_running(False)
-            self.setStatus(f"启动失败: {self._humanize_control_channel_error(str(exc))}")
-            return
-
-        if result.stdout.strip():
-            self._cancel_odas_startup()
-            self._set_odas_running(True)
-            self._apply_state_status()
-            return
-
-        self._startup_attempts_remaining -= 1
-        self._poll_remote_log()
-        if self._startup_attempts_remaining <= 0:
-            reason = self._pick_startup_failure_reason()
-            self._cancel_odas_startup()
-            self._set_odas_running(False)
-            self._set_startup_failure_status(reason)
-            return
-
-        if not self._startup_timer.isActive():
-            self._startup_timer.start()
+        remote_lifecycle.verify_odas_startup(self)
 
     def _poll_remote_log(self) -> None:
-        try:
-            result = self._remote.read_log_tail(80)
-        except Exception as exc:
-            message = str(exc)
-            if "SSH is not connected" in message or "SSH control shell" in message:
-                self._cancel_odas_startup()
-                self._refresh_remote_connection_state()
-                if self._log_timer.isActive():
-                    self._log_timer.stop()
-                reason = self._humanize_control_channel_error(message)
-                self._set_remote_log_lines([reason])
-                self.setStatus(reason)
-                return
-            self._set_remote_log_lines([f"日志读取失败: {message}"])
-            if self._remote_connected and not self._odas_starting:
-                self._sync_remote_odas_state(update_status=True)
-            return
-
-        if result.code != 0 and result.stderr.strip():
-            self._set_remote_log_lines([f"日志读取失败: {result.stderr.strip()}"])
-        else:
-            lines = [line for line in result.stdout.splitlines() if line.strip()]
-            if not lines:
-                self._set_remote_log_lines(["远程日志为空，等待 odaslive 输出..."])
-            else:
-                self._set_remote_log_lines(lines)
-
-        if self._remote_connected and not self._odas_starting:
-            self._sync_remote_odas_state(update_status=True)
+        remote_lifecycle.poll_remote_log(self)
 
     def _refresh_recording_sessions(self) -> None:
-        snapshot_fn = getattr(self._recorder, "sessions_snapshot", None)
-        if snapshot_fn is None or not callable(snapshot_fn):
-            self._set_recording_sessions([])
-            return
-
-        sessions = snapshot_fn()
-        if not isinstance(sessions, list):
-            self._set_recording_sessions([])
-            return
-        items = [f"Source {item.source_id} [{item.mode}] {item.filepath.name}" for item in sessions]
-        self._set_recording_sessions(items)
+        recording_audio.refresh_recording_sessions(self)
 
     def _apply_recording_sample_rates(self) -> None:
-        sample_rates_fn = getattr(self._remote, "recording_sample_rates", None)
-        warning_fn = getattr(self._remote, "recording_sample_rate_warning", None)
-        recorder_update_fn = getattr(self._recorder, "set_sample_rates", None)
-
-        sample_rates = {"sp": 16000, "pf": 16000}
-        if callable(sample_rates_fn):
-            remote_rates = sample_rates_fn()
-            if isinstance(remote_rates, dict):
-                for mode in ("sp", "pf"):
-                    value = remote_rates.get(mode)
-                    if isinstance(value, int) and value > 0:
-                        sample_rates[mode] = value
-        if callable(recorder_update_fn):
-            recorder_update_fn(sample_rates)
-
-        warning = warning_fn() if callable(warning_fn) else None
-        if isinstance(warning, str) and warning.strip():
-            self._recording_sample_rate_warning = warning.strip()
-            self._set_remote_log_lines(self._remote_log_lines)
-        else:
-            self._recording_sample_rate_warning = ""
+        recording_audio.apply_recording_sample_rates(self)
 
     def _refresh_sources(self, *, refresh_chart: bool = True) -> None:
         source_ids = extract_source_ids(self._last_sst)
@@ -1070,7 +821,7 @@ def run_with_bridge(bridge: QObject) -> int:
     bridge.setParent(engine)
     engine.setInitialProperties({"appBridge": bridge})
 
-    qml_path = Path(__file__).resolve().parent / "qml" / "Main.qml"
+    qml_path = Path(__file__).resolve().parents[1] / "qml" / "Main.qml"
     engine.load(str(qml_path))
 
     if not engine.rootObjects():

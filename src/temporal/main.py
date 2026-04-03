@@ -6,7 +6,7 @@ from typing import cast
 
 from PySide6.QtGui import QGuiApplication
 
-from temporal.app import run, run_with_bridge
+from temporal.app.bridge import run, run_with_bridge
 from temporal.preview_bridge import PreviewBridge
 
 

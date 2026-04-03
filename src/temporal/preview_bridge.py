@@ -5,7 +5,7 @@ from typing import Any
 
 from PySide6.QtCore import Property, QTimer, Signal, Slot
 
-from temporal.app import AppBridge
+from temporal.app.bridge import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.core.ssh.remote_odas import CommandResult

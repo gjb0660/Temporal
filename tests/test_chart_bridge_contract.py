@@ -12,7 +12,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
-from temporal.app import AppBridge
+from temporal.app.bridge import AppBridge
 from temporal.core.chart_window import build_chart_window_model
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
@@ -99,10 +99,10 @@ class TestChartBridgeContract(unittest.TestCase):
 
     def _make_runtime_bridge(self) -> AppBridge:
         with (
-            patch("temporal.app.load_config", return_value=_fake_config()),
-            patch("temporal.app.OdasClient", _FakeClient),
-            patch("temporal.app.RemoteOdasController", _FakeRemote),
-            patch("temporal.app.AutoRecorder", _FakeRecorder),
+            patch("temporal.app.bridge.load_config", return_value=_fake_config()),
+            patch("temporal.app.bridge.OdasClient", _FakeClient),
+            patch("temporal.app.bridge.RemoteOdasController", _FakeRemote),
+            patch("temporal.app.bridge.AutoRecorder", _FakeRecorder),
         ):
             return AppBridge()
 

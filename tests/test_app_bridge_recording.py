@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import patch
 
-from temporal.app import AppBridge
+from temporal.app.bridge import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.core.ssh.remote_odas import CommandResult
@@ -140,13 +140,13 @@ class TestAppBridgeRecording(unittest.TestCase):
     def _make_bridge(self) -> AppBridge:
         remote, streams = _fake_config()
         with (
-            patch("temporal.app.AutoRecorder", _FakeRecorder),
+            patch("temporal.app.bridge.AutoRecorder", _FakeRecorder),
             patch(
-                "temporal.app.load_config",
+                "temporal.app.bridge.load_config",
                 return_value=TemporalConfig(remote=remote, streams=streams),
             ),
-            patch("temporal.app.OdasClient", _FakeClient),
-            patch("temporal.app.RemoteOdasController", _FakeRemote),
+            patch("temporal.app.bridge.OdasClient", _FakeClient),
+            patch("temporal.app.bridge.RemoteOdasController", _FakeRemote),
         ):
             return AppBridge()
 
@@ -301,6 +301,7 @@ class TestAppBridgeRecording(unittest.TestCase):
 
         self.assertEqual(bridge.sourceRowsModel.count, 2)
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

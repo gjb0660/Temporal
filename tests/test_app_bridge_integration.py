@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-from temporal.app import AppBridge
+from temporal.app.bridge import AppBridge
 from temporal.core.config_loader import TemporalConfig
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 from temporal.core.recording.auto_recorder import AutoRecorder
@@ -142,12 +142,12 @@ class TestAppBridgeIntegration(unittest.TestCase):
         remote, streams = _fake_config()
         with (
             patch(
-                "temporal.app.load_config",
+                "temporal.app.bridge.load_config",
                 return_value=TemporalConfig(remote=remote, streams=streams),
             ),
-            patch("temporal.app.OdasClient", client_cls),
-            patch("temporal.app.RemoteOdasController", remote_cls),
-            patch("temporal.app.AutoRecorder", return_value=recorder),
+            patch("temporal.app.bridge.OdasClient", client_cls),
+            patch("temporal.app.bridge.RemoteOdasController", remote_cls),
+            patch("temporal.app.bridge.AutoRecorder", return_value=recorder),
         ):
             return AppBridge()
 
