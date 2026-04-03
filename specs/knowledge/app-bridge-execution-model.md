@@ -22,12 +22,15 @@
   - `on_ssl` 绑定 `TcpJsonListener(config.ssl, on_ssl, "ssl")`
   - `on_sep_audio` 绑定 `TcpAudioListener(config.sss_sep, on_sep_audio, "sep")`
   - `on_pf_audio` 绑定 `TcpAudioListener(config.sss_pf, on_pf_audio, "pf")`
-- `src/temporal/app.py` 构造器把上述回调连接到
+- `src/temporal/app/bridge.py` 构造器把上述回调连接到
   `_on_sst/_on_ssl/_on_sep_audio/_on_pf_audio`。
+- `src/temporal/app/bridge.py` 中 `_on_*` 在非 QObject 线程时通过
+  `_sstIngressRequested/_sslIngressRequested/_sepAudioIngressRequested/_pfAudioIngressRequested`
+  进入 `Qt.QueuedConnection`，再由 `_handle_*_ingress` 执行后续处理。
 
 ### Timer Path（Qt event loop）
 
-- `src/temporal/app.py` 创建：
+- `src/temporal/app/bridge.py` 创建：
   - `_log_timer = QTimer(self)`，`timeout.connect(self._poll_remote_log)`
   - `_startup_timer = QTimer(self)`，`timeout.connect(self._verify_odas_startup)`
 
@@ -41,15 +44,17 @@
     `recordingSourceCountChanged`, `remoteLogLinesChanged`,
     `remoteLogTextChanged`, `recordingSessionsChanged`,
     `sourcePositionsChanged`, `sourceIdsChanged`, `sourceItemsChanged`,
-    `sourceCountChanged`, `potentialCountChanged`
+    `sourceCountChanged`, `potentialCountChanged`,
+    `_sstIngressRequested`, `_sslIngressRequested`,
+    `_sepAudioIngressRequested`, `_pfAudioIngressRequested`
 - `QmlListModel.replace()` 触发点：
   - 初始化时：`_source_rows_model`, `_source_positions_model`,
-    `_elevation_series_model`, `_azimuth_series_model`,
-    `_preview_scenario_options_model`, `_chart_x_ticks_model`,
+    `_elevation_chart_series_model`, `_azimuth_chart_series_model`,
+    `_preview_scenario_options_model`, `_chart_window_model`,
     `_header_nav_labels_model`, `_recording_sessions_model`
   - 运行时：`_recording_sessions_model`, `_source_positions_model`,
-    `_source_rows_model`, `_chart_x_ticks_model`,
-    `_elevation_series_model`, `_azimuth_series_model`
+    `_source_rows_model`, `_chart_window_model`,
+    `_elevation_chart_series_model`, `_azimuth_chart_series_model`
 
 ## 4. State Variables And Transition Triggers
 
@@ -62,35 +67,44 @@
     `_sync_remote_odas_state`, `_verify_odas_startup`, `_poll_remote_log`
 - 数据态字段：`_last_sst`, `_last_ssl`, `_source_ids`,
   `_selected_source_ids`, `_source_channel_map`, `_channel_source_map`,
-  `_runtime_chart_frames`
+  `_runtime_chart_messages`, `_runtime_chart_frame_sources`
   - 触发入口：`_on_sst`, `_on_ssl`, `_on_sep_audio`, `_on_pf_audio`,
+    `_handle_sst_ingress`, `_handle_ssl_ingress`,
+    `_handle_sep_audio_ingress`, `_handle_pf_audio_ingress`,
     `_refresh_sources`, `_refresh_chart_models`, `_append_runtime_chart_frame`
 
 ## 5. Public Interface Usage Snapshot
 
 统计范围：`src/temporal/qml/*.qml` 与 `tests/*.py`。
 
-### Property / Slot 初始瘦身候选（当前直接引用计数）
+### 已移除候选接口（当前静态引用）
 
-- `sourceItems`: `qml=0`, `tests=0`
-- `sourcePositions`: `qml=0`, `tests=0`
-- `sourceCount`: `qml=0`, `tests=0`
-- `recordingSessions`: `qml=0`, `tests=0`
-- `setStatus(...)`: `qml=0`, `tests=0`
-- `isSourceSelected(...)`: `qml=0`, `tests=0`
+- `sourceItems`: `src=0`, `qml=0`, `tests=0`
+- `sourcePositions`: `src=0`, `qml=0`, `tests=0`
+- `recordingSessions`: `src=0`, `qml=0`, `tests=0`
+- `isSourceSelected(...)`: `src=0`, `qml=0`, `tests=0`
 
-### 仍被引用的典型公开面（样例）
+### 仍被引用的公开面（当前快照）
 
-- `sourceRowsModel`: `qml=2`, `tests=29`
-- `sourcePositionsModel`: `qml=1`, `tests=14`
-- `elevationSeriesModel`: `qml=1`, `tests=16`
-- `azimuthSeriesModel`: `qml=1`, `tests=13`
+- `sourceRowsModel`: `qml=2`, `tests=15`
+- `sourcePositionsModel`: `qml=4`, `tests=16`
+- `chartWindowModel`: `qml=2`, `tests=8`
+- `elevationChartSeriesModel`: `qml=1`, `tests=8`
+- `azimuthChartSeriesModel`: `qml=1`, `tests=7`
+- `previewScenarioOptionsModel`: `qml=3`, `tests=3`
+- `recordingSessionsModel`: `qml=2`, `tests=1`
 - `toggleRemoteOdas(...)`: `qml=1`, `tests=8`
-- `toggleStreams(...)`: `qml=1`, `tests=6`
+- `toggleStreams(...)`: `qml=1`, `tests=9`
+
+### 仍保留但未被 QML/tests 直接引用的接口（当前快照）
+
+- `sourceCount`: `qml=0`, `tests=0`（`src` 内部状态/文案链路仍引用）
+- `setStatus(...)`: `qml=0`, `tests=0`（`src` 内部状态写入链路仍引用）
 
 ## 6. References
 
-- `src/temporal/app.py`
+- `src/temporal/app/bridge.py`
+- `src/temporal/app/preview_runtime.py`
 - `src/temporal/core/network/odas_client.py`
 - `src/temporal/core/network/odas_stream_client.py`
 - `src/temporal/preview_bridge.py`

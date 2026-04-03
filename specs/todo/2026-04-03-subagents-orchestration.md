@@ -259,7 +259,7 @@
 1. `tests.test_app_bridge_integration`
 2. `tests.test_app_bridge_recording`
 3. `tests.test_preview_bridge`
-4. `tests.test_projection_parity`
+4. `tests.test_ui_projection`
 
 测试约束：
 
@@ -289,3 +289,73 @@
 7. `atomic-commit-summary`
 8. `stage-sync-check`
 9. `cleanup-check`
+
+## 9. Structured Execution Record (2026-04-03)
+
+### Stage 5 / Commit #5
+
+- `task-slice`: R1-R6 高风险模拟与线程/状态一致性 bugfix gate
+- `red-findings`: none（未发现线程或状态一致性缺陷）
+- `green-fixes`: none
+- `refactor-cleanups`: none
+- `acceptance-mapping`:
+  - R1（远端快速切换）：pass
+  - R2（监听并发风暴）：pass
+  - R3（启停竞争）：pass
+  - R4（预览切换竞争）：pass
+  - R5（录音路由竞争）：pass
+  - R6（断连恢复）：pass
+- `pollution-check`: 代理级别均仅报告预存未跟踪 `config/odas.toml`，无新增污染
+- `atomic-commit-summary`: Stage 5 无代码修复，仅提交执行记录与 feature 收口状态
+- `stage-sync-check`: pass（A/B/C 均同步到 Stage 4 头后执行 Stage 5）
+- `cleanup-check`: pending（待最终总门禁通过后统一关闭 A/B/C）
+
+### Stage 5 Matrix Details
+
+#### R1
+
+1. trigger sequence: 高频 `toggleRemoteOdas/toggleStreams` 交替 + 导入门面链路检查
+2. expected invariants: 导入链路稳定、状态字段与最终意图一致
+3. observed result: pass
+4. defect id: none
+5. fix commit reference: n/a
+
+#### R2
+
+1. trigger sequence: worker thread 高频 `_on_sst/_on_ssl/_on_sep_audio/_on_pf_audio` 混合输入
+2. expected invariants: queued ingress 生效、无后台线程直写 Qt 状态
+3. observed result: pass
+4. defect id: none
+5. fix commit reference: n/a
+
+#### R3
+
+1. trigger sequence: `startRemoteOdas/stopRemoteOdas` 与 `_verify_odas_startup/_poll_remote_log` 竞争
+2. expected invariants: `odasStarting` 收敛为 false，启动计时器不悬挂
+3. observed result: pass
+4. defect id: none
+5. fix commit reference: n/a
+
+#### R4
+
+1. trigger sequence: preview 场景高速切换 + `advancePreviewTick` 并发推进
+2. expected invariants: preview contract 稳定，模型计数与场景一致
+3. observed result: pass
+4. defect id: none
+5. fix commit reference: n/a
+
+#### R5
+
+1. trigger sequence: recording/source 映射更新与 audio route 并发输入
+2. expected invariants: 录音计数/会话与 source 映射一致，stop 后收口
+3. observed result: pass
+4. defect id: none
+5. fix commit reference: n/a
+
+#### R6
+
+1. trigger sequence: remote disconnect/reconnect + status/log polling 恢复路径
+2. expected invariants: reconnect 后状态一致、无脏启动态
+3. observed result: pass
+4. defect id: none
+5. fix commit reference: n/a

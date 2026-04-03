@@ -1,7 +1,7 @@
 ---
 title: app-bridge-refactor-modularization
 tracker: refactor
-status: active
+status: done
 owner: codex/core
 updated: 2026-04-03
 ---
@@ -157,7 +157,7 @@ updated: 2026-04-03
 - [x] Stage 2：Preview 组合化（保持继承外观）。
 - [x] Stage 3：线程安全收敛（queued signal 回主线程）。
 - [x] Stage 4：接口瘦身收口（已移除 `sourceItems`、`sourcePositions`、`recordingSessions`、`isSourceSelected`；保留 `sourceCount`、`setStatus`，原因分别是状态汇总与状态写入仍被门面/状态链路使用）。
-- [ ] Stage 5：执行四套主回归与门禁验证（不新增测试 case，不改 QML）。
+- [x] Stage 5：执行四套主回归与门禁验证（R1-R6 高风险模拟通过，未发现需修复缺陷；不新增测试 case，不改 QML）。
 
 ## Todo
 
