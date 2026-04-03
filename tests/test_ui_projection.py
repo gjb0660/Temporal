@@ -57,15 +57,32 @@ class TestUiProjection(unittest.TestCase):
         positions = build_positions_model_items(current_frame_sources, visible_rows, {15})
         self.assertEqual([item["id"] for item in positions], [15])
 
-    def test_chart_projection_uses_structured_models(self) -> None:
-        messages = [
-            {"timeStamp": 350, "sources": [{"id": 15, "x": 0.0, "y": 1.0, "z": 0.0}]}
+    def test_rows_checked_and_active_follow_target_identity_when_available(self) -> None:
+        sidebar_sources = [
+            {"id": 7, "targetId": 101, "color": "#111111"},
+            {"id": 7, "targetId": 202, "color": "#222222"},
         ]
+
+        rows = build_rows_model_items(
+            sidebar_sources,
+            {202},
+            active_source_ids={202},
+        )
+
+        self.assertEqual([row["sourceId"] for row in rows], [7, 7])
+        self.assertEqual([row["checked"] for row in rows], [False, True])
+        self.assertEqual([row["active"] for row in rows], [False, True])
+
+    def test_chart_projection_uses_structured_models(self) -> None:
+        messages = [{"timeStamp": 350, "sources": [{"id": 15, "x": 0.0, "y": 1.0, "z": 0.0}]}]
 
         window = build_chart_window_model(messages)
         series = build_chart_series(messages, {15: {"color": "#123456"}}, [15], axis="azimuth")
 
-        self.assertEqual([tick["value"] for tick in window["ticks"]], [-1200, -1000, -800, -600, -400, -200, 0, 200, 350])
+        self.assertEqual(
+            [tick["value"] for tick in window["ticks"]],
+            [-1200, -1000, -800, -600, -400, -200, 0, 200, 350],
+        )
         self.assertTrue(window["ticks"][-1]["isLatest"])
         self.assertEqual(series[0]["points"][0]["y"], 90.0)
 

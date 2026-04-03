@@ -328,8 +328,10 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.setSourcesEnabled(False)
 
         self.assertFalse(bridge.sourcesEnabled)
-        self.assertEqual(bridge.sourceRowsModel.count, 0)
+        self.assertEqual(bridge.sourceRowsModel.count, 4)
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
+        self.assertEqual(bridge.elevationChartSeriesModel.count, 0)
+        self.assertEqual(bridge.azimuthChartSeriesModel.count, 0)
 
         bridge.setSourcesEnabled(True)
         bridge.setPotentialsEnabled(True)
@@ -342,6 +344,36 @@ class TestPreviewBridge(unittest.TestCase):
             [item["sourceId"] for item in _model_items(bridge.sourceRowsModel)], [7, 15, 21, 31]
         )
         self.assertEqual(_source_ids(bridge), [7, 15, 21, 31])
+
+    def test_disappeared_sources_stay_listed_as_inactive_until_window_expires(self) -> None:
+        bridge = PreviewBridge()
+        bridge._scenario = {
+            "key": "singleThenEmpty",
+            "displayName": "singleThenEmpty",
+            "status": "Temporal 就绪",
+            "remoteLogLines": ["等待连接远程 odaslive..."],
+            "sources": [{"id": 7, "color": "#4bc0c0", "energy": 0.9}],
+            "trackingFrames": [
+                {"sample": 0, "sources": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]},
+                {"sample": 19, "sources": []},
+                {"sample": 1700, "sources": []},
+            ],
+        }
+        bridge._reset_selected_sources()
+        bridge._reset_preview_sample_window()
+        bridge.toggleStreams()
+        self.assertEqual(bridge.sourceRowsModel.get(0)["sourceId"], 7)
+        self.assertTrue(bridge.sourceRowsModel.get(0)["active"])
+        self.assertEqual(bridge.elevationChartSeriesModel.count, 1)
+
+        bridge.advancePreviewTick()
+        self.assertEqual(bridge.sourceRowsModel.count, 1)
+        self.assertFalse(bridge.sourceRowsModel.get(0)["active"])
+        self.assertEqual(bridge.elevationChartSeriesModel.count, 1)
+
+        bridge._on_sst({"timeStamp": 1700, "src": []})
+        self.assertEqual(bridge.sourceRowsModel.count, 0)
+        self.assertEqual(bridge.elevationChartSeriesModel.count, 0)
 
 
 class TestPreviewQmlContract(unittest.TestCase):

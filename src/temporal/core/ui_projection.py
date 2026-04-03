@@ -19,11 +19,7 @@ def compute_sidebar_sources(
         return list(sources)
     low = min(potential_min, potential_max)
     high = max(potential_min, potential_max)
-    return [
-        source
-        for source in sources
-        if low <= float(source.get("energy", 0.0)) <= high
-    ]
+    return [source for source in sources if low <= float(source.get("energy", 0.0)) <= high]
 
 
 def compute_visible_source_ids(
@@ -31,27 +27,33 @@ def compute_visible_source_ids(
     selected_source_ids: set[int],
 ) -> list[int]:
     return [
-        int(source["id"])
-        for source in sidebar_sources
-        if int(source["id"]) in selected_source_ids
+        int(source["id"]) for source in sidebar_sources if int(source["id"]) in selected_source_ids
     ]
 
 
 def build_rows_model_items(
     sidebar_sources: list[dict[str, Any]],
     selected_source_ids: set[int],
+    *,
+    active_source_ids: set[int] | None = None,
 ) -> list[dict[str, Any]]:
-    return [
-        {
-            "sourceId": int(source["id"]),
-            "label": "声源",
-            "checked": int(source["id"]) in selected_source_ids,
-            "enabled": True,
-            "badge": str(int(source["id"])),
-            "badgeColor": str(source.get("color", "")),
-        }
-        for source in sidebar_sources
-    ]
+    active_ids = set(active_source_ids or set())
+    rows: list[dict[str, Any]] = []
+    for source in sidebar_sources:
+        source_id = int(source["id"])
+        target_id = int(source.get("targetId", source_id))
+        rows.append(
+            {
+                "sourceId": source_id,
+                "label": "声源",
+                "checked": target_id in selected_source_ids,
+                "enabled": True,
+                "active": target_id in active_ids,
+                "badge": str(source_id),
+                "badgeColor": str(source.get("color", "")),
+            }
+        )
+    return rows
 
 
 def build_positions_model_items(

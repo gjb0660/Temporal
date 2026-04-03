@@ -12,24 +12,9 @@ from PySide6.QtQml import QQmlApplicationEngine
 from temporal.core.chart_time import build_default_chart_ticks
 from temporal.core.config_loader import TemporalConfig, load_config, resolve_default_config_path
 from temporal.core.network.odas_client import OdasClient
-from temporal.core.network.odas_message_view import (
-    build_source_items,
-    count_potentials,
-    extract_source_ids,
-    extract_source_positions,
-)
 from temporal.core.recording.auto_recorder import AutoRecorder
-from temporal.core.source_palette import SourceColorAllocator
-from temporal.core.source_tracking import SourceObservation, SpaceTargetSession, TrackingResult
+from temporal.core.source_tracking import SpaceTargetSession, TrackingResult
 from temporal.core.ssh.remote_odas import RemoteOdasController
-from temporal.core.ui_projection import (
-    build_chart_series_model,
-    build_chart_window_model,
-    build_positions_model_items,
-    build_rows_model_items,
-    compute_sidebar_sources,
-    compute_visible_source_ids,
-)
 from temporal.qml_list_model import QmlListModel
 from . import recording_audio, remote_lifecycle, status_state, stream_projection
 
@@ -114,19 +99,18 @@ class AppBridge(QObject):
         self._startup_attempts_remaining = 0
         self._startup_failure_hint = ""
         self._runtime_chart_messages: list[dict[str, Any]] = []
-        self._runtime_chart_frame_sources: dict[int, dict[str, float]] = {}
+        self._runtime_chart_frame_sources: dict[int, dict[str, float | int]] = {}
+        self._runtime_target_colors: dict[int, str] = {}
+        self._runtime_source_target_alias: dict[int, int] = {}
         self._runtime_tracking_result = TrackingResult(
             visible_targets=[],
             dropped_source_ids=[],
         )
         self._space_target_session = SpaceTargetSession()
-        self._source_color_allocator = SourceColorAllocator()
 
         self._sstIngressRequested.connect(self._handle_sst_ingress, Qt.QueuedConnection)
         self._sslIngressRequested.connect(self._handle_ssl_ingress, Qt.QueuedConnection)
-        self._sepAudioIngressRequested.connect(
-            self._handle_sep_audio_ingress, Qt.QueuedConnection
-        )
+        self._sepAudioIngressRequested.connect(self._handle_sep_audio_ingress, Qt.QueuedConnection)
         self._pfAudioIngressRequested.connect(self._handle_pf_audio_ingress, Qt.QueuedConnection)
 
         self._log_timer = QTimer(self)
@@ -137,7 +121,7 @@ class AppBridge(QObject):
         self._startup_timer.timeout.connect(self._verify_odas_startup)
 
         self._source_rows_model = QmlListModel(
-            ["sourceId", "label", "checked", "enabled", "badge", "badgeColor"], self
+            ["sourceId", "label", "checked", "enabled", "active", "badge", "badgeColor"], self
         )
         self._source_positions_model = QmlListModel(["id", "color", "x", "y", "z"], self)
         self._elevation_chart_series_model = QmlListModel(["sourceId", "color", "points"], self)
@@ -670,84 +654,14 @@ class AppBridge(QObject):
         recording_audio.apply_recording_sample_rates(self)
 
     def _refresh_sources(self, *, refresh_chart: bool = True) -> None:
-        source_ids = extract_source_ids(self._last_sst)
-        if source_ids != self._source_ids:
-            current = set(source_ids)
-            self._selected_source_ids = {
-                source_id for source_id in self._selected_source_ids if source_id in current
-            }
-            for source_id in source_ids:
-                if source_id not in self._selected_source_ids:
-                    self._selected_source_ids.add(source_id)
-            self._source_ids = source_ids
-            self.sourceIdsChanged.emit()
-
-        items = build_source_items(
-            self._last_sst,
-            enabled=self._sources_enabled,
-            selected_ids=self._selected_source_ids,
-        )
-        if items != self._source_items:
-            self._source_items = items
-            self.sourceItemsChanged.emit()
-            self.sourceCountChanged.emit()
-
-        if self._runtime_tracking_result.visible_targets:
-            base_sources = [
-                {"id": target.source_id, "color": target.color}
-                for target in self._runtime_tracking_result.visible_targets
-            ]
-        else:
-            base_sources = [
-                {"id": source_id, "color": self._source_color_allocator.color_for(source_id)}
-                for source_id in self._source_ids
-            ]
-        sidebar_sources = compute_sidebar_sources(
-            base_sources,
-            sources_enabled=self._sources_enabled,
-            potentials_enabled=False,
-            potential_min=0.0,
-            potential_max=1.0,
-        )
-        visible_source_ids = compute_visible_source_ids(sidebar_sources, self._selected_source_ids)
-        visible_rows = {int(source["id"]): source for source in sidebar_sources}
-        current_frame_sources = self._current_runtime_frame_sources()
-
-        positions = build_positions_model_items(
-            current_frame_sources,
-            visible_rows,
-            set(visible_source_ids),
-        )
-        self._set_source_positions(positions)
-        self._source_rows_model.replace(
-            build_rows_model_items(sidebar_sources, self._selected_source_ids)
-        )
-        if refresh_chart:
-            self._refresh_chart_models(visible_rows, visible_source_ids)
+        stream_projection.refresh_sources(self, refresh_chart=refresh_chart)
 
     def _refresh_chart_models(
         self,
         visible_rows: dict[int, dict[str, Any]],
         visible_source_ids: list[int],
     ) -> None:
-        window_model = build_chart_window_model(self._runtime_chart_messages)
-        self._chart_window_model.replace(window_model["ticks"])
-        self._elevation_chart_series_model.replace(
-            self._chart_series_model_items(
-                self._runtime_chart_messages,
-                visible_rows,
-                visible_source_ids,
-                axis="elevation",
-            )
-        )
-        self._azimuth_chart_series_model.replace(
-            self._chart_series_model_items(
-                self._runtime_chart_messages,
-                visible_rows,
-                visible_source_ids,
-                axis="azimuth",
-            )
-        )
+        stream_projection.refresh_chart_models(self, visible_rows, visible_source_ids)
 
     def _chart_series_model_items(
         self,
@@ -757,87 +671,25 @@ class AppBridge(QObject):
         *,
         axis: str,
     ) -> list[dict[str, Any]]:
-        items = build_chart_series_model(messages, visible_rows, visible_source_ids, axis=axis)
-        return [
-            {
-                "sourceId": int(item["sourceId"]),
-                "color": str(item["color"]),
-                "points": list(item.get("points", [])),
-            }
-            for item in items
-        ]
+        return stream_projection.chart_series_model_items(
+            self,
+            messages,
+            visible_rows,
+            visible_source_ids,
+            axis=axis,
+        )
 
     def _append_runtime_chart_frame(self, message: dict[str, Any]) -> bool:
-        positions = extract_source_positions(
-            message,
-            enabled=True,
-            selected_ids=None,
-        )
-        normalized_sources = [
-            {
-                "id": int(item["id"]),
-                "x": float(item["x"]),
-                "y": float(item["y"]),
-                "z": float(item["z"]),
-            }
-            for item in positions
-        ]
-        self._runtime_chart_frame_sources = {
-            int(item["id"]): {
-                "x": float(item["x"]),
-                "y": float(item["y"]),
-                "z": float(item["z"]),
-            }
-            for item in normalized_sources
-        }
-        sample_raw = message.get("timeStamp")
-        if type(sample_raw) is not int:
-            return False
-
-        sample = int(sample_raw)
-        self._runtime_chart_messages.append({"timeStamp": sample, "src": normalized_sources})
-        if len(self._runtime_chart_messages) > 1600:
-            self._runtime_chart_messages = self._runtime_chart_messages[-1600:]
-        self._runtime_tracking_result = self._space_target_session.step(
-            [
-                SourceObservation(
-                    source_id=int(item["id"]),
-                    sample=sample,
-                    x=float(item["x"]),
-                    y=float(item["y"]),
-                    z=float(item["z"]),
-                )
-                for item in normalized_sources
-            ]
-        )
-        return True
+        return stream_projection.append_runtime_chart_frame(self, message)
 
     def _reset_runtime_chart_clock(self) -> None:
-        self._runtime_chart_messages = []
-        self._runtime_chart_frame_sources = {}
-        self._runtime_tracking_result = TrackingResult(
-            visible_targets=[],
-            dropped_source_ids=[],
-        )
-        self._space_target_session = SpaceTargetSession()
-        self._source_color_allocator.reset()
-        self._chart_window_model.replace(self._RUNTIME_CHART_X_TICKS)
-        self._elevation_chart_series_model.replace([])
-        self._azimuth_chart_series_model.replace([])
+        stream_projection.reset_runtime_chart_clock(self)
 
-    def _current_runtime_frame_sources(self) -> dict[int, dict[str, float]]:
-        return dict(self._runtime_chart_frame_sources)
+    def _current_runtime_frame_sources(self) -> dict[int, dict[str, float | int]]:
+        return stream_projection.current_runtime_frame_sources(self)
 
     def _refresh_potentials(self) -> None:
-        count = count_potentials(
-            self._last_ssl,
-            min_energy=self._potential_min,
-            max_energy=self._potential_max,
-            enabled=self._potentials_enabled,
-        )
-        if count != self._potential_count:
-            self._potential_count = count
-            self.potentialCountChanged.emit()
+        stream_projection.refresh_potentials(self)
 
 
 def run_with_bridge(bridge: QObject) -> int:
