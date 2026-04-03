@@ -5,141 +5,86 @@ description: General-purpose stage pipeline orchestration for multi-agent develo
 
 # Subagent Orchestrator
 
-## Overview
+## Core Contract
 
-Use this skill to run a multi-agent implementation pipeline that stays convergent over long sessions.
-Prefer delegation, then enforce convergence with serial gates and atomic stage closure.
+Keep this skill minimal and delegate-first.
+Use first principles and Occam's Razor: keep only high-repeat, high-error controls.
 
-## Core Rules
+Hard lines:
 
-1. Think in first principles.
-2. Apply Occam's Razor.
-3. Automate only high-repeat, high-error links.
-4. Slice parallel work by file ownership first.
-5. Keep the supervisor delegate-first.
-6. Keep final integration and stage closure with the supervisor.
-7. Reuse the same agents for the full pipeline.
-8. Close agents only after final gate pass.
+1. strict ownership boundaries
+2. serial stage gates with bounded parallel windows
+3. supervisor-only atomic stage close
+4. immediate freeze on divergence
+5. lookahead is required (record `none` explicitly when no safe read-only prep exists)
+6. final hardening is required (last stage must run high-risk simulation and close with records)
 
-## Delegate-First Supervision
+## Supervisor Role
 
-Treat supervisor local implementation as an exception.
-Delegate all non-blocking execution to subagents whenever ownership can be isolated.
+Treat local supervisor coding as an exception.
+Main duties:
 
-Supervisor responsibilities:
+1. freeze objective, constraints, ownership, and admission gates
+2. open/close parallel windows and arbitrate conflicts serially
+3. run gate/pollution evaluation and stage-sync checkpoints
+4. close each main stage with one atomic commit
 
-- freeze stage objective and boundaries
-- assign ownership and concurrency windows
-- run convergence gates
-- resolve conflicts serially
-- perform atomic stage commit
+## Worker Handoff
 
-Do not let supervisor become the execution bottleneck.
+Pass only task-local context:
 
-## Pipeline Contract
+1. objective
+2. ownership boundary
+3. constraints and gate profile
+4. [worker-execution-card.md](references/worker-execution-card.md)
 
-Follow a strict timeline:
+Avoid passing full orchestration narrative unless required.
 
-1. Serial stage freeze.
-2. Parallel execution window.
-3. Serial convergence review.
-4. Atomic stage commit.
-5. Stage-sync checkpoint.
-6. Next-stage admission.
+## Gates, Tools, and SLO
 
-Allow sub-stage cluster merge when explicitly planned.
-Keep one supervisor atomic commit per main stage.
+Use `fast` (in-stage) and `full` (stage-close) gates with baseline-exempt pollution checks.
+Prefer built-in scripts; equivalent mechanisms are allowed:
 
-Use [pipeline-template.md](references/pipeline-template.md) for the stage skeleton.
-
-## Load Balancing
-
-Keep supervisor judgment as final authority.
-Use evidence to support assignment, not to replace judgment.
-
-Minimum evidence set:
-
-- recent change volume
-- current unresolved workload
-- conflict hotspot signals
-
-Prefer least-loaded capable agent first.
-Rebalance only at stage boundaries or explicit freeze points.
-
-## Gates and Pollution Policy
-
-Run two gate tiers:
-
-- fast gate during parallel iteration
-- full gate at stage closure
-
-Run pollution checks with baseline exemption:
-
-- capture baseline at stage entry
-- block only incremental pollution introduced in the stage
-
-Use:
-
-- [gate-checklists.md](references/gate-checklists.md)
 - `scripts/run_stage_gate.py`
 - `scripts/check_pollution_baseline.py`
 
-## Divergence and Stability
+`60-minute stability` is a supervisor capability target, not an automatic blocker.
+If unmet, record cause and remedy in final close record.
 
-Stability SLO:
-
-- keep continuous convergence for 60 minutes with no loss of control
-
-Divergence trigger examples:
-
-- repeated gate failure with no net progress
-- repeated ownership overlap conflicts
-- uncontrolled retry loops
+## Divergence Policy
 
 On divergence:
 
-1. Freeze parallel window immediately.
-2. Return to the latest stable checkpoint.
-3. Arbitrate serially.
-4. Reopen parallel only with updated boundaries.
+1. freeze parallel window immediately
+2. return to latest stable checkpoint
+3. arbitrate serially
+4. reopen with revised ownership boundaries
 
-## Execution Record
+## Consistency Check
 
-Log each stage with the required fields in
-[execution-record-template.md](references/execution-record-template.md).
+Before publishing updates, verify supervisor rules and worker card remain aligned on:
 
-Do not skip:
+1. gate vocabulary
+2. pass/fail semantics
+3. divergence behavior
+4. ownership language
 
-- acceptance mapping
-- pollution check
-- stage-sync status
-- atomic submit summary
-- unresolved risks
+## References
 
-## Script Usage
+- [pipeline-template.md](references/pipeline-template.md)
+- [supervisor-stage-playbook.md](references/supervisor-stage-playbook.md)
+- [worker-execution-card.md](references/worker-execution-card.md)
 
-Run fast/full stage gates:
+## Mandatory Forward-Test
 
-```bash
-python scripts/run_stage_gate.py --profile fast --commands-file .tmp/gates.json --report .tmp/fast-gate.json
-python scripts/run_stage_gate.py --profile full --commands-file .tmp/gates.json --report .tmp/full-gate.json
-```
+Run one blind subagent forward-test for major updates.
+Pass only skill path and realistic request.
+Do not leak expected output or diagnosis.
+Expect output to include:
 
-Capture and compare pollution baseline:
-
-```bash
-python scripts/check_pollution_baseline.py --capture --baseline .tmp/stage-baseline.json
-python scripts/check_pollution_baseline.py --compare --baseline .tmp/stage-baseline.json --report .tmp/pollution-report.json
-```
-
-## Mandatory Forward-Test Before Release
-
-For major skill updates, run one blind subagent forward-test:
-
-1. Pass only skill path plus a realistic orchestration request.
-2. Do not leak expected output or diagnosis.
-3. Verify output includes:
-   - explicit serial/parallel segmentation
-   - stage gates and convergence conditions
-   - checkpoint and freeze-on-divergence behavior
-   - delegate-first supervision stance
+1. explicit serial/parallel segmentation
+2. stage gates and convergence conditions
+3. required lookahead handling
+4. required final hardening handling
+5. checkpoint and freeze-on-divergence behavior
+6. delegate-first supervision stance
