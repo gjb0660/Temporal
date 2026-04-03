@@ -180,17 +180,9 @@ class AppBridge(QObject):
     def canToggleStreams(self) -> bool:
         return True
 
-    @Property(list, notify=sourceItemsChanged)  # type: ignore[reportCallIssue]
-    def sourceItems(self) -> list[str]:
-        return self._source_items
-
     @Property(list, notify=sourceIdsChanged)  # type: ignore[reportCallIssue]
     def sourceIds(self) -> list[int]:
         return self._source_ids
-
-    @Property(list, notify=sourcePositionsChanged)  # type: ignore[reportCallIssue]
-    def sourcePositions(self) -> list[dict[str, float | int]]:
-        return self._source_positions
 
     @Property(list, notify=remoteLogLinesChanged)  # type: ignore[reportCallIssue]
     def remoteLogLines(self) -> list[str]:
@@ -211,10 +203,6 @@ class AppBridge(QObject):
     @Property(int, notify=recordingSourceCountChanged)  # type: ignore[reportCallIssue]
     def recordingSourceCount(self) -> int:
         return self._recording_source_count
-
-    @Property(list, notify=recordingSessionsChanged)  # type: ignore[reportCallIssue]
-    def recordingSessions(self) -> list[str]:
-        return self._recording_sessions
 
     @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
     def sourcesEnabled(self) -> bool:
@@ -319,10 +307,6 @@ class AppBridge(QObject):
     @Slot(int, bool)
     def setSourceSelected(self, source_id: int, selected: bool) -> None:
         stream_projection.set_source_selected(self, source_id, selected)
-
-    @Slot(int, result=bool)
-    def isSourceSelected(self, source_id: int) -> bool:
-        return stream_projection.is_source_selected(self, source_id)
 
     @Slot(bool)
     def setPotentialsEnabled(self, enabled: bool) -> None:

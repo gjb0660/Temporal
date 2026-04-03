@@ -87,7 +87,6 @@ __all__ = [
     "StreamProjectionBridge",
     "append_runtime_chart_frame",
     "current_runtime_frame_sources",
-    "is_source_selected",
     "on_pf_audio",
     "on_sep_audio",
     "on_sst",
@@ -170,10 +169,6 @@ def set_source_selected(bridge: StreamProjectionBridge, source_id: int, selected
 
     refresh_sources(bridge)
     update_stream_status(bridge, "声源选择已更新")
-
-
-def is_source_selected(bridge: StreamProjectionBridge, source_id: int) -> bool:
-    return source_id in bridge._selected_source_ids
 
 
 def set_potentials_enabled(bridge: StreamProjectionBridge, enabled: bool) -> None:
