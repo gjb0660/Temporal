@@ -25,3 +25,5 @@ htmlcov/
 *.tmp
 
 # Local developer tools and notes
+config/
+!config/odas.example.toml
