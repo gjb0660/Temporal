@@ -12,13 +12,10 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
-from temporal.app.bridge import AppBridge
-from temporal.core.config_loader import TemporalConfig
-from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
+from temporal.app.fake_runtime import fake_app_bridge
 from temporal.main import preview_main
 from temporal.preview_bridge import PreviewBridge
 from temporal.preview_data import DEFAULT_PREVIEW_SCENARIO_KEY, PREVIEW_SCENARIO_KEYS
-
 
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _QML_DIR = os.path.join(_REPO_ROOT, "src", "temporal", "qml")
@@ -29,63 +26,6 @@ def _ensure_app() -> QGuiApplication:
     if app is not None:
         return cast(QGuiApplication, app)
     return QGuiApplication([])
-
-
-class _FakeRecorder:
-    def __init__(self, _output_dir) -> None:
-        pass
-
-    def stop_all(self) -> None:
-        return
-
-    def sessions_snapshot(self):
-        return []
-
-    def update_active_sources(self, _source_ids) -> None:
-        return
-
-    def sweep_inactive(self):
-        return []
-
-    def active_sources(self) -> set[int]:
-        return set()
-
-    def push(self, _source_id: int, _mode: str, _pcm_chunk: bytes) -> None:
-        return
-
-
-class _FakeClient:
-    def __init__(self, **_kwargs) -> None:
-        pass
-
-    def start(self) -> None:
-        return
-
-    def stop(self) -> None:
-        return
-
-
-class _FakeRemote:
-    def __init__(self, _config, _streams) -> None:
-        pass
-
-
-def _fake_config() -> TemporalConfig:
-    remote = RemoteOdasConfig(
-        host="127.0.0.1",
-        port=22,
-        username="odas",
-        private_key="~/.ssh/id_rsa",
-        odas_args=["-c", "/opt/odas/config/odas.cfg"],
-        odas_log="/tmp/odaslive.log",
-    )
-    streams = OdasStreamConfig(
-        sst=OdasEndpoint(host="127.0.0.1", port=9000),
-        ssl=OdasEndpoint(host="127.0.0.1", port=9001),
-        sss_sep=OdasEndpoint(host="127.0.0.1", port=10000),
-        sss_pf=OdasEndpoint(host="127.0.0.1", port=10010),
-    )
-    return TemporalConfig(remote=remote, streams=streams)
 
 
 def _model_items(model) -> list[dict[str, Any]]:
@@ -511,13 +451,7 @@ Item {
 
 class TestAppBridgePreviewDefaults(unittest.TestCase):
     def test_preview_defaults_are_safe_in_production_bridge(self) -> None:
-        with (
-            patch("temporal.app.bridge.load_config", return_value=_fake_config()),
-            patch("temporal.app.bridge.OdasClient", _FakeClient),
-            patch("temporal.app.bridge.RemoteOdasController", _FakeRemote),
-            patch("temporal.app.bridge.AutoRecorder", _FakeRecorder),
-        ):
-            bridge = AppBridge()
+        bridge = fake_app_bridge()
 
         self.assertFalse(bridge.previewMode)
         self.assertEqual(bridge.previewScenarioKey, "")
