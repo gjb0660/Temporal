@@ -3,7 +3,7 @@ title: app-bridge-refactor-modularization
 tracker: refactor
 status: active
 owner: codex/core
-updated: 2026-04-02
+updated: 2026-04-03
 ---
 
 ## Goal
@@ -32,7 +32,8 @@ updated: 2026-04-02
 - `QTimer(self)` 当前驱动 `_poll_remote_log` 与 `_verify_odas_startup`。
 - `specs/knowledge/app-bridge-source-analysis.md` 与
   `specs/knowledge/app-bridge-execution-model.md` 已提供事实证据。
-- 当前 tests 依赖 `temporal.app` 导入与 `temporal.app.*` patch 锚点。
+- 主回归 tests 已迁移到 `temporal.app.bridge` 导入与
+  `temporal.app.bridge.*` patch 锚点。
 - 本执行单元约束：不改 QML；允许更新 tests 包名/patch 路径并删除冗余 case；
   绝对不允许新增测试 case。
 - 阶段策略已冻结：Stage 1 拆分为 `1A/1B/1C`，且 `1A/1B` 允许因测试未迁移出现临时红，
@@ -91,7 +92,7 @@ updated: 2026-04-02
    - `tests.test_app_bridge_integration`
    - `tests.test_app_bridge_recording`
    - `tests.test_preview_bridge`
-   - `tests.test_projection_parity`
+   - `tests.test_ui_projection`
 10. 允许更新测试包名/patch 路径并删除冗余 case，但绝对不允许新增测试 case。
 11. 不修改任何 QML 文件。
 12. 仓库既有门禁保持通过：pyright、ruff、qmllint、markdownlint、unittest。
@@ -142,7 +143,7 @@ updated: 2026-04-02
    - 输入门禁：Stage 2/3/4 全部完成。
    - 任务：运行四套主回归与仓库门禁，完成问题收口。
    - 退出门禁：四套主回归可跑通过，且未新增任何测试 case。
-9. 本次会话仅完成 specs 收敛，代码实施在后续会话推进。
+9. 当前会话进入代码实施阶段，按 Stage 1A/1B/1C/2/3/4/5 顺序推进。
 
 ## Progress
 
@@ -150,10 +151,10 @@ updated: 2026-04-02
 - [x] 已完成执行模型事实补充（线程事件、状态迁移、接口引用统计）。
 - [x] 已完成 feature 多阶段重排（Stage 0/1A/1B/1C/2/3/4/5）与阶段门禁固化。
 - [x] 已完成导入策略决策：迁移到 `temporal.app.bridge`，不保留旧导入兼容。
-- [ ] Stage 1A：目录与门面切换（迁移到 `src/temporal/app/`）。
-- [ ] Stage 1B：业务域抽离（四子域边界稳定）。
-- [ ] Stage 1C：调用方与测试迁移收口（恢复四套主回归可跑）。
-- [ ] Stage 2：Preview 组合化（保持继承外观）。
+- [x] Stage 1A：目录与门面切换（迁移到 `src/temporal/app/`）。
+- [x] Stage 1B：业务域抽离（四子域边界稳定）。
+- [x] Stage 1C：调用方与测试迁移收口（恢复四套主回归可跑）。
+- [x] Stage 2：Preview 组合化（保持继承外观）。
 - [ ] Stage 3：线程安全收敛（queued signal 回主线程）。
 - [ ] Stage 4：接口瘦身收口（仅处理静态零引用且非 contract 公开面）。
 - [ ] Stage 5：执行四套主回归与门禁验证（不新增测试 case，不改 QML）。
