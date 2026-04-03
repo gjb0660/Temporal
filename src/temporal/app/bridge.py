@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # pyright: reportMissingImports=false, reportUntypedFunctionDecorator=false
 import sys
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ class AppBridge(QObject):
     _STARTUP_VERIFY_INTERVAL_MS = 200
     _STARTUP_VERIFY_ATTEMPTS = 11
     _RUNTIME_CHART_X_TICKS = build_default_chart_ticks()
+    _RUNTIME_CHART_COMMIT_INTERVAL_MS = 50
     _HEADER_NAV_LABELS = ["配置", "录制", "相机"]
     _EMPTY_REMOTE_LOG = ["等待连接远程 odaslive..."]
 
@@ -98,10 +100,17 @@ class AppBridge(QObject):
         self._streams_active = False
         self._startup_attempts_remaining = 0
         self._startup_failure_hint = ""
-        self._runtime_chart_messages: list[dict[str, Any]] = []
+        self._runtime_chart_samples: deque[int] = deque(maxlen=1600)
         self._runtime_chart_frame_sources: dict[int, dict[str, float | int]] = {}
+        self._runtime_catalog_by_target: dict[int, dict[str, Any]] = {}
+        self._runtime_series_cache: dict[int, deque[dict[str, float | int | None]]] = {}
+        self._runtime_series_last_sample: int | None = None
+        self._runtime_chart_visible_rows: dict[int, dict[str, Any]] = {}
+        self._runtime_chart_visible_target_ids: list[int] = []
         self._runtime_target_colors: dict[int, str] = {}
         self._runtime_source_target_alias: dict[int, int] = {}
+        self._chart_commit_dirty = False
+        self._chart_next_commit_at = 0.0
         self._runtime_tracking_result = TrackingResult(
             visible_targets=[],
             dropped_source_ids=[],
@@ -119,6 +128,9 @@ class AppBridge(QObject):
         self._startup_timer = QTimer(self)
         self._startup_timer.setInterval(self._STARTUP_VERIFY_INTERVAL_MS)
         self._startup_timer.timeout.connect(self._verify_odas_startup)
+        self._chart_commit_timer = QTimer(self)
+        self._chart_commit_timer.setInterval(self._RUNTIME_CHART_COMMIT_INTERVAL_MS)
+        self._chart_commit_timer.timeout.connect(self._on_chart_commit_timeout)
 
         self._source_rows_model = QmlListModel(
             ["sourceId", "label", "checked", "enabled", "active", "badge", "badgeColor"], self
@@ -653,31 +665,11 @@ class AppBridge(QObject):
     def _apply_recording_sample_rates(self) -> None:
         recording_audio.apply_recording_sample_rates(self)
 
+    def _on_chart_commit_timeout(self) -> None:
+        stream_projection.flush_chart_models_if_due(self, force=False)
+
     def _refresh_sources(self, *, refresh_chart: bool = True) -> None:
         stream_projection.refresh_sources(self, refresh_chart=refresh_chart)
-
-    def _refresh_chart_models(
-        self,
-        visible_rows: dict[int, dict[str, Any]],
-        visible_source_ids: list[int],
-    ) -> None:
-        stream_projection.refresh_chart_models(self, visible_rows, visible_source_ids)
-
-    def _chart_series_model_items(
-        self,
-        messages: list[dict[str, Any]],
-        visible_rows: dict[int, dict[str, Any]],
-        visible_source_ids: list[int],
-        *,
-        axis: str,
-    ) -> list[dict[str, Any]]:
-        return stream_projection.chart_series_model_items(
-            self,
-            messages,
-            visible_rows,
-            visible_source_ids,
-            axis=axis,
-        )
 
     def _append_runtime_chart_frame(self, message: dict[str, Any]) -> bool:
         return stream_projection.append_runtime_chart_frame(self, message)

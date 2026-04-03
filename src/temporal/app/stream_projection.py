@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from math import atan2, degrees, sqrt
+from collections import deque
+from math import atan2, ceil, degrees, sqrt
+from time import monotonic
 from typing import Any, Protocol
 
 from temporal.core.network.odas_message_view import (
@@ -11,7 +13,6 @@ from temporal.core.network.odas_message_view import (
 from temporal.core.source_tracking import SourceObservation, SpaceTargetSession, TrackingResult
 from temporal.core.source_palette import SOURCE_COLOR_PALETTE
 from temporal.core.ui_projection import (
-    build_chart_window_model,
     build_rows_model_items,
     compute_sidebar_sources,
 )
@@ -23,10 +24,19 @@ class StreamProjectionBridge(Protocol):
     _AUDIO_CHANNELS: int
     _AUDIO_SAMPLE_WIDTH: int
     _RUNTIME_CHART_X_TICKS: list[dict[str, Any]]
-    _runtime_chart_messages: list[dict[str, Any]]
+    _RUNTIME_CHART_COMMIT_INTERVAL_MS: int
+    _runtime_chart_samples: deque[int]
     _runtime_chart_frame_sources: dict[int, dict[str, float | int]]
+    _runtime_catalog_by_target: dict[int, dict[str, Any]]
+    _runtime_series_cache: dict[int, deque[dict[str, float | int | None]]]
+    _runtime_series_last_sample: int | None
+    _runtime_chart_visible_rows: dict[int, dict[str, Any]]
+    _runtime_chart_visible_target_ids: list[int]
     _runtime_target_colors: dict[int, str]
     _runtime_source_target_alias: dict[int, int]
+    _chart_commit_dirty: bool
+    _chart_next_commit_at: float
+    _chart_commit_timer: Any
     _runtime_tracking_result: TrackingResult
     _space_target_session: SpaceTargetSession
     _source_channel_map: dict[int, int]
@@ -74,11 +84,6 @@ class StreamProjectionBridge(Protocol):
     def _set_source_positions(self, positions: list[dict[str, float | int]]) -> None: ...
     def _refresh_recording_sessions(self) -> None: ...
     def _update_source_channel_map(self, source_ids: list[int]) -> None: ...
-    def _refresh_chart_models(
-        self,
-        visible_rows: dict[int, dict[str, Any]],
-        visible_source_ids: list[int],
-    ) -> None: ...
     def _refresh_potentials(self) -> None: ...
     def _apply_recording_sample_rates(self) -> None: ...
     def _current_runtime_frame_sources(self) -> dict[int, dict[str, float | int]]: ...
@@ -94,6 +99,7 @@ __all__ = [
     "on_sst",
     "on_ssl",
     "refresh_chart_models",
+    "flush_chart_models_if_due",
     "refresh_potentials",
     "refresh_sources",
     "reset_runtime_chart_clock",
@@ -125,10 +131,14 @@ def start_streams(bridge: StreamProjectionBridge) -> None:
 
     bridge._reset_runtime_chart_clock()
     bridge._set_streams_active(True)
+    bridge._chart_next_commit_at = 0.0
+    bridge._chart_commit_timer.start()
     apply_state_status(bridge)
 
 
 def stop_streams(bridge: StreamProjectionBridge) -> None:
+    flush_chart_models_if_due(bridge, force=True)
+    bridge._chart_commit_timer.stop()
     bridge._client.stop()
     bridge._recorder.stop_all()
     bridge._source_channel_map.clear()
@@ -201,8 +211,12 @@ def set_potential_energy_range(
 
 def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
     bridge._last_sst = message
-    refresh_chart = append_runtime_chart_frame(bridge, message)
-    refresh_sources(bridge, refresh_chart=refresh_chart)
+    has_chart_sample = append_runtime_chart_frame(bridge, message)
+    refresh_sources(bridge, refresh_chart=False)
+    if has_chart_sample:
+        _append_chart_series_sample(bridge)
+        bridge._chart_commit_dirty = True
+        flush_chart_models_if_due(bridge, force=not bridge._streams_active)
     active_source_ids = extract_source_ids(message)
     update_source_channel_map(bridge, active_source_ids)
     mapped_source_ids = [
@@ -293,21 +307,26 @@ def update_source_channel_map(bridge: StreamProjectionBridge, source_ids: list[i
 
 
 def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = True) -> None:
-    previous_catalog_target_ids = {
-        int(value) for value in bridge._runtime_source_target_alias.values()
-    }
+    previous_catalog_target_ids = set(int(value) for value in bridge._runtime_catalog_by_target)
     current_targets = list(bridge._runtime_tracking_result.visible_targets)
     active_target_ids = {int(target.target_id) for target in current_targets}
 
-    catalog_by_target = _window_catalog_by_target(
-        bridge._runtime_chart_messages,
-    )
+    catalog_by_target = {
+        int(target_id): dict(row) for target_id, row in bridge._runtime_catalog_by_target.items()
+    }
     for target in current_targets:
         target_id = int(target.target_id)
         catalog_by_target[target_id] = {
             "targetId": target_id,
             "sourceId": int(target.source_id),
             "lastSample": int(target.sample),
+        }
+    latest_sample = _latest_chart_sample(bridge)
+    if latest_sample is not None:
+        catalog_by_target = {
+            int(target_id): dict(row)
+            for target_id, row in catalog_by_target.items()
+            if latest_sample - int(row.get("lastSample", latest_sample)) <= 1600
         }
     catalog_by_target = _trim_catalog_targets(
         catalog_by_target,
@@ -325,8 +344,14 @@ def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = Tru
         catalog_by_target.values(),
         key=lambda row: (int(row["sourceId"]), int(row["targetId"])),
     )
+    bridge._runtime_catalog_by_target = {int(row["targetId"]): dict(row) for row in catalog_rows}
     catalog_target_ids = [int(row["targetId"]) for row in catalog_rows]
     catalog_target_id_set = set(catalog_target_ids)
+    bridge._runtime_series_cache = {
+        int(target_id): cache
+        for target_id, cache in bridge._runtime_series_cache.items()
+        if int(target_id) in catalog_target_id_set
+    }
 
     bridge._selected_source_ids = {
         target_id for target_id in bridge._selected_source_ids if target_id in catalog_target_id_set
@@ -375,6 +400,10 @@ def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = Tru
         else []
     )
     visible_rows_by_target = {int(source["targetId"]): source for source in sidebar_sources}
+    bridge._runtime_chart_visible_rows = {
+        int(target_id): dict(row) for target_id, row in visible_rows_by_target.items()
+    }
+    bridge._runtime_chart_visible_target_ids = list(visible_target_ids)
 
     current_frame_sources = current_runtime_frame_sources(bridge)
     visible_target_id_set = set(visible_target_ids)
@@ -398,44 +427,14 @@ def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = Tru
         )
     )
     if refresh_chart:
+        _append_chart_series_sample(bridge)
         refresh_chart_models(bridge, visible_rows_by_target, visible_target_ids)
 
 
-def _window_catalog_by_target(
-    messages: list[dict[str, Any]],
-) -> dict[int, dict[str, Any]]:
-    window_model = build_chart_window_model(messages)
-    window_start = window_model.get("windowStart")
-    window_end = window_model.get("windowEnd")
-    if not isinstance(window_start, int) or not isinstance(window_end, int):
-        return {}
-
-    catalog: dict[int, dict[str, Any]] = {}
-    for frame in messages:
-        sample_raw = frame.get("timeStamp")
-        if type(sample_raw) is not int:
-            continue
-        sample = int(sample_raw)
-        if sample < window_start or sample > window_end:
-            continue
-        frame_sources = frame.get("src")
-        if not isinstance(frame_sources, list):
-            continue
-        for source in frame_sources:
-            if not isinstance(source, dict):
-                continue
-            target_id = source.get("targetId")
-            source_id = source.get("id")
-            if not isinstance(target_id, int) or not isinstance(source_id, int):
-                continue
-            previous = catalog.get(target_id)
-            if previous is None or int(previous["lastSample"]) <= sample:
-                catalog[target_id] = {
-                    "targetId": target_id,
-                    "sourceId": source_id,
-                    "lastSample": sample,
-                }
-    return catalog
+def _latest_chart_sample(bridge: StreamProjectionBridge) -> int | None:
+    if not bridge._runtime_chart_samples:
+        return None
+    return int(bridge._runtime_chart_samples[-1])
 
 
 def _trim_catalog_targets(
@@ -491,17 +490,94 @@ def _assign_catalog_colors(
     return assigned
 
 
+def _append_chart_series_sample(bridge: StreamProjectionBridge) -> None:
+    sample = _latest_chart_sample(bridge)
+    if sample is None:
+        return
+    if bridge._runtime_series_last_sample is not None and int(
+        bridge._runtime_series_last_sample
+    ) == int(sample):
+        return
+
+    current_frame_sources = current_runtime_frame_sources(bridge)
+    for target_id in bridge._runtime_catalog_by_target:
+        tid = int(target_id)
+        cache = bridge._runtime_series_cache.get(tid)
+        if cache is None:
+            cache = deque(maxlen=1600)
+            bridge._runtime_series_cache[tid] = cache
+        source = current_frame_sources.get(tid)
+        if source is None:
+            cache.append({"x": int(sample), "elevation": None, "azimuth": None})
+            continue
+        cache.append(
+            {
+                "x": int(sample),
+                "elevation": _axis_value(source, axis="elevation"),
+                "azimuth": _axis_value(source, axis="azimuth"),
+            }
+        )
+    bridge._runtime_series_last_sample = int(sample)
+
+
+def flush_chart_models_if_due(
+    bridge: StreamProjectionBridge,
+    *,
+    force: bool = False,
+) -> None:
+    if not bridge._chart_commit_dirty:
+        return
+    now = monotonic()
+    if not force and now < bridge._chart_next_commit_at:
+        return
+    refresh_chart_models(
+        bridge,
+        bridge._runtime_chart_visible_rows,
+        bridge._runtime_chart_visible_target_ids,
+    )
+    bridge._chart_commit_dirty = False
+    interval_ms = max(1, int(bridge._RUNTIME_CHART_COMMIT_INTERVAL_MS))
+    bridge._chart_next_commit_at = now + (interval_ms / 1000.0)
+
+
+def _build_chart_window_ticks(samples: deque[int]) -> list[dict[str, Any]]:
+    if not samples:
+        return []
+    latest = int(samples[-1])
+    window_start = latest - 1600
+    tick_step = 200
+    first_tick = int(ceil(window_start / tick_step) * tick_step)
+    ticks = [
+        {
+            "value": int(value),
+            "label": str(int(value)),
+            "isMajor": int(value) % tick_step == 0,
+            "isLatest": int(value) == latest,
+        }
+        for value in range(first_tick, latest + 1, tick_step)
+        if window_start <= int(value) <= latest
+    ]
+    if latest % tick_step != 0:
+        ticks.append(
+            {
+                "value": latest,
+                "label": str(latest),
+                "isMajor": latest % tick_step == 0,
+                "isLatest": True,
+            }
+        )
+    return ticks
+
+
 def refresh_chart_models(
     bridge: StreamProjectionBridge,
     visible_rows: dict[int, dict[str, Any]],
     visible_source_ids: list[int],
 ) -> None:
-    window_model = build_chart_window_model(bridge._runtime_chart_messages)
-    bridge._chart_window_model.replace(window_model["ticks"])
+    bridge._chart_window_model.replace(_build_chart_window_ticks(bridge._runtime_chart_samples))
     bridge._elevation_chart_series_model.replace(
         chart_series_model_items(
             bridge,
-            bridge._runtime_chart_messages,
             visible_rows,
             visible_source_ids,
             axis="elevation",
@@ -510,7 +586,6 @@ def refresh_chart_models(
     bridge._azimuth_chart_series_model.replace(
         chart_series_model_items(
             bridge,
-            bridge._runtime_chart_messages,
             visible_rows,
             visible_source_ids,
             axis="azimuth",
@@ -520,52 +595,28 @@ def refresh_chart_models(
 
 def chart_series_model_items(
     bridge: StreamProjectionBridge,
-    messages: list[dict[str, Any]],
     visible_rows: dict[int, dict[str, Any]],
     visible_source_ids: list[int],
     *,
     axis: str,
 ) -> list[dict[str, Any]]:
-    window_model = build_chart_window_model(messages)
-    window_start = window_model.get("windowStart")
-    window_end = window_model.get("windowEnd")
-    if not isinstance(window_start, int) or not isinstance(window_end, int):
+    if not bridge._runtime_chart_samples:
         return []
-
-    frame_samples: list[int] = []
-    for message in messages:
-        sample_raw = message.get("timeStamp")
-        if type(sample_raw) is not int:
-            continue
-        sample_value = int(sample_raw)
-        if window_start <= sample_value <= window_end:
-            frame_samples.append(sample_value)
-    frame_samples.sort()
-    if not frame_samples:
-        return []
-
-    frame_by_sample = {
-        int(message["timeStamp"]): message
-        for message in messages
-        if type(message.get("timeStamp")) is int
-        and window_start <= int(message["timeStamp"]) <= window_end
-    }
+    axis_key = "elevation" if axis == "elevation" else "azimuth"
     items: list[dict[str, Any]] = []
     for target_id in visible_source_ids:
         row = visible_rows.get(int(target_id))
         if row is None:
             continue
+        cache = bridge._runtime_series_cache.get(int(target_id))
+        if not cache:
+            continue
         points: list[dict[str, float | int | None]] = []
-        for sample in frame_samples:
-            frame = frame_by_sample.get(sample, {})
-            frame_sources = frame.get("src", [])
-            source = _find_target_source(frame_sources, int(target_id))
-            points.append(
-                {
-                    "x": int(sample),
-                    "y": None if source is None else _axis_value(source, axis=axis),
-                }
-            )
+        for point in cache:
+            sample = point.get("x")
+            if sample is None:
+                continue
+            points.append({"x": int(sample), "y": point.get(axis_key)})
         items.append(
             {
                 "sourceId": int(row["id"]),
@@ -574,21 +625,6 @@ def chart_series_model_items(
             }
         )
     return items
-
-
-def _find_target_source(
-    frame_sources: Any,
-    target_id: int,
-) -> dict[str, Any] | None:
-    if not isinstance(frame_sources, list):
-        return None
-    for source in frame_sources:
-        if not isinstance(source, dict):
-            continue
-        if int(source.get("targetId", -1)) != int(target_id):
-            continue
-        return source
-    return None
 
 
 def _axis_value(source: dict[str, Any], *, axis: str) -> float:
@@ -630,10 +666,6 @@ def append_runtime_chart_frame(bridge: StreamProjectionBridge, message: dict[str
             for item in normalized_sources
         ]
     )
-    target_by_source = {
-        int(target.source_id): int(target.target_id)
-        for target in bridge._runtime_tracking_result.visible_targets
-    }
     bridge._runtime_chart_frame_sources = {
         int(target.target_id): {
             "sourceId": int(target.source_id),
@@ -643,23 +675,10 @@ def append_runtime_chart_frame(bridge: StreamProjectionBridge, message: dict[str
         }
         for target in bridge._runtime_tracking_result.visible_targets
     }
-    frame_sources = [
-        {
-            "id": int(item["id"]),
-            "targetId": target_by_source.get(int(item["id"])),
-            "x": float(item["x"]),
-            "y": float(item["y"]),
-            "z": float(item["z"]),
-        }
-        for item in normalized_sources
-        if target_by_source.get(int(item["id"])) is not None
-    ]
     if not has_timestamp:
         return False
 
-    bridge._runtime_chart_messages.append({"timeStamp": sample, "src": frame_sources})
-    if len(bridge._runtime_chart_messages) > 1600:
-        bridge._runtime_chart_messages = bridge._runtime_chart_messages[-1600:]
+    bridge._runtime_chart_samples.append(int(sample))
     return True
 
 
@@ -669,19 +688,22 @@ def _next_tracking_sample(bridge: StreamProjectionBridge) -> int:
             max(int(target.sample) for target in bridge._runtime_tracking_result.visible_targets)
             + 1
         )
-    valid_samples: list[int] = []
-    for message in bridge._runtime_chart_messages:
-        sample_raw = message.get("timeStamp")
-        if type(sample_raw) is int:
-            valid_samples.append(int(sample_raw))
-    if valid_samples:
-        return max(valid_samples) + 1
+    if bridge._runtime_chart_samples:
+        return int(bridge._runtime_chart_samples[-1]) + 1
     return 0
 
 
 def reset_runtime_chart_clock(bridge: StreamProjectionBridge) -> None:
-    bridge._runtime_chart_messages = []
+    bridge._chart_commit_timer.stop()
+    bridge._chart_commit_dirty = False
+    bridge._chart_next_commit_at = 0.0
+    bridge._runtime_chart_samples.clear()
     bridge._runtime_chart_frame_sources = {}
+    bridge._runtime_catalog_by_target = {}
+    bridge._runtime_series_cache = {}
+    bridge._runtime_series_last_sample = None
+    bridge._runtime_chart_visible_rows = {}
+    bridge._runtime_chart_visible_target_ids = []
     bridge._runtime_target_colors = {}
     bridge._runtime_source_target_alias = {}
     bridge._runtime_tracking_result = TrackingResult(

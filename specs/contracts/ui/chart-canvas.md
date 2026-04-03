@@ -2,7 +2,7 @@
 title: chart-canvas
 status: active
 stability: flexible
-version: 0.5
+version: 0.6
 ---
 
 ## Role
@@ -26,6 +26,7 @@ version: 0.5
 - 当同一空间目标在静默 `<=2.0s` 后恢复时，上游 MUST 优先复用原颜色；当静默 `>2.0s` 时，上游 MAY 复用原颜色或分配新颜色。
 - 图表画布 MUST 保持只读可视化语义，MUST NOT 默认引入缩放、平移或点选分析交互。
 - 时间轴 MUST 以 0.01s 为显示单位，并以当前连接首帧时间作为零点。
+- 运行时 SST 摄取频率与图表模型提交频率 MAY 解耦（默认 20Hz 提交）；该解耦 MUST NOT 改变 sample 语义与 `y=null` 断点语义。
 - 横轴可见窗口 MUST 固定为 1600 个 sample（在 0.01s 单位下为 16s）。
 - 横轴窗口 MUST 采用滚动区间 `[latest-1600, latest]`。
 - X 坐标映射 MUST 以该滚动窗口作为唯一真源；折线点位与刻度线 MUST 共享同一映射函数。
