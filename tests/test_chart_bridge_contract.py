@@ -117,10 +117,7 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertTrue(hasattr(bridge, "azimuthChartSeriesModel"))
         self.assertEqual(
             [item["value"] for item in _model_items(bridge.chartWindowModel)],
-            [
-                tick["value"]
-                for tick in build_chart_window_model(bridge._runtime_chart_messages)["ticks"]
-            ],
+            [tick["value"] for tick in build_chart_window_model([{"timeStamp": 0}])["ticks"]],
         )
         elevation_series = _model_items(bridge.elevationChartSeriesModel)
         azimuth_series = _model_items(bridge.azimuthChartSeriesModel)
@@ -375,6 +372,27 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertEqual(_model_items(bridge.elevationChartSeriesModel), baseline_elevation)
         self.assertEqual(_model_items(bridge.azimuthChartSeriesModel), baseline_azimuth)
         self.assertFalse(hasattr(bridge, "_runtime_chart_next_fallback_sample"))
+
+    def test_runtime_chart_commit_is_throttled_to_interval(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._set_streams_active(True)
+        messages = [
+            {"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]},
+            {"timeStamp": 19, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]},
+            {"timeStamp": 38, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]},
+            {"timeStamp": 57, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]},
+        ]
+        with (
+            patch("temporal.app.stream_projection.refresh_chart_models") as refresh_mock,
+            patch(
+                "temporal.app.stream_projection.monotonic",
+                side_effect=[1.00, 1.01, 1.02, 1.07],
+            ),
+        ):
+            for message in messages:
+                bridge._on_sst(message)
+
+        self.assertEqual(refresh_mock.call_count, 2)
 
     def test_runtime_and_preview_chart_models_match_for_same_frame(self) -> None:
         runtime = self._make_runtime_bridge()

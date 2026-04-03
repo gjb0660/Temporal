@@ -26,6 +26,7 @@ updated: 2026-04-04
 - 图表后端路线结论已由 `ui-system-refactor-chart-canvas` 承接，`ui-system` 只消费其上层展示边界。
 - row 的对象目录语义与可见过滤语义已解耦：row 可保留共享历史窗口内的历史 source，chart/3D 仅消费当前可见子集。
 - runtime 已收口目标身份账本：`target_id -> stable_color` 与 `source_id -> target_id` 别名映射由 bridge 单一路径维护。
+- runtime 已收口性能策略：SST 高频摄取与 chart 模型提交解耦，默认 20Hz 提交；row/3D 仍按当前帧实时投影。
 - source 颜色由 bridge 输出并按空间目标连续性保持稳定映射，row/3D/chart 共享同一映射；颜色身份主键为 `targetId`。
 - `sourceId` 在输入侧可作为短期跟踪标识展示，但不再作为展示身份主键。
 - bridge 已稳定输出历史行保留、颜色稳定与按活跃优先/最新历史优先裁剪所需的共享 row 语义，供右栏与跨视图展示一致消费。

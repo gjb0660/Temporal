@@ -23,36 +23,12 @@ Canvas {
         function onModelReset() {
             root.requestPaint()
         }
-
-        function onRowsInserted() {
-            root.requestPaint()
-        }
-
-        function onRowsRemoved() {
-            root.requestPaint()
-        }
-
-        function onDataChanged() {
-            root.requestPaint()
-        }
     }
 
     Connections {
         target: root.seriesModel
 
         function onModelReset() {
-            root.requestPaint()
-        }
-
-        function onRowsInserted() {
-            root.requestPaint()
-        }
-
-        function onRowsRemoved() {
-            root.requestPaint()
-        }
-
-        function onDataChanged() {
             root.requestPaint()
         }
     }
@@ -158,19 +134,6 @@ Canvas {
                 continue
             }
             latest = latest === null ? tickValue : Math.max(latest, tickValue)
-        }
-        const count = modelCount(seriesModel)
-        for (let seriesIndex = 0; seriesIndex < count; seriesIndex += 1) {
-            const item = seriesModel.get(seriesIndex)
-            const points = toPointList(item.points)
-            for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
-                const point = points[pointIndex]
-                const xValue = Number(point && point.x)
-                if (!Number.isFinite(xValue)) {
-                    continue
-                }
-                latest = latest === null ? xValue : Math.max(latest, xValue)
-            }
         }
         return latest === null ? 0 : latest
     }
