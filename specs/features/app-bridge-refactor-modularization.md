@@ -3,7 +3,7 @@ title: app-bridge-refactor-modularization
 tracker: refactor
 status: done
 owner: codex/core
-updated: 2026-04-03
+updated: 2026-04-07
 ---
 
 ## Goal
@@ -22,8 +22,8 @@ updated: 2026-04-03
 
 ## Facts
 
-- `src/temporal/app.py` 当前聚合 bridge 对外接口、运行态编排与入口，属于高频并发改动热点。
-- 目标目录 `src/temporal/app/` 与现有 `src/temporal/app.py` 同名冲突，阶段实施必须迁移为目录形态。
+- `src/temporal/app/bridge.py` 当前作为统一门面，聚合 bridge 对外接口、装配与入口，仍是高频并发改动热点。
+- `src/temporal/app/` 目录形态与 `temporal.app.bridge` 门面迁移已完成。
 - `PreviewBridge` 当前通过继承复用 `AppBridge` 行为。
 - listener 回调来自 `odas_stream_client` 线程（`threading.Thread`），
   并经 `OdasClient` 绑定到 `AppBridge._on_*`。
@@ -143,7 +143,6 @@ updated: 2026-04-03
    - 输入门禁：Stage 2/3/4 全部完成。
    - 任务：运行四套主回归与仓库门禁，完成问题收口。
    - 退出门禁：四套主回归可跑通过，且未新增任何测试 case。
-9. 当前会话进入代码实施阶段，按 Stage 1A/1B/1C/2/3/4/5 顺序推进。
 
 ## Progress
 
@@ -158,6 +157,7 @@ updated: 2026-04-03
 - [x] Stage 3：线程安全收敛（queued signal 回主线程）。
 - [x] Stage 4：接口瘦身收口（已移除 `sourceItems`、`sourcePositions`、`recordingSessions`、`isSourceSelected`；保留 `sourceCount`、`setStatus`，原因分别是状态汇总与状态写入仍被门面/状态链路使用）。
 - [x] Stage 5：执行四套主回归与门禁验证（R1-R6 高风险模拟通过，未发现需修复缺陷；不新增测试 case，不改 QML）。
+- [x] 收口增量：继续收敛 `bridge.py`，将残留业务逻辑下沉到子模块并固定 helper ownership，四套主回归保持通过。
 
 ## Todo
 
