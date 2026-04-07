@@ -8,7 +8,7 @@ Use this page as the single supervisor reference for stage pipeline execution.
 2. Apply Occam's Razor: automate only high-repeat, high-error links.
 3. Delegate by default; local supervisor coding is an exception.
 4. Reuse the same agents through the full pipeline, then close after final gate pass.
-5. Require lookahead planning at each stage close; if none is safe, record `none`.
+5. Require lookahead planning at each stage close; if none is safe, record `none` with reason.
 6. Require a final hardening round with high-risk simulation records.
 
 ## Time-Ordered Pipeline Contract
@@ -68,6 +68,7 @@ Pass when all required checks pass, no unresolved critical findings, no incremen
 4. Supervisor semantic review completed.
 5. Atomic commit completed.
 6. Stage-sync checkpoint completed.
+7. Lookahead recorded (`tasks` or `none` with reason).
 
 ## Divergence and Freeze
 
@@ -120,11 +121,18 @@ Record at final close:
 4. final-pollution-delta
 5. final-stage-sync
 6. cleanup-check
+7. hardening-result: pass|fail
+8. hardening-fail-action (required when hardening-result=fail)
+
+Final-close gate:
+
+- If `hardening-result=fail`, final close is blocked by default.
+- Close only after fix/mitigation and revalidation.
 
 SLO semantics:
 
-- `stability-slo-window-minutes=60` is a capability target, not an automatic blocker.
-- If unmet, record concrete cause and remedy in final close record.
+- `SLO` means the 60-minute stability target.
+- It is a background capability objective, not a gate and not a required record field.
 
 ## Script Quickstart
 
