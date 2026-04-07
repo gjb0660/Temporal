@@ -25,6 +25,8 @@ temporal = "temporal.main:main"
 temporal-preview = "temporal.main:preview_main"
 
 [tool.pyright]
+venvPath = "."
+venv = ".venv"
 include = [
     "src",
     "tests",
