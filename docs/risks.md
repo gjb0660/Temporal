@@ -8,7 +8,7 @@
 
 - 描述：当前按 `4` 通道固定映射 source，本轮未改变录音通道容量模型。
 - 影响：超过 `4` 个 source 时，超出部分不会进入录制会话。
-- 现状：已通过 `recordingSourceCount` 和 `recordingSessions` 对齐，相关测试保持通过。
+- 现状：已通过 `recordingSourceCount` 和 `recordingSessionsModel` 对齐，相关测试保持通过。
 - 操作建议：现场多源场景需提前确认优先 source，并区分“可见 source”与“可录制 source”。
 
 ## 风险 2：网络抖动导致超时停录

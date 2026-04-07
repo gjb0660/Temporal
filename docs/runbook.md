@@ -36,7 +36,7 @@
 4. 再次开启监听时，preview 应从场景起点重新开始，保证复现稳定。
 5. 正式运行时，检查 Sources 列表是否出现有效 source id（非 `0`）。
 6. 检查 `recordingSourceCount` 是否与可映射 source 数一致。
-7. 检查 `recordingSessions` 是否出现 `Source {id} [sp|pf] ...wav`。
+7. 检查 `recordingSessionsModel` 是否出现 `Source {id} [sp|pf] ...wav`。
 8. 单独点击“停止监听”后，监听端口关闭，但不会自动停止远端 `odaslive`。
 
 ## 5. 录制文件检查
