@@ -6,7 +6,7 @@ from collections import deque
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Property, QObject, QThread, QTimer, Signal, Slot, Qt
+from PySide6.QtCore import Property, QObject, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -17,6 +17,7 @@ from temporal.core.recording.auto_recorder import AutoRecorder
 from temporal.core.source_tracking import SpaceTargetSession, TrackingResult
 from temporal.core.ssh.remote_odas import RemoteOdasController
 from temporal.qml_list_model import QmlListModel
+
 from . import recording_audio, remote_lifecycle, status_state, stream_projection
 
 
@@ -361,297 +362,64 @@ class AppBridge(QObject):
             stream_projection.on_pf_audio(self, bytes(chunk))
 
     def _route_audio_chunk(self, chunk: bytes, mode: str) -> None:
-        if not self._channel_source_map:
-            return
-
-        frame_width = self._AUDIO_CHANNELS * self._AUDIO_SAMPLE_WIDTH
-        usable = len(chunk) - (len(chunk) % frame_width)
-        if usable <= 0:
-            return
-
-        buffers = {
-            channel_index: bytearray()
-            for channel_index in self._channel_source_map
-            if 0 <= channel_index < self._AUDIO_CHANNELS
-        }
-        if not buffers:
-            return
-
-        for offset in range(0, usable, frame_width):
-            frame = chunk[offset : offset + frame_width]
-            for channel_index in buffers:
-                sample_offset = channel_index * self._AUDIO_SAMPLE_WIDTH
-                sample = frame[sample_offset : sample_offset + self._AUDIO_SAMPLE_WIDTH]
-                buffers[channel_index].extend(sample)
-
-        for channel_index, channel_pcm in buffers.items():
-            source_id = self._channel_source_map.get(channel_index)
-            if source_id is None or not channel_pcm:
-                continue
-            self._recorder.push(source_id, mode, bytes(channel_pcm))
+        recording_audio.route_audio_chunk(self, chunk, mode)
 
     def _update_source_channel_map(self, source_ids: list[int]) -> None:
-        next_source_map: dict[int, int] = {}
-        used_channels: set[int] = set()
-
-        for source_id in source_ids:
-            channel_index = self._source_channel_map.get(source_id)
-            if channel_index is None or channel_index in used_channels:
-                continue
-            if not 0 <= channel_index < self._AUDIO_CHANNELS:
-                continue
-            next_source_map[source_id] = channel_index
-            used_channels.add(channel_index)
-
-        free_channels = [
-            channel_index
-            for channel_index in range(self._AUDIO_CHANNELS)
-            if channel_index not in used_channels
-        ]
-        for source_id in source_ids:
-            if source_id in next_source_map:
-                continue
-            if not free_channels:
-                break
-            channel_index = free_channels.pop(0)
-            next_source_map[source_id] = channel_index
-
-        self._source_channel_map = next_source_map
-        self._channel_source_map = {
-            channel_index: source_id
-            for source_id, channel_index in self._source_channel_map.items()
-        }
+        recording_audio.update_source_channel_map(self, source_ids)
 
     def _update_stream_status(self, prefix: str) -> None:
-        self.setStatus(
-            f"{prefix} | 声源={self.sourceCount} 候选={self._potential_count} "
-            f"录制中={self._recording_source_count}"
-        )
+        remote_lifecycle.update_stream_status(self, prefix)
 
     def _apply_state_status(self) -> None:
-        if self._odas_starting:
-            self.setStatus("远程 odaslive 启动中")
-            return
-        if self._streams_active:
-            self._update_stream_status("正在监听 SST/SSL/SSS 数据流")
-            return
-        if self._odas_running:
-            self.setStatus("SSH 已连接，远程 odaslive 运行中")
-            return
-        if self._remote_connected:
-            self.setStatus("SSH 已连接，远程 odaslive 未运行")
-            return
-        self.setStatus("Temporal 就绪")
+        remote_lifecycle.apply_state_status(self)
 
     def _refresh_remote_connection_state(self) -> bool:
-        connected = self._remote.is_connected()
-        self._set_remote_connected(connected)
-        return connected
+        return remote_lifecycle.refresh_remote_connection_state(self)
 
     def _set_remote_connected(self, connected: bool) -> None:
-        if self._remote_connected == connected:
-            return
-        self._remote_connected = connected
-        self.remoteConnectedChanged.emit()
-        self.canToggleStreamsChanged.emit()
+        status_state.set_remote_connected(self, connected)
 
     def _set_odas_starting(self, starting: bool) -> None:
-        if self._odas_starting == starting:
-            return
-        self._odas_starting = starting
-        self.odasStartingChanged.emit()
+        status_state.set_odas_starting(self, starting)
 
     def _set_odas_running(self, running: bool) -> None:
-        if self._odas_running == running:
-            return
-        self._odas_running = running
-        self.odasRunningChanged.emit()
+        status_state.set_odas_running(self, running)
 
     def _set_streams_active(self, active: bool) -> None:
-        if self._streams_active == active:
-            return
-        self._streams_active = active
-        self.streamsActiveChanged.emit()
-        self.canToggleStreamsChanged.emit()
+        status_state.set_streams_active(self, active)
 
     def _set_recording_source_count(self, value: int) -> None:
-        if self._recording_source_count == value:
-            return
-        self._recording_source_count = value
-        self.recordingSourceCountChanged.emit()
+        status_state.set_recording_source_count(self, value)
 
     def _set_remote_log_lines(self, lines: list[str]) -> None:
-        clean_lines = lines[-120:] if lines else ["远程日志为空，等待 odaslive 输出..."]
-        if (
-            self._recording_sample_rate_warning
-            and self._recording_sample_rate_warning not in clean_lines
-        ):
-            clean_lines = [*clean_lines, self._recording_sample_rate_warning][-120:]
-        if clean_lines == self._remote_log_lines:
-            return
-        self._remote_log_lines = clean_lines
-        self.remoteLogLinesChanged.emit()
-        self.remoteLogTextChanged.emit()
+        status_state.set_remote_log_lines(self, lines)
 
     def _set_recording_sessions(self, sessions: list[str]) -> None:
-        if self._recording_sessions == sessions:
-            return
-        self._recording_sessions = sessions
-        self.recordingSessionsChanged.emit()
-        self._recording_sessions_model.replace(sessions)
+        recording_audio.set_recording_sessions(self, sessions)
 
     def _set_source_positions(self, positions: list[dict[str, float | int]]) -> None:
-        if positions != self._source_positions:
-            self._source_positions = positions
-            self.sourcePositionsChanged.emit()
-        self._source_positions_model.replace(
-            [
-                {
-                    "id": int(item["id"]),
-                    "color": item.get("color", ""),
-                    "x": float(item["x"]),
-                    "y": float(item["y"]),
-                    "z": float(item["z"]),
-                }
-                for item in positions
-            ]
-        )
+        stream_projection.set_source_positions(self, positions)
 
     def _sync_remote_odas_state(self, update_status: bool = False) -> bool | None:
-        previous_running = self._odas_running
-        if not self._refresh_remote_connection_state():
-            self._set_odas_starting(False)
-            if update_status:
-                self.setStatus("远程控制通道已断开")
-            return None
-
-        try:
-            result = self._remote.status()
-        except Exception as exc:
-            self._set_odas_starting(False)
-            self._refresh_remote_connection_state()
-            if update_status:
-                self.setStatus(self._humanize_control_channel_error(str(exc)))
-            return None
-
-        running = bool(result.stdout.strip())
-        self._set_odas_starting(False)
-        self._set_odas_running(running)
-        if not update_status or previous_running == running:
-            return running
-        self._apply_state_status()
-        return running
+        return remote_lifecycle.sync_remote_odas_state(self, update_status=update_status)
 
     def _cancel_odas_startup(self) -> None:
-        if self._startup_timer.isActive():
-            self._startup_timer.stop()
-        self._startup_attempts_remaining = 0
-        self._startup_failure_hint = ""
-        self._set_odas_starting(False)
+        remote_lifecycle.cancel_odas_startup(self)
 
     def _latest_remote_log_reason(self) -> str:
-        for line in reversed(self._remote_log_lines):
-            stripped = line.strip()
-            if not stripped:
-                continue
-            if stripped.startswith("等待连接远程 odaslive"):
-                continue
-            if stripped.startswith("远程日志为空"):
-                continue
-            return stripped
-        return ""
+        return remote_lifecycle.latest_remote_log_reason(self)
 
     def _pick_startup_failure_reason(self, result: object | None = None) -> str:
-        if result is not None:
-            stderr = getattr(result, "stderr", "")
-            stdout = getattr(result, "stdout", "")
-            explicit = stderr.strip() or stdout.strip()
-            if explicit.lower().startswith("preflight:"):
-                return explicit
-        log_reason = self._latest_remote_log_reason()
-        if log_reason:
-            return log_reason
-        if result is not None:
-            stderr = getattr(result, "stderr", "")
-            stdout = getattr(result, "stdout", "")
-            message = stderr.strip() or stdout.strip()
-            if message:
-                return message
-        if self._startup_failure_hint:
-            return self._startup_failure_hint
-        return "远程 odaslive 启动失败"
+        return remote_lifecycle.pick_startup_failure_reason(self, result)
 
     def _humanize_startup_failure_reason(self, reason: str) -> str:
-        normalized = reason.strip()
-        lower = normalized.lower()
-
-        if normalized.startswith("日志读取失败"):
-            if "cd:" in lower and "no such file or directory" in lower:
-                return "远程工作目录不存在或不可访问"
-            if "permission denied" in lower:
-                return "远程日志路径不可读或不可写"
-            return "远程日志读取失败"
-        if "preflight: remote working directory" in lower:
-            return "远程工作目录不存在或不可访问"
-        if "preflight: remote command missing" in lower:
-            return "远程命令不存在或未安装"
-        if "preflight: remote command not executable" in lower:
-            return "远程命令或目录权限不足"
-        if "preflight: odas config path missing" in lower:
-            return "远程 ODAS 配置文件未声明或无法解析"
-        if "preflight: odas config file missing" in lower:
-            return "远程 ODAS 配置文件不存在"
-        if "preflight: sink host mismatch" in lower:
-            return "远程 ODAS 配置中的输出地址与 Temporal 监听地址不一致"
-        if "preflight: tracked sink missing" in lower:
-            return "远程 ODAS 配置缺少 tracked 输出定义"
-        if "preflight: potential sink missing" in lower:
-            return "远程 ODAS 配置缺少 potential 输出定义"
-        if "preflight: separated sink missing" in lower:
-            return "远程 ODAS 配置缺少 separated 输出定义"
-        if "preflight: postfiltered sink missing" in lower:
-            return "远程 ODAS 配置缺少 postfiltered 输出定义"
-        if "preflight: tracked sink port mismatch" in lower:
-            return "远程 ODAS 配置中的 tracked 输出端口与 Temporal 不一致"
-        if "preflight: potential sink port mismatch" in lower:
-            return "远程 ODAS 配置中的 potential 输出端口与 Temporal 不一致"
-        if "preflight: separated sink port mismatch" in lower:
-            return "远程 ODAS 配置中的 separated 输出端口与 Temporal 不一致"
-        if "preflight: postfiltered sink port mismatch" in lower:
-            return "远程 ODAS 配置中的 postfiltered 输出端口与 Temporal 不一致"
-        if "command not found" in lower:
-            return "远程命令不存在或未安装"
-        if "permission denied" in lower:
-            return "远程命令或目录权限不足"
-        if "no such file or directory" in lower:
-            return "远程文件或目录不存在"
-        if "not connected" in lower:
-            return "远程 SSH 连接已断开"
-        if "timed out" in lower:
-            return "远程连接超时"
-        if normalized.startswith("启动失败:"):
-            remainder = normalized.split(":", 1)[1].strip()
-            if remainder:
-                return self._humanize_startup_failure_reason(remainder)
-        return normalized
+        return remote_lifecycle.humanize_startup_failure_reason(reason)
 
     def _humanize_control_channel_error(self, reason: str) -> str:
-        normalized = reason.strip()
-        lower = normalized.lower()
-        if "ssh control shell timed out" in lower:
-            return "远程控制通道初始化失败"
-        if "ssh control shell lost" in lower or "protocol desynced" in lower:
-            return "远程控制通道已断开"
-        if "ssh is not connected" in lower:
-            return "远程 SSH 连接已断开"
-        return normalized
+        return remote_lifecycle.humanize_control_channel_error(reason)
 
     def _set_startup_failure_status(self, reason: str) -> None:
-        humanized = self._humanize_startup_failure_reason(reason)
-        if humanized.startswith("启动失败"):
-            self.setStatus(humanized)
-            return
-        self.setStatus(f"启动失败: {humanized}")
+        remote_lifecycle.set_startup_failure_status(self, reason)
 
     def _verify_odas_startup(self) -> None:
         remote_lifecycle.verify_odas_startup(self)

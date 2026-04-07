@@ -10,14 +10,14 @@ from temporal.core.network.odas_message_view import (
     extract_source_ids,
     extract_source_positions,
 )
-from temporal.core.source_tracking import SourceObservation, SpaceTargetSession, TrackingResult
 from temporal.core.source_palette import SOURCE_COLOR_PALETTE
+from temporal.core.source_tracking import SourceObservation, SpaceTargetSession, TrackingResult
 from temporal.core.ui_projection import (
     build_rows_model_items,
     compute_sidebar_sources,
 )
 
-from .remote_lifecycle import apply_state_status, update_stream_status
+from . import recording_audio, remote_lifecycle, status_state
 
 
 class StreamProjectionBridge(Protocol):
@@ -78,16 +78,8 @@ class StreamProjectionBridge(Protocol):
     def startStreams(self) -> None: ...
     def stopStreams(self) -> None: ...
 
-    def _set_streams_active(self, active: bool) -> None: ...
-    def _set_recording_source_count(self, value: int) -> None: ...
-    def _set_recording_sessions(self, sessions: list[str]) -> None: ...
-    def _set_source_positions(self, positions: list[dict[str, float | int]]) -> None: ...
     def _refresh_recording_sessions(self) -> None: ...
-    def _update_source_channel_map(self, source_ids: list[int]) -> None: ...
-    def _refresh_potentials(self) -> None: ...
     def _apply_recording_sample_rates(self) -> None: ...
-    def _current_runtime_frame_sources(self) -> dict[int, dict[str, float | int]]: ...
-    def _reset_runtime_chart_clock(self) -> None: ...
 
 
 __all__ = [
@@ -103,15 +95,14 @@ __all__ = [
     "refresh_potentials",
     "refresh_sources",
     "reset_runtime_chart_clock",
-    "route_audio_chunk",
     "set_potential_energy_range",
     "set_potentials_enabled",
     "set_source_selected",
+    "set_source_positions",
     "set_sources_enabled",
     "start_streams",
     "stop_streams",
     "toggle_streams",
-    "update_source_channel_map",
 ]
 
 _HISTORY_ROW_LIMIT = len(SOURCE_COLOR_PALETTE)
@@ -119,21 +110,21 @@ _HISTORY_ROW_LIMIT = len(SOURCE_COLOR_PALETTE)
 
 def start_streams(bridge: StreamProjectionBridge) -> None:
     if bridge._streams_active:
-        update_stream_status(bridge, "正在监听 SST/SSL/SSS 数据流")
+        remote_lifecycle.update_stream_status(bridge, "正在监听 SST/SSL/SSS 数据流")
         return
 
     try:
         bridge._client.start()
     except Exception as exc:
-        bridge._set_streams_active(False)
+        status_state.set_streams_active(bridge, False)
         bridge.setStatus(f"本地监听启动失败: {exc}")
         return
 
-    bridge._reset_runtime_chart_clock()
-    bridge._set_streams_active(True)
+    reset_runtime_chart_clock(bridge)
+    status_state.set_streams_active(bridge, True)
     bridge._chart_next_commit_at = 0.0
     bridge._chart_commit_timer.start()
-    apply_state_status(bridge)
+    remote_lifecycle.apply_state_status(bridge)
 
 
 def stop_streams(bridge: StreamProjectionBridge) -> None:
@@ -143,11 +134,11 @@ def stop_streams(bridge: StreamProjectionBridge) -> None:
     bridge._recorder.stop_all()
     bridge._source_channel_map.clear()
     bridge._channel_source_map.clear()
-    bridge._reset_runtime_chart_clock()
-    bridge._set_streams_active(False)
-    bridge._set_recording_source_count(0)
-    bridge._set_recording_sessions([])
-    apply_state_status(bridge)
+    reset_runtime_chart_clock(bridge)
+    status_state.set_streams_active(bridge, False)
+    status_state.set_recording_source_count(bridge, 0)
+    recording_audio.set_recording_sessions(bridge, [])
+    remote_lifecycle.apply_state_status(bridge)
 
 
 def toggle_streams(bridge: StreamProjectionBridge) -> None:
@@ -163,7 +154,7 @@ def set_sources_enabled(bridge: StreamProjectionBridge, enabled: bool) -> None:
     bridge._sources_enabled = enabled
     bridge.sourcesEnabledChanged.emit()
     refresh_sources(bridge)
-    update_stream_status(bridge, "声源筛选已更新")
+    remote_lifecycle.update_stream_status(bridge, "声源筛选已更新")
 
 
 def set_source_selected(bridge: StreamProjectionBridge, source_id: int, selected: bool) -> None:
@@ -183,7 +174,7 @@ def set_source_selected(bridge: StreamProjectionBridge, source_id: int, selected
         return
 
     refresh_sources(bridge)
-    update_stream_status(bridge, "声源选择已更新")
+    remote_lifecycle.update_stream_status(bridge, "声源选择已更新")
 
 
 def set_potentials_enabled(bridge: StreamProjectionBridge, enabled: bool) -> None:
@@ -192,7 +183,7 @@ def set_potentials_enabled(bridge: StreamProjectionBridge, enabled: bool) -> Non
     bridge._potentials_enabled = enabled
     bridge.potentialsEnabledChanged.emit()
     refresh_potentials(bridge)
-    update_stream_status(bridge, "候选点筛选已更新")
+    remote_lifecycle.update_stream_status(bridge, "候选点筛选已更新")
 
 
 def set_potential_energy_range(
@@ -206,7 +197,7 @@ def set_potential_energy_range(
     bridge._potential_max = high
     bridge.potentialRangeChanged.emit()
     refresh_potentials(bridge)
-    update_stream_status(bridge, "候选能量范围已更新")
+    remote_lifecycle.update_stream_status(bridge, "候选能量范围已更新")
 
 
 def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
@@ -218,92 +209,42 @@ def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
         bridge._chart_commit_dirty = True
         flush_chart_models_if_due(bridge, force=not bridge._streams_active)
     active_source_ids = extract_source_ids(message)
-    update_source_channel_map(bridge, active_source_ids)
-    mapped_source_ids = [
-        source_id for source_id in active_source_ids if source_id in bridge._source_channel_map
-    ]
-    bridge._recorder.update_active_sources(mapped_source_ids)
-    bridge._recorder.sweep_inactive()
-    bridge._set_recording_source_count(len(bridge._recorder.active_sources()))
-    bridge._refresh_recording_sessions()
-    update_stream_status(bridge, "SST 数据已更新")
+    recording_audio.sync_recording_state_from_sources(bridge, active_source_ids)
+    remote_lifecycle.update_stream_status(bridge, "SST 数据已更新")
 
 
 def on_ssl(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
     bridge._last_ssl = message
     refresh_potentials(bridge)
-    update_stream_status(bridge, "SSL 数据已更新")
+    remote_lifecycle.update_stream_status(bridge, "SSL 数据已更新")
 
 
 def on_sep_audio(bridge: StreamProjectionBridge, chunk: bytes) -> None:
-    route_audio_chunk(bridge, chunk, mode="sp")
+    recording_audio.route_audio_chunk(bridge, chunk, mode="sp")
 
 
 def on_pf_audio(bridge: StreamProjectionBridge, chunk: bytes) -> None:
-    route_audio_chunk(bridge, chunk, mode="pf")
+    recording_audio.route_audio_chunk(bridge, chunk, mode="pf")
 
 
-def route_audio_chunk(bridge: StreamProjectionBridge, chunk: bytes, mode: str) -> None:
-    if not bridge._channel_source_map:
-        return
-
-    frame_width = bridge._AUDIO_CHANNELS * bridge._AUDIO_SAMPLE_WIDTH
-    usable = len(chunk) - (len(chunk) % frame_width)
-    if usable <= 0:
-        return
-
-    buffers = {
-        channel_index: bytearray()
-        for channel_index in bridge._channel_source_map
-        if 0 <= channel_index < bridge._AUDIO_CHANNELS
-    }
-    if not buffers:
-        return
-
-    for offset in range(0, usable, frame_width):
-        frame = chunk[offset : offset + frame_width]
-        for channel_index in buffers:
-            sample_offset = channel_index * bridge._AUDIO_SAMPLE_WIDTH
-            sample = frame[sample_offset : sample_offset + bridge._AUDIO_SAMPLE_WIDTH]
-            buffers[channel_index].extend(sample)
-
-    for channel_index, channel_pcm in buffers.items():
-        source_id = bridge._channel_source_map.get(channel_index)
-        if source_id is None or not channel_pcm:
-            continue
-        bridge._recorder.push(source_id, mode, bytes(channel_pcm))
-
-
-def update_source_channel_map(bridge: StreamProjectionBridge, source_ids: list[int]) -> None:
-    next_source_map: dict[int, int] = {}
-    used_channels: set[int] = set()
-
-    for source_id in source_ids:
-        channel_index = bridge._source_channel_map.get(source_id)
-        if channel_index is None or channel_index in used_channels:
-            continue
-        if not 0 <= channel_index < bridge._AUDIO_CHANNELS:
-            continue
-        next_source_map[source_id] = channel_index
-        used_channels.add(channel_index)
-
-    free_channels = [
-        channel_index
-        for channel_index in range(bridge._AUDIO_CHANNELS)
-        if channel_index not in used_channels
-    ]
-    for source_id in source_ids:
-        if source_id in next_source_map:
-            continue
-        if not free_channels:
-            break
-        channel_index = free_channels.pop(0)
-        next_source_map[source_id] = channel_index
-
-    bridge._source_channel_map = next_source_map
-    bridge._channel_source_map = {
-        channel_index: source_id for source_id, channel_index in bridge._source_channel_map.items()
-    }
+def set_source_positions(
+    bridge: StreamProjectionBridge, positions: list[dict[str, float | int]]
+) -> None:
+    if positions != bridge._source_positions:
+        bridge._source_positions = positions
+        bridge.sourcePositionsChanged.emit()
+    bridge._source_positions_model.replace(
+        [
+            {
+                "id": int(item["id"]),
+                "color": item.get("color", ""),
+                "x": float(item["x"]),
+                "y": float(item["y"]),
+                "z": float(item["z"]),
+            }
+            for item in positions
+        ]
+    )
 
 
 def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = True) -> None:
@@ -418,7 +359,7 @@ def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = Tru
         for target_id, frame_source in current_frame_sources.items()
         if target_id in visible_rows_by_target and target_id in visible_target_id_set
     ]
-    bridge._set_source_positions(positions)
+    set_source_positions(bridge, positions)
     bridge._source_rows_model.replace(
         build_rows_model_items(
             sidebar_sources,
