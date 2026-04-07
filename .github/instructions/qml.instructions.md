@@ -25,6 +25,12 @@ in `specs/contracts/ui/*.md`, CamelCase -> kebab-case.
 - UI actions MUST go through bridge.
 - DO NOT bypass bridge interaction paths.
 
+## Types and Linting
+
+- SHOULD keep `pyside6-qmllint` at 0 errors, 0 warnings.
+- SHOULD fix findings from root-cause; do not suppress findings.
+- SHOULD NOT add `// qmllint disable ...` to bypass findings.
+
 ## Local Checks
 
 - `uv run pyside6-qmllint`
