@@ -141,10 +141,10 @@ updated: YYYY-MM-DD
   * `refactor`: improve existing structure
   * `research`: clarify unknowns
 * `status`:
-  * `exploring`: not ready to execute
-  * `active`: in progress
-  * `blocked`: cannot proceed
-  * `done`: completed
+  * `exploring`: future state; boundaries are still being explored and not yet in the current execution loop
+  * `active`: present state; currently in progress
+  * `blocked`: present state; currently blocked and waiting for unblocking
+  * `done`: past state; the execution loop has been completed
 * `owner`: current responsible agent
 * `updated`: last meaningful update (YYYY-MM-DD)
 
@@ -414,9 +414,9 @@ version: <major>.<minor>
 ### Contract Metadata
 
 * `status`:
-  * `draft`: not yet stable enough for normal references
-  * `active`: current valid contract for normal references
-  * `deprecated`: replaced contract that must not receive new references
+  * `draft`: future state; still converging and not yet a stable reference
+  * `active`: present state; current valid contract for normal references
+  * `deprecated`: past state; historical contract that must not receive new references
 * `stability`:
   * `strict`: must not change casually
   * `semi`: change allowed with explicit review
