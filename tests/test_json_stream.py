@@ -7,7 +7,7 @@ class TestJsonStreamBuffer(unittest.TestCase):
     def test_parses_multiline_odas_tracks_payload(self) -> None:
         parser = JsonStreamBuffer()
         result = parser.feed(
-            b'{\n'
+            b"{\n"
             b'    "timeStamp": 123,\n'
             b'    "src": [\n'
             b'        { "id": 7, "tag": "", "x": 0.100, "y": -0.200, "z": 0.300, "activity": 0.900 },\n'
@@ -33,7 +33,7 @@ class TestJsonStreamBuffer(unittest.TestCase):
     def test_does_not_emit_inner_src_items_as_top_level_messages(self) -> None:
         parser = JsonStreamBuffer()
         result = parser.feed(
-            b'{\n'
+            b"{\n"
             b'    "timeStamp": 77,\n'
             b'    "src": [\n'
             b'        { "id": 1, "x": 1.0, "y": 0.0, "z": 0.0 },\n'
@@ -49,7 +49,7 @@ class TestJsonStreamBuffer(unittest.TestCase):
         parser = JsonStreamBuffer()
         result = parser.feed(
             b"junk-prefix\n{invalid}\n"
-            b'{\n'
+            b"{\n"
             b'    "timeStamp": 89,\n'
             b'    "src": [\n'
             b'        { "category": "nonspeech" }\n'
@@ -63,6 +63,7 @@ class TestJsonStreamBuffer(unittest.TestCase):
         parser = JsonStreamBuffer()
         result = parser.feed(b'{"a": 1}\n{"b": 2}\n')
         self.assertEqual(result, [])
+
 
 if __name__ == "__main__":
     unittest.main()

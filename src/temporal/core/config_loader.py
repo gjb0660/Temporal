@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-# pyright: reportMissingImports=false
-
 from dataclasses import dataclass
 from pathlib import Path
 
-import tomli  # pyright: ignore[reportMissingImports]
+import tomli
 
 from temporal.core.models import OdasEndpoint, OdasStreamConfig, RemoteOdasConfig
 

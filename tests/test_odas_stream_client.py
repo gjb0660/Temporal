@@ -29,7 +29,7 @@ class TestOdasStreamClient(unittest.TestCase):
 
         with socket.create_connection(("127.0.0.1", listener.bound_port), timeout=1.0) as client:
             client.sendall(
-                b'{\n'
+                b"{\n"
                 b'    "timeStamp": 9,\n'
                 b'    "src": [\n'
                 b'        { "id": 9, "x": 0.0, "y": 0.0, "z": 1.0 }\n'
@@ -54,13 +54,13 @@ class TestOdasStreamClient(unittest.TestCase):
 
         with socket.create_connection(("127.0.0.1", listener.bound_port), timeout=1.0) as client:
             client.sendall(
-                b'{\n'
+                b"{\n"  #
                 b'    "timeStamp": 1,\n'
                 b'    "src": [\n'
                 b'        { "id": 1, "x": 1.0, "y": 0.0'
             )
             client.sendall(
-                b', "z": 0.0 }\n'
+                b', "z": 0.0 }\n'  #
                 b"    ]\n"
                 b"}\n"
                 b"not-json\n"
@@ -68,7 +68,7 @@ class TestOdasStreamClient(unittest.TestCase):
 
         with socket.create_connection(("127.0.0.1", listener.bound_port), timeout=1.0) as client:
             client.sendall(
-                b'{\n'
+                b"{\n"
                 b'    "timeStamp": 2,\n'
                 b'    "src": [\n'
                 b'        { "id": 2, "x": 0.0, "y": 1.0, "z": 0.0 }\n'

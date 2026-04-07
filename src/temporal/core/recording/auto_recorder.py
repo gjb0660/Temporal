@@ -18,6 +18,7 @@ class RecorderSession:
 
 class AutoRecorder:
     """Source-driven recorder: start on source appear, stop on disappear."""
+
     _DEFAULT_SAMPLE_RATE = 16000
 
     def __init__(

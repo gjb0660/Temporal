@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-# pyright: reportMissingImports=false, reportUntypedFunctionDecorator=false
 import sys
 from collections import deque
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Property, QObject, Qt, QThread, QTimer, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
@@ -17,6 +16,7 @@ from temporal.core.recording.auto_recorder import AutoRecorder
 from temporal.core.source_tracking import SpaceTargetSession, TrackingResult
 from temporal.core.ssh.remote_odas import RemoteOdasController
 from temporal.qml_list_model import QmlListModel
+from temporal.qt_decorators import qt_property, qt_slot
 
 from . import recording_audio, remote_lifecycle, status_state, stream_projection
 
@@ -118,10 +118,18 @@ class AppBridge(QObject):
         )
         self._space_target_session = SpaceTargetSession()
 
-        self._sstIngressRequested.connect(self._handle_sst_ingress, Qt.QueuedConnection)
-        self._sslIngressRequested.connect(self._handle_ssl_ingress, Qt.QueuedConnection)
-        self._sepAudioIngressRequested.connect(self._handle_sep_audio_ingress, Qt.QueuedConnection)
-        self._pfAudioIngressRequested.connect(self._handle_pf_audio_ingress, Qt.QueuedConnection)
+        self._sstIngressRequested.connect(
+            self._handle_sst_ingress, Qt.ConnectionType.QueuedConnection
+        )
+        self._sslIngressRequested.connect(
+            self._handle_ssl_ingress, Qt.ConnectionType.QueuedConnection
+        )
+        self._sepAudioIngressRequested.connect(
+            self._handle_sep_audio_ingress, Qt.ConnectionType.QueuedConnection
+        )
+        self._pfAudioIngressRequested.connect(
+            self._handle_pf_audio_ingress, Qt.ConnectionType.QueuedConnection
+        )
 
         self._log_timer = QTimer(self)
         self._log_timer.setInterval(1500)
@@ -153,167 +161,167 @@ class AppBridge(QObject):
         self._elevation_chart_series_model.replace([])
         self._azimuth_chart_series_model.replace([])
 
-    @Property(str, notify=statusChanged)  # type: ignore[reportCallIssue]
+    @qt_property(str, notify=statusChanged)
     def status(self) -> str:
         return self._status
 
-    @Property(bool, notify=remoteConnectedChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=remoteConnectedChanged)
     def remoteConnected(self) -> bool:
         return self._remote_connected
 
-    @Property(bool, notify=odasStartingChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=odasStartingChanged)
     def odasStarting(self) -> bool:
         return self._odas_starting
 
-    @Property(bool, notify=odasRunningChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=odasRunningChanged)
     def odasRunning(self) -> bool:
         return self._odas_running
 
-    @Property(bool, notify=streamsActiveChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=streamsActiveChanged)
     def streamsActive(self) -> bool:
         return self._streams_active
 
-    @Property(bool, notify=canToggleStreamsChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=canToggleStreamsChanged)
     def canToggleStreams(self) -> bool:
         return True
 
-    @Property(list, notify=sourceIdsChanged)  # type: ignore[reportCallIssue]
+    @qt_property(list, notify=sourceIdsChanged)
     def sourceIds(self) -> list[int]:
         return self._source_ids
 
-    @Property(list, notify=remoteLogLinesChanged)  # type: ignore[reportCallIssue]
+    @qt_property(list, notify=remoteLogLinesChanged)
     def remoteLogLines(self) -> list[str]:
         return self._remote_log_lines
 
-    @Property(str, notify=remoteLogTextChanged)  # type: ignore[reportCallIssue]
+    @qt_property(str, notify=remoteLogTextChanged)
     def remoteLogText(self) -> str:
         return "\n".join(self._remote_log_lines)
 
-    @Property(int, notify=sourceCountChanged)  # type: ignore[reportCallIssue]
+    @qt_property(int, notify=sourceCountChanged)
     def sourceCount(self) -> int:
         return len(self._source_items)
 
-    @Property(int, notify=potentialCountChanged)  # type: ignore[reportCallIssue]
+    @qt_property(int, notify=potentialCountChanged)
     def potentialCount(self) -> int:
         return self._potential_count
 
-    @Property(int, notify=recordingSourceCountChanged)  # type: ignore[reportCallIssue]
+    @qt_property(int, notify=recordingSourceCountChanged)
     def recordingSourceCount(self) -> int:
         return self._recording_source_count
 
-    @Property(bool, notify=sourcesEnabledChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=sourcesEnabledChanged)
     def sourcesEnabled(self) -> bool:
         return self._sources_enabled
 
-    @Property(bool, notify=potentialsEnabledChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=potentialsEnabledChanged)
     def potentialsEnabled(self) -> bool:
         return self._potentials_enabled
 
-    @Property(float, notify=potentialRangeChanged)  # type: ignore[reportCallIssue]
+    @qt_property(float, notify=potentialRangeChanged)
     def potentialEnergyMin(self) -> float:
         return self._potential_min
 
-    @Property(float, notify=potentialRangeChanged)  # type: ignore[reportCallIssue]
+    @qt_property(float, notify=potentialRangeChanged)
     def potentialEnergyMax(self) -> float:
         return self._potential_max
 
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    @qt_property(QObject, constant=True)
     def sourceRowsModel(self) -> QmlListModel:
         return self._source_rows_model
 
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    @qt_property(QObject, constant=True)
     def sourcePositionsModel(self) -> QmlListModel:
         return self._source_positions_model
 
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    @qt_property(QObject, constant=True)
     def elevationChartSeriesModel(self) -> QmlListModel:
         return self._elevation_chart_series_model
 
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    @qt_property(QObject, constant=True)
     def azimuthChartSeriesModel(self) -> QmlListModel:
         return self._azimuth_chart_series_model
 
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    @qt_property(QObject, constant=True)
     def previewScenarioOptionsModel(self) -> QmlListModel:
         return self._preview_scenario_options_model
 
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    @qt_property(QObject, constant=True)
     def chartWindowModel(self) -> QmlListModel:
         return self._chart_window_model
 
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    @qt_property(QObject, constant=True)
     def headerNavLabelsModel(self) -> QmlListModel:
         return self._header_nav_labels_model
 
-    @Property(QObject, constant=True)  # type: ignore[reportCallIssue]
+    @qt_property(QObject, constant=True)
     def recordingSessionsModel(self) -> QmlListModel:
         return self._recording_sessions_model
 
-    @Property(bool, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=previewStateChanged)
     def previewMode(self) -> bool:
         return False
 
-    @Property(str, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    @qt_property(str, notify=previewStateChanged)
     def previewScenarioKey(self) -> str:
         return ""
 
-    @Property(list, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    @qt_property(list, notify=previewStateChanged)
     def previewScenarioKeys(self) -> list[str]:
         return []
 
-    @Property(bool, notify=previewStateChanged)  # type: ignore[reportCallIssue]
+    @qt_property(bool, notify=previewStateChanged)
     def showPreviewScenarioSelector(self) -> bool:
         return False
 
-    @Slot(str)
+    @qt_slot(str)
     def setStatus(self, status: str) -> None:
         status_state.set_status(self, status)
 
-    @Slot()
+    @qt_slot()
     def connectRemote(self) -> None:
         remote_lifecycle.connect_remote(self)
 
-    @Slot()
+    @qt_slot()
     def startRemoteOdas(self) -> None:
         remote_lifecycle.start_remote_odas(self)
 
-    @Slot()
+    @qt_slot()
     def stopRemoteOdas(self) -> None:
         remote_lifecycle.stop_remote_odas(self)
 
-    @Slot()
+    @qt_slot()
     def toggleRemoteOdas(self) -> None:
         remote_lifecycle.toggle_remote_odas(self)
 
-    @Slot()
+    @qt_slot()
     def startStreams(self) -> None:
         stream_projection.start_streams(self)
 
-    @Slot()
+    @qt_slot()
     def stopStreams(self) -> None:
         stream_projection.stop_streams(self)
 
-    @Slot()
+    @qt_slot()
     def toggleStreams(self) -> None:
         stream_projection.toggle_streams(self)
 
-    @Slot(bool)
+    @qt_slot(bool)
     def setSourcesEnabled(self, enabled: bool) -> None:
         stream_projection.set_sources_enabled(self, enabled)
 
-    @Slot(int, bool)
+    @qt_slot(int, bool)
     def setSourceSelected(self, source_id: int, selected: bool) -> None:
         stream_projection.set_source_selected(self, source_id, selected)
 
-    @Slot(bool)
+    @qt_slot(bool)
     def setPotentialsEnabled(self, enabled: bool) -> None:
         stream_projection.set_potentials_enabled(self, enabled)
 
-    @Slot(float, float)
+    @qt_slot(float, float)
     def setPotentialEnergyRange(self, minimum: float, maximum: float) -> None:
         stream_projection.set_potential_energy_range(self, minimum, maximum)
 
-    @Slot(str)
+    @qt_slot(str)
     def setPreviewScenario(self, _key: str) -> None:
         return
 
@@ -341,22 +349,22 @@ class AppBridge(QObject):
             return
         self._pfAudioIngressRequested.emit(chunk)
 
-    @Slot(object)
+    @qt_slot(object)
     def _handle_sst_ingress(self, message: object) -> None:
         if isinstance(message, dict):
             stream_projection.on_sst(self, message)
 
-    @Slot(object)
+    @qt_slot(object)
     def _handle_ssl_ingress(self, message: object) -> None:
         if isinstance(message, dict):
             stream_projection.on_ssl(self, message)
 
-    @Slot(object)
+    @qt_slot(object)
     def _handle_sep_audio_ingress(self, chunk: object) -> None:
         if isinstance(chunk, (bytes, bytearray, memoryview)):
             stream_projection.on_sep_audio(self, bytes(chunk))
 
-    @Slot(object)
+    @qt_slot(object)
     def _handle_pf_audio_ingress(self, chunk: object) -> None:
         if isinstance(chunk, (bytes, bytearray, memoryview)):
             stream_projection.on_pf_audio(self, bytes(chunk))

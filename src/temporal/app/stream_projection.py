@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import deque
 from math import atan2, ceil, degrees, sqrt
 from time import monotonic
-from typing import Any, Protocol
+from typing import Any, Protocol, Sequence
 
 from temporal.core.network.odas_message_view import (
     count_potentials,
@@ -21,10 +21,6 @@ from . import recording_audio, remote_lifecycle, status_state
 
 
 class StreamProjectionBridge(Protocol):
-    _AUDIO_CHANNELS: int
-    _AUDIO_SAMPLE_WIDTH: int
-    _RUNTIME_CHART_X_TICKS: list[dict[str, Any]]
-    _RUNTIME_CHART_COMMIT_INTERVAL_MS: int
     _runtime_chart_samples: deque[int]
     _runtime_chart_frame_sources: dict[int, dict[str, float | int]]
     _runtime_catalog_by_target: dict[int, dict[str, Any]]
@@ -63,8 +59,6 @@ class StreamProjectionBridge(Protocol):
     _elevation_chart_series_model: Any
     _azimuth_chart_series_model: Any
     _chart_window_model: Any
-    sourceCount: int
-
     sourcesEnabledChanged: Any
     potentialsEnabledChanged: Any
     potentialRangeChanged: Any
@@ -73,6 +67,15 @@ class StreamProjectionBridge(Protocol):
     sourceCountChanged: Any
     sourcePositionsChanged: Any
     potentialCountChanged: Any
+
+    @property
+    def _AUDIO_CHANNELS(self) -> int: ...
+    @property
+    def _AUDIO_SAMPLE_WIDTH(self) -> int: ...
+    @property
+    def _RUNTIME_CHART_X_TICKS(self) -> Sequence[str]: ...
+    @property
+    def _RUNTIME_CHART_COMMIT_INTERVAL_MS(self) -> int: ...
 
     def setStatus(self, status: str) -> None: ...
     def startStreams(self) -> None: ...

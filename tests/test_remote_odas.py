@@ -249,8 +249,8 @@ class TestRemoteOdasController(unittest.TestCase):
         sample_rates, warning = controller._resolve_recording_sample_rates(
             "\n".join(
                 [
-                    "separated: { interface: { ip = \"10.10.0.8\"; port = 10000; }; };",
-                    "postfiltered: { interface: { ip = \"10.10.0.8\"; port = 10010; }; };",
+                    'separated: { interface: { ip = "10.10.0.8"; port = 10000; }; };',
+                    'postfiltered: { interface: { ip = "10.10.0.8"; port = 10010; }; };',
                 ]
             )
         )
@@ -546,10 +546,10 @@ class TestRemoteOdasController(unittest.TestCase):
     def test_start_odaslive_records_sample_rate_warning_without_failing(self) -> None:
         cfg_without_fs = "\n".join(
             [
-                "tracked: { interface: { ip = \"10.10.0.8\"; port = 9000; }; };",
-                "potential: { interface: { ip = \"10.10.0.8\"; port = 9001; }; };",
-                "separated: { interface: { ip = \"10.10.0.8\"; port = 10000; }; };",
-                "postfiltered: { interface: { ip = \"10.10.0.8\"; port = 10010; }; };",
+                'tracked: { interface: { ip = "10.10.0.8"; port = 9000; }; };',
+                'potential: { interface: { ip = "10.10.0.8"; port = 9001; }; };',
+                'separated: { interface: { ip = "10.10.0.8"; port = 10000; }; };',
+                'postfiltered: { interface: { ip = "10.10.0.8"; port = 10010; }; };',
             ]
         )
 

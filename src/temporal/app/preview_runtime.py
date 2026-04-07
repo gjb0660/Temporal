@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-# pyright: reportMissingImports=false
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QTimer
@@ -19,7 +18,7 @@ if TYPE_CHECKING:
     from temporal.preview_bridge import PreviewBridge
 
 
-class _PreviewRecorder:
+class PreviewRecorder:
     def __init__(self) -> None:
         self._active: set[int] = set()
 
@@ -42,7 +41,7 @@ class _PreviewRecorder:
         return
 
 
-class _PreviewClient:
+class PreviewClient:
     def __init__(self) -> None:
         self.started = False
 
@@ -53,7 +52,7 @@ class _PreviewClient:
         self.started = False
 
 
-class _PreviewRemoteController:
+class PreviewRemoteController:
     def __init__(self) -> None:
         self.connected = True
         self.running = False

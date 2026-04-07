@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-# pyright: reportMissingImports=false, reportUntypedFunctionDecorator=false
-
 from typing import Any
 
-from PySide6.QtCore import Property, QAbstractListModel, QModelIndex, QObject, Qt, Signal, Slot
+from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, Qt, Signal
+
+from temporal.qt_decorators import qt_property, qt_slot
 
 
 class QmlListModel(QAbstractListModel):
@@ -19,12 +19,12 @@ class QmlListModel(QAbstractListModel):
         }
         self._items: list[dict[str, Any]] = []
 
-    @Property(int, notify=countChanged)  # type: ignore[reportCallIssue]
+    @qt_property(int, notify=countChanged)
     def count(self) -> int:
         return len(self._items)
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
-        if parent.isValid():
+    def rowCount(self, parent: QModelIndex | None = None) -> int:
+        if parent is not None and parent.isValid():
             return 0
         return len(self._items)
 
@@ -44,7 +44,7 @@ class QmlListModel(QAbstractListModel):
     def roleNames(self) -> dict[int, bytes]:
         return {role_id: role_name.encode("utf-8") for role_id, role_name in self._role_ids.items()}
 
-    @Slot(int, result="QVariant")  # type: ignore[reportArgumentType]
+    @qt_slot(int, result="QVariant")
     def get(self, index: int) -> dict[str, Any]:
         if index < 0 or index >= len(self._items):
             return {}

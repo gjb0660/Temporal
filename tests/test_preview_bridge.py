@@ -4,8 +4,6 @@ import unittest
 from typing import Any, cast
 from unittest.mock import patch
 
-# pyright: reportMissingImports=false
-
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QUrl

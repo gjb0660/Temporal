@@ -192,7 +192,9 @@ class SpaceTargetSession:
         for target_id in expired_target_ids:
             self._targets.pop(target_id, None)
 
-        dropped_source_ids = [observation.source_id for observation in ranked_observations[len(selected) :]]
+        dropped_source_ids = [
+            observation.source_id for observation in ranked_observations[len(selected) :]
+        ]
 
         visible_targets: list[TrackedTarget] = []
         matched_target_ids: set[int] = set()
