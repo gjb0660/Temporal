@@ -40,26 +40,27 @@ Do not proceed as code-ready if this skill has not been applied.
 1. Confirm governing sources.
    - Read `AGENTS.md`
    - Read repository constraints from `.github/copilot-instructions.md`
+   - Route domain instructions by `ApplyTo` before editing or testing:
+     - `src/**/*.py` -> `.github/instructions/backend.instructions.md`
+     - `src/**/*.qml` -> `.github/instructions/qml.instructions.md`
+     - `tests/**` -> `.github/instructions/tests.instructions.md`
 
 2. Resolve spec entry path.
-   - Read `specs/index.md`
-   - Classify the current context as exactly one of:
-     - Feature
-     - Contract
-     - Knowledge
-   - Read the matching domain index before editing any spec file
+   - Follow [spec-entry](./references/spec-entry.md) details
+   - Classify the current context as exactly one of: feature, contract, knowledge, or missing
+   - If spec context is to edit, do not forget read the matching domain index
+   - If spec context is missing or unclear, do not treat spec stage as ready
 
 3. Resolve execution stage.
+   - Follow [execution-flow](./references/execution-flow.md) details
    - Determine the current stage and exit condition
    - If facts are insufficient, stay in exploration
    - If plan or acceptance is missing, do not treat code stage as ready
-   - Use [execution-flow](./references/execution-flow.md) as needed
 
 4. Enforce spec-code sync.
    - Keep spec and code aligned
    - Update spec before continuing when facts invalidate the current decision
    - Do not continue through drift
-   - Use [spec-entry](./references/spec-entry.md) as needed
 
 5. Apply Delegated TDD Supervision conditionally.
    - Trigger only when both are true:
