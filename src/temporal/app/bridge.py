@@ -32,6 +32,9 @@ class AppBridge(QObject):
     _EMPTY_REMOTE_LOG = ["等待连接远程 odaslive..."]
 
     statusChanged = Signal()
+    controlPhaseChanged = Signal()
+    controlDataStateChanged = Signal()
+    controlSummaryChanged = Signal()
     remoteConnectedChanged = Signal()
     odasStartingChanged = Signal()
     odasRunningChanged = Signal()
@@ -65,6 +68,11 @@ class AppBridge(QObject):
     ) -> None:
         super().__init__()
         self._status = "Temporal 就绪"
+        self._control_phase = "idle"
+        self._control_data_state = "inactive"
+        self._control_phase_summary_override: str | None = None
+        self._control_summary = ""
+        self._last_sst_monotonic: float | None = None
         self._root = Path(__file__).resolve().parents[3]
         self._cfg_path = resolve_default_config_path(self._root)
         self._cfg = cfg or load_config(self._cfg_path)
@@ -117,6 +125,7 @@ class AppBridge(QObject):
             dropped_source_ids=[],
         )
         self._space_target_session = SpaceTargetSession()
+        self._SST_DATA_TIMEOUT_SEC = 2.0
 
         self._sstIngressRequested.connect(
             self._handle_sst_ingress, Qt.ConnectionType.QueuedConnection
@@ -160,10 +169,23 @@ class AppBridge(QObject):
         self._source_positions_model.replace([])
         self._elevation_chart_series_model.replace([])
         self._azimuth_chart_series_model.replace([])
+        status_state.refresh_control_summary(self)
 
     @qt_property(str, notify=statusChanged)
     def status(self) -> str:
-        return self._status
+        return self._control_summary
+
+    @qt_property(str, notify=controlPhaseChanged)
+    def controlPhase(self) -> str:
+        return self._control_phase
+
+    @qt_property(str, notify=controlDataStateChanged)
+    def controlDataState(self) -> str:
+        return self._control_data_state
+
+    @qt_property(str, notify=controlSummaryChanged)
+    def controlSummary(self) -> str:
+        return self._control_summary
 
     @qt_property(bool, notify=remoteConnectedChanged)
     def remoteConnected(self) -> bool:
@@ -375,9 +397,6 @@ class AppBridge(QObject):
     def _update_source_channel_map(self, source_ids: list[int]) -> None:
         recording_audio.update_source_channel_map(self, source_ids)
 
-    def _update_stream_status(self, prefix: str) -> None:
-        remote_lifecycle.update_stream_status(self, prefix)
-
     def _apply_state_status(self) -> None:
         remote_lifecycle.apply_state_status(self)
 
@@ -386,6 +405,16 @@ class AppBridge(QObject):
 
     def _set_remote_connected(self, connected: bool) -> None:
         status_state.set_remote_connected(self, connected)
+
+    def _set_control_state(
+        self, phase: str, data_state: str, summary_override: str | None = None
+    ) -> None:
+        status_state.set_control_state(
+            self,
+            phase,
+            data_state,
+            summary_override=summary_override,
+        )
 
     def _set_odas_starting(self, starting: bool) -> None:
         status_state.set_odas_starting(self, starting)

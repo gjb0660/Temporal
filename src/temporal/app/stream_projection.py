@@ -52,6 +52,7 @@ class StreamProjectionBridge(Protocol):
     _recording_sessions: list[str]
     _recording_sample_rate_warning: str
     _streams_active: bool
+    _last_sst_monotonic: float | None
     _client: Any
     _recorder: Any
     _source_rows_model: Any
@@ -113,17 +114,23 @@ _HISTORY_ROW_LIMIT = len(SOURCE_COLOR_PALETTE)
 
 def start_streams(bridge: StreamProjectionBridge) -> None:
     if bridge._streams_active:
-        remote_lifecycle.update_stream_status(bridge, "正在监听 SST/SSL/SSS 数据流")
+        remote_lifecycle.apply_state_status(bridge)
         return
 
     try:
         bridge._client.start()
     except Exception as exc:
         status_state.set_streams_active(bridge, False)
-        bridge.setStatus(f"本地监听启动失败: {exc}")
+        status_state.set_control_state(
+            bridge,
+            "error",
+            "unavailable",
+            summary_override=f"本地监听启动失败: {exc}",
+        )
         return
 
     reset_runtime_chart_clock(bridge)
+    bridge._last_sst_monotonic = None
     status_state.set_streams_active(bridge, True)
     bridge._chart_next_commit_at = 0.0
     bridge._chart_commit_timer.start()
@@ -137,6 +144,7 @@ def stop_streams(bridge: StreamProjectionBridge) -> None:
     bridge._recorder.stop_all()
     bridge._source_channel_map.clear()
     bridge._channel_source_map.clear()
+    bridge._last_sst_monotonic = None
     reset_runtime_chart_clock(bridge)
     status_state.set_streams_active(bridge, False)
     status_state.set_recording_source_count(bridge, 0)
@@ -157,7 +165,6 @@ def set_sources_enabled(bridge: StreamProjectionBridge, enabled: bool) -> None:
     bridge._sources_enabled = enabled
     bridge.sourcesEnabledChanged.emit()
     refresh_sources(bridge)
-    remote_lifecycle.update_stream_status(bridge, "声源筛选已更新")
 
 
 def set_source_selected(bridge: StreamProjectionBridge, source_id: int, selected: bool) -> None:
@@ -177,7 +184,6 @@ def set_source_selected(bridge: StreamProjectionBridge, source_id: int, selected
         return
 
     refresh_sources(bridge)
-    remote_lifecycle.update_stream_status(bridge, "声源选择已更新")
 
 
 def set_potentials_enabled(bridge: StreamProjectionBridge, enabled: bool) -> None:
@@ -186,7 +192,6 @@ def set_potentials_enabled(bridge: StreamProjectionBridge, enabled: bool) -> Non
     bridge._potentials_enabled = enabled
     bridge.potentialsEnabledChanged.emit()
     refresh_potentials(bridge)
-    remote_lifecycle.update_stream_status(bridge, "候选点筛选已更新")
 
 
 def set_potential_energy_range(
@@ -200,11 +205,12 @@ def set_potential_energy_range(
     bridge._potential_max = high
     bridge.potentialRangeChanged.emit()
     refresh_potentials(bridge)
-    remote_lifecycle.update_stream_status(bridge, "候选能量范围已更新")
 
 
 def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
+    bridge._last_sst_monotonic = monotonic()
     bridge._last_sst = message
+    remote_lifecycle.apply_state_status(bridge)
     has_chart_sample = append_runtime_chart_frame(bridge, message)
     refresh_sources(bridge, refresh_chart=False)
     if has_chart_sample:
@@ -213,13 +219,11 @@ def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
         flush_chart_models_if_due(bridge, force=not bridge._streams_active)
     active_source_ids = extract_source_ids(message)
     recording_audio.sync_recording_state_from_sources(bridge, active_source_ids)
-    remote_lifecycle.update_stream_status(bridge, "SST 数据已更新")
 
 
 def on_ssl(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
     bridge._last_ssl = message
     refresh_potentials(bridge)
-    remote_lifecycle.update_stream_status(bridge, "SSL 数据已更新")
 
 
 def on_sep_audio(bridge: StreamProjectionBridge, chunk: bytes) -> None:
@@ -319,6 +323,7 @@ def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = Tru
         bridge._source_items = items
         bridge.sourceItemsChanged.emit()
         bridge.sourceCountChanged.emit()
+        status_state.refresh_control_summary(bridge)
 
     sidebar_sources = compute_sidebar_sources(
         [
@@ -676,3 +681,4 @@ def refresh_potentials(bridge: StreamProjectionBridge) -> None:
     if count != bridge._potential_count:
         bridge._potential_count = count
         bridge.potentialCountChanged.emit()
+        status_state.refresh_control_summary(bridge)

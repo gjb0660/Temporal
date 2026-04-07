@@ -319,7 +319,7 @@ class TestChartBridgeContract(unittest.TestCase):
             patch("temporal.app.stream_projection.refresh_chart_models") as refresh_mock,
             patch(
                 "temporal.app.stream_projection.monotonic",
-                side_effect=[1.00, 1.01, 1.02, 1.07],
+                side_effect=[1.00, 1.00, 1.01, 1.01, 1.02, 1.02, 1.07, 1.07],
             ),
         ):
             for message in messages:

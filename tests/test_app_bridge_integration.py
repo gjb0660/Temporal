@@ -3,6 +3,7 @@ import unittest
 import wave
 from datetime import datetime
 from pathlib import Path
+from time import monotonic
 
 from temporal.app.bridge import AppBridge
 from temporal.app.fake_runtime import FakeClient, FakeClock, FakeRemote, fake_app_bridge
@@ -88,6 +89,11 @@ class TestAppBridgeIntegration(unittest.TestCase):
         while bridge.odasStarting:
             bridge._verify_odas_startup()
 
+    def _summary_lines(self, bridge: AppBridge) -> list[str]:
+        lines = str(bridge.controlSummary).splitlines()
+        self.assertEqual(len(lines), 3)
+        return lines
+
     def test_sst_ssl_sss_flow_updates_status_and_writes_audio(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             recorder = AutoRecorder(output_dir=temp_dir)
@@ -95,9 +101,15 @@ class TestAppBridgeIntegration(unittest.TestCase):
             bridge.connectRemote()
 
             bridge.startStreams()
+            lines_before = self._summary_lines(bridge)
             bridge._on_sst({"src": [{"id": 2}, {"id": 4}]})
             bridge.setPotentialsEnabled(True)
             bridge._on_ssl({"src": [{"E": 0.3}, {"E": 0.7}]})
+            lines_after = self._summary_lines(bridge)
+            self.assertEqual(lines_before[0], lines_after[0])
+            self.assertEqual(lines_before[1], lines_after[1])
+            self.assertEqual(bridge.controlPhase, "streams_listening")
+            self.assertEqual(bridge.controlDataState, "listening_remote_not_running")
 
             chunk = b"\x01\x00\x02\x00\x03\x00\x04\x00"
             bridge._on_sep_audio(chunk)
@@ -109,6 +121,11 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertGreaterEqual(len(files), 4)
             self.assertEqual(bridge.potentialCount, 2)
             self.assertEqual(bridge.recordingSourceCount, 0)
+            self.assertEqual(bridge.controlPhase, "ssh_connected_idle")
+            self.assertEqual(bridge.controlDataState, "inactive")
+            lines_final = self._summary_lines(bridge)
+            self.assertIn("SSH 已连接，远程 odaslive 未运行", lines_final[0])
+            self.assertIn("未监听", lines_final[1])
 
     def test_remote_start_applies_sample_rates_to_new_wav_headers(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -222,7 +239,11 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertTrue(bridge.streamsActive)
             self.assertTrue(bridge.canToggleStreams)
-            self.assertIn("正在监听", bridge._status)
+            self.assertEqual(bridge.controlPhase, "streams_listening")
+            self.assertEqual(bridge.controlDataState, "listening_remote_not_running")
+            lines = self._summary_lines(bridge)
+            self.assertIn("正在监听", lines[0])
+            self.assertIn("监听中，远端未启动", lines[1])
 
     def test_connect_remote_reports_control_channel_init_failure_without_labeling_ssh_failure(
         self,
@@ -234,7 +255,11 @@ class TestAppBridgeIntegration(unittest.TestCase):
             bridge.connectRemote()
 
             self.assertFalse(bridge.remoteConnected)
-            self.assertEqual(bridge._status, "远程控制通道初始化失败")
+            self.assertEqual(bridge.controlPhase, "ssh_disconnected")
+            self.assertEqual(bridge.controlDataState, "unavailable")
+            lines = self._summary_lines(bridge)
+            self.assertIn("远程控制通道初始化失败", lines[0])
+            self.assertIn("不可用", lines[1])
             self.assertEqual(bridge.remoteLogLines, ["远程控制通道初始化失败"])
 
     def test_start_streams_keeps_inactive_when_listener_bind_fails(self) -> None:
@@ -246,8 +271,12 @@ class TestAppBridgeIntegration(unittest.TestCase):
             bridge.startStreams()
 
             self.assertFalse(bridge.streamsActive)
-            self.assertIn("本地监听启动失败", bridge._status)
-            self.assertIn("bind failed", bridge._status)
+            self.assertEqual(bridge.controlPhase, "error")
+            self.assertEqual(bridge.controlDataState, "unavailable")
+            lines = self._summary_lines(bridge)
+            self.assertIn("本地监听启动失败", lines[0])
+            self.assertIn("bind failed", lines[0])
+            self.assertIn("不可用", lines[1])
 
     def test_start_remote_does_not_launch_remote_when_listener_start_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -263,7 +292,10 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertFalse(bridge.odasStarting)
             self.assertFalse(bridge.odasRunning)
             self.assertEqual(remote.start_calls, 0)
-            self.assertIn("本地监听启动失败", bridge._status)
+            self.assertEqual(bridge.controlPhase, "error")
+            self.assertEqual(bridge.controlDataState, "unavailable")
+            lines = self._summary_lines(bridge)
+            self.assertIn("本地监听启动失败", lines[0])
 
     def test_preflight_failure_uses_humanized_sink_reason(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -283,9 +315,12 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertFalse(bridge.odasStarting)
             self.assertFalse(bridge.odasRunning)
-            self.assertTrue(bridge._status.startswith("启动失败:"))
-            self.assertIn("Temporal", bridge._status)
-            self.assertNotIn("preflight:", bridge._status)
+            self.assertEqual(bridge.controlPhase, "error")
+            self.assertEqual(bridge.controlDataState, "unavailable")
+            lines = self._summary_lines(bridge)
+            self.assertTrue(lines[0].startswith("启动失败:"))
+            self.assertIn("Temporal", lines[0])
+            self.assertNotIn("preflight:", lines[0])
 
     def test_start_failure_uses_log_reason_when_process_never_appears(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -304,7 +339,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertFalse(bridge.odasStarting)
             self.assertFalse(bridge.odasRunning)
-            self.assertEqual(bridge._status, "启动失败: 远程命令不存在或未安装")
+            self.assertEqual(bridge.controlPhase, "error")
+            self.assertEqual(bridge.controlDataState, "unavailable")
+            self.assertIn("启动失败: 远程命令不存在或未安装", self._summary_lines(bridge)[0])
 
     def test_start_transitions_from_starting_to_running_after_pid_validation(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -316,12 +353,19 @@ class TestAppBridgeIntegration(unittest.TestCase):
             remote.start_status_sequence = ["", "", "4242\n"]
 
             bridge.startRemoteOdas()
+            self.assertTrue(bridge.odasStarting)
+            self.assertEqual(bridge.controlPhase, "odas_starting")
+            self.assertEqual(bridge.controlDataState, "running_waiting_sst")
             bridge._verify_odas_startup()
 
             self.assertFalse(bridge.odasStarting)
             self.assertTrue(bridge.odasRunning)
             self.assertTrue(bridge.streamsActive)
-            self.assertIn("监听", bridge._status)
+            self.assertEqual(bridge.controlPhase, "streams_listening")
+            self.assertEqual(bridge.controlDataState, "running_waiting_sst")
+            lines = self._summary_lines(bridge)
+            self.assertIn("监听", lines[0])
+            self.assertIn("等待 SST", lines[1])
 
     def test_connect_remote_without_pid_file_does_not_adopt_instance(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -332,7 +376,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertTrue(bridge.remoteConnected)
             self.assertFalse(bridge.odasRunning)
-            self.assertEqual(bridge._status, "SSH 已连接，远程 odaslive 未运行")
+            self.assertEqual(bridge.controlPhase, "ssh_connected_idle")
+            self.assertEqual(bridge.controlDataState, "inactive")
+            self.assertIn("未运行", self._summary_lines(bridge)[0])
 
     def test_connect_remote_adopts_instance_with_valid_pid_file(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -346,7 +392,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertTrue(bridge.remoteConnected)
             self.assertTrue(bridge.odasRunning)
-            self.assertIn("运行中", bridge._status)
+            self.assertEqual(bridge.controlPhase, "odas_running")
+            self.assertEqual(bridge.controlDataState, "inactive")
+            self.assertIn("运行中", self._summary_lines(bridge)[0])
 
     def test_health_sync_marks_remote_not_running_after_instance_exit(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -363,7 +411,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
             bridge._poll_remote_log()
 
             self.assertFalse(bridge.odasRunning)
-            self.assertEqual(bridge._status, "SSH 已连接，远程 odaslive 未运行")
+            self.assertEqual(bridge.controlPhase, "ssh_connected_idle")
+            self.assertEqual(bridge.controlDataState, "inactive")
+            self.assertIn("未运行", self._summary_lines(bridge)[0])
 
     def test_log_poll_exception_still_triggers_control_state_sync(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -383,7 +433,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertGreaterEqual(remote.status_calls, baseline_status_calls + 1)
             self.assertTrue(bridge.odasRunning)
-            self.assertEqual(bridge._status, "SSH 已连接，远程 odaslive 运行中")
+            self.assertEqual(bridge.controlPhase, "odas_running")
+            self.assertEqual(bridge.controlDataState, "inactive")
+            self.assertIn("运行中", self._summary_lines(bridge)[0])
 
     def test_stop_remote_odas_keeps_listener_active(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -400,7 +452,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertFalse(bridge.odasRunning)
             self.assertTrue(bridge.streamsActive)
             self.assertEqual(remote.stop_calls, 1)
-            self.assertIn("监听", bridge._status)
+            self.assertEqual(bridge.controlPhase, "streams_listening")
+            self.assertEqual(bridge.controlDataState, "listening_remote_not_running")
+            self.assertIn("监听", self._summary_lines(bridge)[0])
 
     def test_stop_remote_failure_does_not_clear_running_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -415,7 +469,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
             bridge.stopRemoteOdas()
 
             self.assertTrue(bridge.odasRunning)
-            self.assertEqual(bridge._status, "远程 odaslive 停止失败")
+            self.assertEqual(bridge.controlPhase, "error")
+            self.assertEqual(bridge.controlDataState, "unavailable")
+            self.assertIn("远程 odaslive 停止失败", self._summary_lines(bridge)[0])
 
     def test_stop_remote_keeps_running_when_status_check_loses_control_channel(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -433,7 +489,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
             self.assertTrue(bridge.odasRunning)
             self.assertFalse(bridge.remoteConnected)
             self.assertTrue(bridge.canToggleStreams)
-            self.assertEqual(bridge._status, "停止失败: 远程控制通道已断开")
+            self.assertEqual(bridge.controlPhase, "error")
+            self.assertEqual(bridge.controlDataState, "unavailable")
+            self.assertIn("停止失败: 远程控制通道已断开", self._summary_lines(bridge)[0])
 
     def test_toggle_remote_reconnects_control_channel_before_stopping_running_remote(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -471,7 +529,9 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertTrue(bridge.odasRunning)
             self.assertFalse(bridge.streamsActive)
-            self.assertEqual(bridge._status, "SSH 已连接，远程 odaslive 运行中")
+            self.assertEqual(bridge.controlPhase, "odas_running")
+            self.assertEqual(bridge.controlDataState, "inactive")
+            self.assertIn("运行中", self._summary_lines(bridge)[0])
 
     def test_can_toggle_streams_stays_true_when_control_channel_disconnects(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -487,6 +547,52 @@ class TestAppBridgeIntegration(unittest.TestCase):
 
             self.assertTrue(bridge.streamsActive)
             self.assertTrue(bridge.canToggleStreams)
+
+    def test_streams_running_sst_timeout_falls_back_to_waiting_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.status_output = "4242\n"
+
+            bridge.connectRemote()
+            bridge.startStreams()
+            bridge._on_sst({"src": [{"id": 2}], "timeStamp": 1})
+            self.assertEqual(bridge.controlDataState, "receiving_sst")
+
+            bridge._last_sst_monotonic = monotonic() - 3.0
+            bridge._apply_state_status()
+
+            self.assertEqual(bridge.controlDataState, "running_waiting_sst")
+            self.assertIn("等待 SST", self._summary_lines(bridge)[1])
+            bridge.stopStreams()
+
+    def test_on_sst_emits_receiving_state_before_metrics_refresh(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+            remote.status_output = "4242\n"
+
+            bridge.connectRemote()
+            bridge.startStreams()
+            self.assertEqual(bridge.controlDataState, "running_waiting_sst")
+
+            emitted_summaries: list[str] = []
+            bridge.controlSummaryChanged.connect(
+                lambda: emitted_summaries.append(str(bridge.controlSummary))
+            )
+
+            bridge._on_sst({"src": [{"id": 2}], "timeStamp": 1})
+
+            self.assertGreaterEqual(len(emitted_summaries), 1)
+            first_lines = emitted_summaries[0].splitlines()
+            self.assertEqual(len(first_lines), 3)
+            self.assertIn("正在接收 SST", first_lines[1])
+            self.assertEqual(bridge.controlDataState, "receiving_sst")
+            bridge.stopStreams()
 
 
 if __name__ == "__main__":

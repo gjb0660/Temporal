@@ -94,7 +94,12 @@ class TestAppBridgeRecording(unittest.TestCase):
         bridge._on_sst({"src": [{"id": 2}, {"id": 0}, {"id": 5}]})
 
         self.assertEqual(bridge.recordingSourceCount, 2)
-        self.assertIn("录制中=2", bridge._status)
+        self.assertEqual(bridge.controlPhase, "idle")
+        self.assertEqual(bridge.controlDataState, "inactive")
+        self.assertIn("Temporal 就绪", str(bridge.controlSummary))
+        self.assertIn("数据状态: 未监听", str(bridge.controlSummary))
+        self.assertIn("录制中=2", str(bridge.controlSummary))
+        self.assertEqual(str(bridge.status), str(bridge.controlSummary))
 
     def test_stop_streams_resets_recording_count(self) -> None:
         bridge = self._make_bridge()
@@ -103,7 +108,7 @@ class TestAppBridgeRecording(unittest.TestCase):
         bridge.stopStreams()
 
         self.assertEqual(bridge.recordingSourceCount, 0)
-        self.assertEqual(bridge._status, "Temporal 就绪")
+        self.assertIn("Temporal 就绪", str(bridge.controlSummary))
 
     def test_sep_audio_routes_to_mapped_sources(self) -> None:
         bridge = self._make_bridge()
@@ -197,7 +202,9 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertTrue(bridge.streamsActive)
         self.assertEqual(bridge._remote.stop_calls, 1)
         self.assertEqual(bridge._client.stop_calls, 0)
-        self.assertIn("监听", bridge._status)
+        self.assertEqual(bridge.controlPhase, "streams_listening")
+        self.assertEqual(bridge.controlDataState, "listening_remote_not_running")
+        self.assertIn("监听", str(bridge.controlSummary))
 
     def test_toggle_streams_is_independent_from_control_channel(self) -> None:
         bridge = self._make_bridge()
@@ -206,7 +213,9 @@ class TestAppBridgeRecording(unittest.TestCase):
         self.assertTrue(bridge.streamsActive)
         self.assertEqual(bridge._client.start_calls, 1)
         self.assertTrue(bridge.canToggleStreams)
-        self.assertIn("正在监听", bridge._status)
+        self.assertEqual(bridge.controlPhase, "streams_listening")
+        self.assertEqual(bridge.controlDataState, "listening_remote_not_running")
+        self.assertIn("正在监听", str(bridge.controlSummary))
 
         bridge._remote.connected = False
         bridge._refresh_remote_connection_state()

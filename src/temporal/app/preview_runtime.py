@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import monotonic
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QTimer
@@ -54,7 +55,7 @@ class PreviewClient:
 
 class PreviewRemoteController:
     def __init__(self) -> None:
-        self.connected = True
+        self.connected = False
         self.running = False
         self.log_lines = ["等待连接远程 odaslive..."]
 
@@ -122,7 +123,7 @@ class PreviewRuntime:
         self.reset_preview_sample_window()
         self.apply_scenario_metadata()
         self.refresh_preview_models(reset_chart=True)
-        bridge.setStatus(str(bridge._scenario.get("status", "Temporal 就绪")))
+        bridge._apply_state_status()
 
     def start_streams(self, was_active: bool) -> None:
         bridge = self._bridge
@@ -167,7 +168,7 @@ class PreviewRuntime:
             bridge._apply_state_status()
             return
 
-        bridge.setStatus(str(bridge._scenario.get("status", "Temporal 就绪")))
+        bridge._apply_state_status()
 
     def advance_preview_tick(self) -> None:
         bridge = self._bridge
@@ -212,10 +213,12 @@ class PreviewRuntime:
         sst = self.current_preview_sst_message()
         if not bridge._append_runtime_chart_frame(sst):
             return
+        bridge._last_sst_monotonic = monotonic()
         bridge._last_sst = sst
         bridge._refresh_sources()
         bridge._last_ssl = self.current_preview_ssl_message()
         bridge._refresh_potentials()
+        bridge._apply_state_status()
 
     def current_preview_sst_message(self) -> dict[str, Any]:
         bridge = self._bridge

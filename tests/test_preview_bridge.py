@@ -60,7 +60,11 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(len(source_positions), 1)
         self.assertEqual(source_positions[0]["id"], 15)
         self.assertEqual(bridge.recordingSessionsModel.count, 0)
-        self.assertEqual(bridge.status, "Temporal 就绪")
+        self.assertEqual(bridge.controlPhase, "idle")
+        self.assertEqual(bridge.controlDataState, "inactive")
+        self.assertIn("Temporal 就绪", str(bridge.controlSummary))
+        self.assertIn("数据状态: 未监听", str(bridge.controlSummary))
+        self.assertEqual(str(bridge.status), str(bridge.controlSummary))
         self.assertEqual(bridge.remoteLogText, "等待连接远程 odaslive...\n当前场景：参考单点")
         self.assertTrue(bridge.showPreviewScenarioSelector)
         self.assertEqual(bridge.headerNavLabelsModel.count, 3)
@@ -161,6 +165,8 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(bridge.remoteConnected)
         self.assertTrue(bridge.odasRunning)
         self.assertTrue(bridge.streamsActive)
+        self.assertEqual(bridge.controlPhase, "streams_listening")
+        self.assertEqual(bridge.controlDataState, "receiving_sst")
         self.assertIn("正在监听 SST/SSL/SSS 数据流", str(bridge.status))
 
         bridge.toggleRemoteOdas()
@@ -168,6 +174,8 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertTrue(bridge.remoteConnected)
         self.assertFalse(bridge.odasRunning)
         self.assertTrue(bridge.streamsActive)
+        self.assertEqual(bridge.controlPhase, "streams_listening")
+        self.assertEqual(bridge.controlDataState, "listening_remote_not_running")
         self.assertIn("正在监听 SST/SSL/SSS 数据流", str(bridge.status))
 
     def test_toggle_streams_is_independent_and_restart_resets_positions(self) -> None:
@@ -179,6 +187,8 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.toggleStreams()
         self.assertTrue(bridge.streamsActive)
         self.assertFalse(bridge.odasRunning)
+        self.assertEqual(bridge.controlPhase, "streams_listening")
+        self.assertEqual(bridge.controlDataState, "listening_remote_not_running")
         self.assertIn("正在监听 SST/SSL/SSS 数据流", str(bridge.status))
 
         bridge.advancePreviewTick()
@@ -188,7 +198,9 @@ class TestPreviewBridge(unittest.TestCase):
 
         bridge.toggleStreams()
         self.assertFalse(bridge.streamsActive)
-        self.assertEqual(bridge.status, "SSH 已连接，远程 odaslive 未运行")
+        self.assertEqual(bridge.controlPhase, "idle")
+        self.assertEqual(bridge.controlDataState, "inactive")
+        self.assertIn("Temporal 就绪", str(bridge.status))
 
         bridge.toggleStreams()
         self.assertEqual(_model_items(bridge.sourcePositionsModel), initial_positions)
@@ -336,6 +348,8 @@ QtObject {
     property int firstPointId: bridge.sourcePositionsModel.get(0).id
     property bool hasRemoteLog: bridge.remoteLogText.length > 0
     property bool odasStartingDefaultFalse: bridge.odasStarting === false
+    property string controlSummary: bridge.controlSummary
+    property string controlDataState: bridge.controlDataState
 }
 """,
             QUrl(),
@@ -350,6 +364,8 @@ QtObject {
         self.assertEqual(obj.property("firstPointId"), 7)
         self.assertTrue(obj.property("hasRemoteLog"))
         self.assertTrue(obj.property("odasStartingDefaultFalse"))
+        self.assertIn("Temporal 就绪", obj.property("controlSummary"))
+        self.assertEqual(obj.property("controlDataState"), "inactive")
         obj.deleteLater()
         engine.deleteLater()
         self._app.processEvents()

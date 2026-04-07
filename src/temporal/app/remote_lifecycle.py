@@ -1,8 +1,23 @@
 from __future__ import annotations
 
+from time import monotonic
 from typing import Any
 
 RemoteLifecycleBridge = Any
+
+PHASE_IDLE = "idle"
+PHASE_SSH_DISCONNECTED = "ssh_disconnected"
+PHASE_SSH_CONNECTED_IDLE = "ssh_connected_idle"
+PHASE_ODAS_STARTING = "odas_starting"
+PHASE_ODAS_RUNNING = "odas_running"
+PHASE_STREAMS_LISTENING = "streams_listening"
+PHASE_ERROR = "error"
+
+DATA_INACTIVE = "inactive"
+DATA_LISTENING_REMOTE_NOT_RUNNING = "listening_remote_not_running"
+DATA_RUNNING_WAITING_SST = "running_waiting_sst"
+DATA_RECEIVING_SST = "receiving_sst"
+DATA_UNAVAILABLE = "unavailable"
 
 
 __all__ = [
@@ -21,32 +36,60 @@ __all__ = [
     "stop_remote_odas",
     "sync_remote_odas_state",
     "toggle_remote_odas",
-    "update_stream_status",
     "verify_odas_startup",
 ]
 
 
-def update_stream_status(bridge: RemoteLifecycleBridge, prefix: str) -> None:
-    bridge.setStatus(
-        f"{prefix} | 声源={bridge.sourceCount} 候选={bridge._potential_count} "
-        f"录制中={bridge._recording_source_count}"
+def _set_control_state(
+    bridge: RemoteLifecycleBridge,
+    phase: str,
+    summary: str | None = None,
+) -> None:
+    bridge._set_control_state(
+        phase,
+        _derive_control_data_state(bridge, phase),
+        summary_override=summary,
     )
+
+
+def _derive_control_data_state(bridge: RemoteLifecycleBridge, phase: str) -> str:
+    if phase in (PHASE_ERROR, PHASE_SSH_DISCONNECTED):
+        return DATA_UNAVAILABLE
+    if not bridge._streams_active:
+        return DATA_INACTIVE
+    if phase == PHASE_ODAS_STARTING:
+        return DATA_RUNNING_WAITING_SST
+    if not bridge._odas_running:
+        return DATA_LISTENING_REMOTE_NOT_RUNNING
+    last_sst = getattr(bridge, "_last_sst_monotonic", None)
+    timeout = float(getattr(bridge, "_SST_DATA_TIMEOUT_SEC", 2.0))
+    if isinstance(last_sst, (int, float)) and (monotonic() - float(last_sst)) <= timeout:
+        return DATA_RECEIVING_SST
+    return DATA_RUNNING_WAITING_SST
+
+
+def _set_control_error(bridge: RemoteLifecycleBridge, summary: str) -> None:
+    _set_control_state(bridge, PHASE_ERROR, summary)
+
+
+def _set_control_disconnected(bridge: RemoteLifecycleBridge, summary: str) -> None:
+    _set_control_state(bridge, PHASE_SSH_DISCONNECTED, summary)
 
 
 def apply_state_status(bridge: RemoteLifecycleBridge) -> None:
     if bridge._odas_starting:
-        bridge.setStatus("远程 odaslive 启动中")
+        _set_control_state(bridge, PHASE_ODAS_STARTING)
         return
     if bridge._streams_active:
-        update_stream_status(bridge, "正在监听 SST/SSL/SSS 数据流")
+        _set_control_state(bridge, PHASE_STREAMS_LISTENING)
         return
     if bridge._odas_running:
-        bridge.setStatus("SSH 已连接，远程 odaslive 运行中")
+        _set_control_state(bridge, PHASE_ODAS_RUNNING)
         return
     if bridge._remote_connected:
-        bridge.setStatus("SSH 已连接，远程 odaslive 未运行")
+        _set_control_state(bridge, PHASE_SSH_CONNECTED_IDLE)
         return
-    bridge.setStatus("Temporal 就绪")
+    _set_control_state(bridge, PHASE_IDLE)
 
 
 def refresh_remote_connection_state(bridge: RemoteLifecycleBridge) -> bool:
@@ -63,7 +106,7 @@ def connect_remote(bridge: RemoteLifecycleBridge) -> None:
         bridge._set_remote_connected(False)
         bridge._set_odas_running(False)
         reason = humanize_control_channel_error(str(exc))
-        bridge.setStatus(reason)
+        _set_control_disconnected(bridge, reason)
         bridge._set_remote_log_lines([reason])
         return
 
@@ -77,10 +120,10 @@ def connect_remote(bridge: RemoteLifecycleBridge) -> None:
 
 def start_remote_odas(bridge: RemoteLifecycleBridge) -> None:
     if not refresh_remote_connection_state(bridge):
-        bridge.setStatus("请先连接远程 SSH")
+        _set_control_error(bridge, "请先连接远程 SSH")
         return
     if bridge._odas_starting:
-        bridge.setStatus("远程 odaslive 启动中")
+        _set_control_state(bridge, PHASE_ODAS_STARTING)
         return
 
     if not bridge._remote_connected:
@@ -98,7 +141,7 @@ def start_remote_odas(bridge: RemoteLifecycleBridge) -> None:
     except Exception as exc:
         cancel_odas_startup(bridge)
         bridge._set_odas_running(False)
-        bridge.setStatus(f"启动失败: {humanize_control_channel_error(str(exc))}")
+        _set_control_error(bridge, f"启动失败: {humanize_control_channel_error(str(exc))}")
         return
 
     poll_remote_log(bridge)
@@ -113,40 +156,40 @@ def start_remote_odas(bridge: RemoteLifecycleBridge) -> None:
     bridge._startup_attempts_remaining = bridge._STARTUP_VERIFY_ATTEMPTS
     bridge._set_odas_running(False)
     bridge._set_odas_starting(True)
-    bridge.setStatus("远程 odaslive 启动中")
+    _set_control_state(bridge, PHASE_ODAS_STARTING)
     verify_odas_startup(bridge)
 
 
 def stop_remote_odas(bridge: RemoteLifecycleBridge) -> None:
     if not refresh_remote_connection_state(bridge):
-        bridge.setStatus("SSH 未连接")
+        _set_control_error(bridge, "SSH 未连接")
         return
 
     try:
         result = bridge._remote.stop_odaslive()
     except Exception as exc:
-        bridge.setStatus(f"停止失败: {humanize_control_channel_error(str(exc))}")
+        _set_control_error(bridge, f"停止失败: {humanize_control_channel_error(str(exc))}")
         return
 
     cancel_odas_startup(bridge)
     if result.code == 0:
         running = sync_remote_odas_state(bridge, update_status=False)
         if running is None:
-            bridge.setStatus("停止失败: 远程控制通道已断开")
+            _set_control_error(bridge, "停止失败: 远程控制通道已断开")
         elif running:
-            bridge.setStatus("远程 odaslive 停止失败")
+            _set_control_error(bridge, "远程 odaslive 停止失败")
         else:
             apply_state_status(bridge)
     else:
         sync_remote_odas_state(bridge)
-        bridge.setStatus(result.stderr.strip() or "远程 odaslive 停止失败")
+        _set_control_error(bridge, result.stderr.strip() or "远程 odaslive 停止失败")
     if bridge._remote_connected:
         poll_remote_log(bridge)
 
 
 def toggle_remote_odas(bridge: RemoteLifecycleBridge) -> None:
     if bridge._odas_starting:
-        bridge.setStatus("远程 odaslive 启动中")
+        _set_control_state(bridge, PHASE_ODAS_STARTING)
         return
     if bridge._odas_running:
         if not refresh_remote_connection_state(bridge):
@@ -169,7 +212,7 @@ def sync_remote_odas_state(
     if not refresh_remote_connection_state(bridge):
         bridge._set_odas_starting(False)
         if update_status:
-            bridge.setStatus("远程控制通道已断开")
+            _set_control_disconnected(bridge, "远程控制通道已断开")
         return None
 
     try:
@@ -178,13 +221,20 @@ def sync_remote_odas_state(
         bridge._set_odas_starting(False)
         refresh_remote_connection_state(bridge)
         if update_status:
-            bridge.setStatus(humanize_control_channel_error(str(exc)))
+            reason = humanize_control_channel_error(str(exc))
+            if "断开" in reason:
+                _set_control_disconnected(bridge, reason)
+            else:
+                _set_control_error(bridge, reason)
         return None
 
     running = bool(result.stdout.strip())
     bridge._set_odas_starting(False)
     bridge._set_odas_running(running)
-    if not update_status or previous_running == running:
+    phase = getattr(bridge, "controlPhase", "")
+    if not update_status:
+        return running
+    if previous_running == running and phase in (PHASE_ERROR, PHASE_SSH_DISCONNECTED):
         return running
     apply_state_status(bridge)
     return running
@@ -302,9 +352,9 @@ def humanize_control_channel_error(reason: str) -> str:
 def set_startup_failure_status(bridge: RemoteLifecycleBridge, reason: str) -> None:
     humanized = humanize_startup_failure_reason(reason)
     if humanized.startswith("启动失败"):
-        bridge.setStatus(humanized)
+        _set_control_error(bridge, humanized)
         return
-    bridge.setStatus(f"启动失败: {humanized}")
+    _set_control_error(bridge, f"启动失败: {humanized}")
 
 
 def verify_odas_startup(bridge: RemoteLifecycleBridge) -> None:
@@ -317,7 +367,7 @@ def verify_odas_startup(bridge: RemoteLifecycleBridge) -> None:
         cancel_odas_startup(bridge)
         refresh_remote_connection_state(bridge)
         bridge._set_odas_running(False)
-        bridge.setStatus(f"启动失败: {humanize_control_channel_error(str(exc))}")
+        _set_control_error(bridge, f"启动失败: {humanize_control_channel_error(str(exc))}")
         return
 
     if result.stdout.strip():
@@ -351,7 +401,7 @@ def poll_remote_log(bridge: RemoteLifecycleBridge) -> None:
                 bridge._log_timer.stop()
             reason = humanize_control_channel_error(message)
             bridge._set_remote_log_lines([reason])
-            bridge.setStatus(reason)
+            _set_control_disconnected(bridge, reason)
             return
         bridge._set_remote_log_lines([f"日志读取失败: {message}"])
         if bridge._remote_connected and not bridge._odas_starting:

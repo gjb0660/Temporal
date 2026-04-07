@@ -121,7 +121,7 @@ Rectangle {
                                     readOnly: true
                                     wrapMode: TextArea.Wrap
                                     selectByMouse: true
-                                    text: root.appBridge.status
+                                    text: root.appBridge.controlSummary
                                     color: theme.mutedText
                                     font.pixelSize: theme.bodyFont
                                     padding: 0
