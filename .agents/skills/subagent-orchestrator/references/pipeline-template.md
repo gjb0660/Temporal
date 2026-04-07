@@ -55,7 +55,7 @@
 ## Stage Plan
 
 先列阶段清单，再按模板展开每个阶段。阶段数量不设上限，不要求固定命名。
-每个阶段收口都必须填写 lookahead 记录（可写 `none`）。
+每个阶段收口都必须填写 lookahead 记录（可写 `none` 并给理由）。
 
 ### Stage List
 
@@ -78,13 +78,13 @@ Entry Gates：
 1. `<进入条件1>`
 2. `<进入条件2>`
 
-Parallel Tasks (A/B/C ownership)：
+Parallel Tasks (A/B/C... ownership)：
 
-1. Worker 1: `<任务 + ownership>`
-2. Worker 2: `<任务 + ownership>`
-3. Worker 3: `<任务 + ownership>`
+1. Agent A: `<任务 + ownership>`
+2. Agent B: `<任务 + ownership>`
+3. Agent C: `<任务 + ownership>`
 
-说明：`A/B/C` 只是示例角色命名，也可使用 `W1..Wn`。
+说明：可按需要扩展为 `A/B/C/D/...`，不代表固定三代理上限。
 
 Convergence Gates：
 
@@ -101,7 +101,7 @@ Exit Criteria：
 
 1. `<退出门禁1>`
 2. `<退出门禁2>`
-3. `lookahead: <read-only prep list | none>`
+3. `lookahead: <read-only prep list | none with reason>`
 
 ### Cluster Block Template (Optional)
 
@@ -120,7 +120,7 @@ Cluster Close Gates：
 
 ### Lookahead Block (Required At Stage Close)
 
-每个阶段收口都必须填写。若无安全只读任务，显式记录 `none`。
+每个阶段收口都必须填写。若无安全只读任务，显式记录 `none` 并给出理由。
 
 #### Lookahead `<From-Stage>` -> `<Next-Stage>`
 
@@ -134,6 +134,7 @@ Cluster Close Gates：
 1. 只允许只读分析与证据整理。
 2. 不得修改当前阶段 ownership 文件。
 3. 不得绕过当前阶段关闭门禁。
+4. 若 `lookahead=none`，必须写明理由。
 
 ## Gates
 
@@ -208,3 +209,10 @@ Commit Mapping（按实际阶段填写）：
 4. `final-pollution-delta`
 5. `final-stage-sync`
 6. `cleanup-check`
+7. `hardening-result: pass|fail`
+8. `hardening-fail-action`（当 `hardening-result=fail` 必填）
+
+关闭规则：
+
+1. `hardening-result=fail` 时，默认阻断 final close。
+2. 必须执行修复或降级处理并复验后，才能关闭。

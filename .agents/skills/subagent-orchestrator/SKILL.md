@@ -16,8 +16,8 @@ Hard lines:
 2. serial stage gates with bounded parallel windows
 3. supervisor-only atomic stage close
 4. immediate freeze on divergence
-5. lookahead is required (record `none` explicitly when no safe read-only prep exists)
-6. final hardening is required (last stage must run high-risk simulation and close with records)
+5. lookahead is a light gate at each stage close (record `none` with reason if no safe prep exists)
+6. final hardening is a final-close gate (if fail, final close is blocked until revalidated)
 
 ## Supervisor Role
 
@@ -48,8 +48,8 @@ Prefer built-in scripts; equivalent mechanisms are allowed:
 - `scripts/run_stage_gate.py`
 - `scripts/check_pollution_baseline.py`
 
-`60-minute stability` is a supervisor capability target, not an automatic blocker.
-If unmet, record cause and remedy in final close record.
+`SLO` (Service Level Objective) here means the 60-minute stability target.
+It is a background capability target, not a close gate.
 
 ## Divergence Policy
 
