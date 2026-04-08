@@ -2,7 +2,7 @@
 title: chart-canvas
 status: active
 stability: flexible
-version: 0.6
+version: 0.7
 ---
 
 ## Role
@@ -23,7 +23,7 @@ version: 0.6
 - 当历史目录目标数超过默认调色板容量（12）时，bridge 投影层 MUST 先裁剪目录（活跃优先 + 最新历史优先），再投影到图表，MUST NOT 通过同色复用解决溢出。
 - 颜色映射 MUST 与 `sourceId` 数值范围解耦；`sourceId` MAY 继续用于标签展示，但 MUST NOT 作为颜色绑定主键。
 - bridge 颜色真源 MUST 仅来自空间目标连续性账本；MUST NOT 对历史行或历史序列回退到按 `sourceId` 重新取色。
-- 当同一空间目标在静默 `<=2.0s` 后恢复时，上游 MUST 优先复用原颜色；当静默 `>2.0s` 时，上游 MAY 复用原颜色或分配新颜色。
+- 当同一空间目标在静默 `<=16.0s`（`1600` sample）后恢复时，上游 MUST 优先复用原颜色；当静默 `>16.0s` 时，上游 MAY 复用原颜色或分配新颜色。
 - 图表画布 MUST 保持只读可视化语义，MUST NOT 默认引入缩放、平移或点选分析交互。
 - 时间轴 MUST 以 0.01s 为显示单位，并以当前连接首帧时间作为零点。
 - 运行时 SST 摄取频率与图表模型提交频率 MAY 解耦（默认 20Hz 提交）；该解耦 MUST NOT 改变 sample 语义与 `y=null` 断点语义。

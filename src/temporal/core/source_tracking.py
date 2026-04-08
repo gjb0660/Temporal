@@ -8,6 +8,7 @@ from typing import Any, Iterable, Sequence, cast
 from temporal.core.source_palette import SOURCE_COLOR_PALETTE
 
 _LOGGER = logging.getLogger(__name__)
+DEFAULT_CONTINUITY_WINDOW_SAMPLES = 1600
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,7 +168,7 @@ class SpaceTargetSession:
         self,
         *,
         palette: Sequence[str] | None = None,
-        continuity_window_samples: int = 200,
+        continuity_window_samples: int = DEFAULT_CONTINUITY_WINDOW_SAMPLES,
         angular_threshold_degrees: float = 20.0,
     ) -> None:
         provided_palette = tuple(palette or SOURCE_COLOR_PALETTE)
