@@ -1,8 +1,9 @@
 import os
 import sys
 import unittest
+from collections.abc import Callable
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -10,6 +11,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
+from temporal.app.bridge import run_with_bridge
 from temporal.app.fake_runtime import fake_app_bridge
 from temporal.main import preview_main
 from temporal.preview_bridge import PreviewBridge
@@ -36,6 +38,46 @@ def _scalar_values(model) -> list[Any]:
 
 def _source_ids(bridge: PreviewBridge) -> list[int]:
     return cast(list[int], getattr(bridge, "sourceIds"))
+
+
+class _FakeSignal:
+    def __init__(self) -> None:
+        self._callbacks: list[Callable[[], None]] = []
+
+    def connect(self, callback: Callable[[], None]) -> None:
+        self._callbacks.append(callback)
+
+    def emit(self) -> None:
+        for callback in list(self._callbacks):
+            callback()
+
+
+class _FakeQuitApp:
+    def __init__(self, *, return_code: int = 0) -> None:
+        self.aboutToQuit = _FakeSignal()
+        self._return_code = int(return_code)
+        self.exec_calls = 0
+
+    def exec(self) -> int:
+        self.exec_calls += 1
+        self.aboutToQuit.emit()
+        return self._return_code
+
+
+class _FakeQmlEngine:
+    def __init__(self) -> None:
+        self.initial_properties: dict[str, object] = {}
+        self.loaded_path = ""
+        self._roots = [object()]
+
+    def setInitialProperties(self, properties: dict[str, object]) -> None:
+        self.initial_properties = dict(properties)
+
+    def load(self, path: str) -> None:
+        self.loaded_path = str(path)
+
+    def rootObjects(self) -> list[object]:
+        return list(self._roots)
 
 
 class TestPreviewBridge(unittest.TestCase):
@@ -501,6 +543,28 @@ class TestPreviewEntrypoint(unittest.TestCase):
         qapp_cls.assert_called_once_with(sys.argv)
         bridge_cls.assert_called_once_with()
         run_with_bridge.assert_called_once_with(sentinel_bridge)
+
+    def test_run_with_bridge_stops_local_streams_on_about_to_quit_once(self) -> None:
+        fake_app = _FakeQuitApp(return_code=7)
+        fake_engine = _FakeQmlEngine()
+        bridge = MagicMock()
+
+        with (
+            patch("temporal.app.bridge.QGuiApplication") as qapp_cls,
+            patch("temporal.app.bridge.QQmlApplicationEngine", return_value=fake_engine),
+        ):
+            qapp_cls.instance.return_value = fake_app
+
+            result = run_with_bridge(bridge)
+
+        self.assertEqual(result, 7)
+        self.assertEqual(fake_app.exec_calls, 1)
+        bridge.setParent.assert_called_once_with(fake_engine)
+        self.assertEqual(fake_engine.initial_properties.get("appBridge"), bridge)
+        bridge.stopStreams.assert_called_once_with()
+
+        fake_app.aboutToQuit.emit()
+        bridge.stopStreams.assert_called_once_with()
 
 
 if __name__ == "__main__":

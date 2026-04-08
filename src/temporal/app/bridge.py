@@ -497,6 +497,20 @@ def run_with_bridge(bridge: QObject) -> int:
     app = QGuiApplication.instance()
     if app is None:
         app = QGuiApplication(sys.argv)
+
+    cleaned_up = False
+
+    def _cleanup_local_streams_on_quit() -> None:
+        nonlocal cleaned_up
+        if cleaned_up:
+            return
+        cleaned_up = True
+        stop_streams = getattr(bridge, "stopStreams", None)
+        if callable(stop_streams):
+            stop_streams()
+
+    app.aboutToQuit.connect(_cleanup_local_streams_on_quit)
+
     engine = QQmlApplicationEngine()
     bridge.setParent(engine)
     engine.setInitialProperties({"appBridge": bridge})
