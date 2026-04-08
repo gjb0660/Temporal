@@ -199,6 +199,18 @@ class TestPreviewBridge(unittest.TestCase):
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
         self.assertEqual(bridge.remoteLogText, "等待连接远程 odaslive...\n当前场景：空状态")
 
+    def test_clear_remote_log_keeps_polling_and_receives_new_preview_logs(self) -> None:
+        bridge = PreviewBridge()
+        bridge.connectRemote()
+
+        bridge.clearRemoteLog()
+        self.assertEqual(bridge.remoteLogText, "远程日志为空，等待 odaslive 输出...")
+
+        bridge._preview_remote.log_lines = ["preview new log"]
+        bridge._poll_remote_log()
+
+        self.assertEqual(bridge.remoteLogText, "preview new log")
+
     def test_toggle_remote_auto_starts_streams_and_stop_clears_both(self) -> None:
         bridge = PreviewBridge()
 

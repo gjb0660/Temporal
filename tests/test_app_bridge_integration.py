@@ -4,6 +4,7 @@ import wave
 from datetime import datetime
 from pathlib import Path
 from time import monotonic
+from unittest.mock import patch
 
 from temporal.app.bridge import AppBridge
 from temporal.app.fake_runtime import FakeClient, FakeClock, FakeRemote, fake_app_bridge
@@ -70,6 +71,8 @@ class _FakeRemoteOdasController(FakeRemote):
         if not self.connected:
             raise RuntimeError("SSH is not connected")
         self.clear_calls += 1
+        if self.clear_result.code == 0:
+            self.log_output = ""
         return self.clear_result
 
 
@@ -283,6 +286,41 @@ class TestAppBridgeIntegration(unittest.TestCase):
                     self.assertEqual(remote.clear_calls, 1)
                     self.assertEqual(bridge.remoteLogLines, ["远程日志为空，等待 odaslive 输出..."])
                     self.assertNotIn(warning_text, bridge._remote_log_lines)
+
+    def test_clear_remote_log_allows_followup_log_updates(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+
+            bridge.clearRemoteLog()
+            self.assertEqual(bridge.remoteLogLines, ["远程日志为空，等待 odaslive 输出..."])
+
+            remote.log_output = "after clear line 1\nafter clear line 2\n"
+            bridge._poll_remote_log()
+
+            self.assertEqual(bridge.remoteLogLines, ["after clear line 1", "after clear line 2"])
+
+    def test_clear_remote_log_restarts_log_timer_when_stopped(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            bridge.connectRemote()
+            remote = bridge._remote
+            self.assertIsInstance(remote, _FakeRemoteOdasController)
+
+            bridge._log_timer.stop()
+            self.assertFalse(bridge._log_timer.isActive())
+
+            with patch.object(bridge._log_timer, "start", wraps=bridge._log_timer.start) as start_spy:
+                bridge.clearRemoteLog()
+                start_spy.assert_called_once_with()
+
+            remote.log_output = "timer restored\n"
+            bridge._poll_remote_log()
+            self.assertEqual(bridge.remoteLogLines, ["timer restored"])
 
     def test_start_remote_starts_local_listeners_before_remote_launch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

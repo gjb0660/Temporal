@@ -229,7 +229,11 @@ def clear_remote_log(bridge: RemoteLifecycleBridge) -> None:
         return
 
     bridge._set_remote_log_lines([], include_warning=False)
-    apply_state_status(bridge)
+    if not bridge._log_timer.isActive():
+        bridge._log_timer.start()
+    poll_remote_log(bridge, include_warning=False)
+    if bridge._remote_connected:
+        apply_state_status(bridge)
 
 
 def sync_remote_odas_state(
@@ -416,7 +420,7 @@ def verify_odas_startup(bridge: RemoteLifecycleBridge) -> None:
         bridge._startup_timer.start()
 
 
-def poll_remote_log(bridge: RemoteLifecycleBridge) -> None:
+def poll_remote_log(bridge: RemoteLifecycleBridge, *, include_warning: bool = True) -> None:
     try:
         result = bridge._remote.read_log_tail(80)
     except Exception as exc:
@@ -427,22 +431,26 @@ def poll_remote_log(bridge: RemoteLifecycleBridge) -> None:
             if bridge._log_timer.isActive():
                 bridge._log_timer.stop()
             reason = humanize_control_channel_error(message)
-            bridge._set_remote_log_lines([reason])
+            bridge._set_remote_log_lines([reason], include_warning=include_warning)
             _set_control_disconnected(bridge, reason)
             return
-        bridge._set_remote_log_lines([f"日志读取失败: {message}"])
+        bridge._set_remote_log_lines([f"日志读取失败: {message}"], include_warning=include_warning)
         if bridge._remote_connected and not bridge._odas_starting:
             sync_remote_odas_state(bridge, update_status=True)
         return
 
     if result.code != 0 and result.stderr.strip():
-        bridge._set_remote_log_lines([f"日志读取失败: {result.stderr.strip()}"])
+        bridge._set_remote_log_lines(
+            [f"日志读取失败: {result.stderr.strip()}"], include_warning=include_warning
+        )
     else:
         lines = [line for line in result.stdout.splitlines() if line.strip()]
         if not lines:
-            bridge._set_remote_log_lines(["远程日志为空，等待 odaslive 输出..."])
+            bridge._set_remote_log_lines(
+                ["远程日志为空，等待 odaslive 输出..."], include_warning=include_warning
+            )
         else:
-            bridge._set_remote_log_lines(lines)
+            bridge._set_remote_log_lines(lines, include_warning=include_warning)
 
     if bridge._remote_connected and not bridge._odas_starting:
         sync_remote_odas_state(bridge, update_status=True)

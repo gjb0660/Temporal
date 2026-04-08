@@ -22,6 +22,7 @@ version: 0.4
 - 状态区 MUST 只呈现摘要与计数语义；不用原始 shell 细节替代状态说明。
 - 清空日志动作 MUST 通过 `appBridge.clearRemoteLog()` 路由；UI MUST NOT 在远端确认成功前主动清空日志显示。
 - 清空日志成功后，日志区 MUST 回到统一空态占位；MUST NOT 继续展示本地录音采样率 warning。
+- 清空日志成功后，日志区 MUST 继续绑定既有轮询投影链路；新增远端日志到达时 MUST 继续刷新显示。
 - 日志区 MUST 保留 shell 详细日志。
 - 日志文本 MUST 支持滚动、换行和复制，以便用户持续观察远端运行反馈。
 
