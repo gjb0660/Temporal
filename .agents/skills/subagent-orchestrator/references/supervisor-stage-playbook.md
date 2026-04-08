@@ -18,7 +18,7 @@ For each stage:
 1. Serial stage freeze.
 2. Parallel execution window.
 3. Serial convergence review.
-4. Supervisor atomic stage commit.
+4. Supervisor stage close through `$converge-commit` atomic submit.
 5. Stage-sync checkpoint.
 6. Next-stage admission.
 
@@ -58,17 +58,49 @@ Pass when all commands pass, no ownership violation, no incremental pollution.
 4. Spec/docs consistency checks if stage changed them.
 5. Pollution delta check against stage-entry baseline.
 
-Pass when all required checks pass, no unresolved critical findings, no incremental pollution.
+Pass when all required checks pass, no unresolved critical findings, no incremental pollution,
+and all primary stage-close gates in `Stage-Close Output Contract (SSOT)` are `pass`.
 
 ### Mandatory Stage Close Checklist
 
 1. Acceptance mapping submitted per agent.
 2. Pollution report generated.
-3. Ownership overlap scan completed.
-4. Supervisor semantic review completed.
-5. Atomic commit completed.
-6. Stage-sync checkpoint completed.
-7. Lookahead recorded (`tasks` or `none` with reason).
+3. Delegation admission snapshot recorded
+   (`source/category/stage/sync-risk/delegation`).
+4. Ownership overlap scan completed.
+5. Supervisor semantic review completed.
+6. Stage close completed through `$converge-commit` atomic submit.
+7. Stage-sync checkpoint completed.
+8. Lookahead recorded (`tasks` or `none` with reason).
+
+## Stage-Close Output Contract (SSOT)
+
+Use this as the only output contract at stage close.
+
+Required primary status block:
+
+1. `source`
+2. `category`
+3. `stage`
+4. `sync-risk`
+5. `delegation`
+6. `semantic-gate`
+7. `pollution-gate`
+8. `static-gate`
+9. `atomic-submit`
+10. `cleanup`
+
+Required appendix record:
+
+1. `task-slice`
+2. `acceptance-mapping`
+3. `pollution-check`
+4. `ownership-check`
+5. `atomic-commit-summary`
+6. `stage-sync`
+7. `remaining-risk`
+8. `divergence-events`
+9. `lookahead`
 
 ## Divergence and Freeze
 
@@ -88,17 +120,12 @@ Freeze flow:
 
 ## Execution Record Minimum
 
-Record at stage close:
+Record the full SSOT payload at stage close:
 
-1. stage id and task slice
-2. acceptance mapping
-3. pollution check result and delta
-4. gate results (fast/full)
-5. ownership check result
-6. atomic commit summary
-7. stage-sync result
-8. unresolved risks
-9. divergence-events (or `none`)
+1. include all required primary status fields
+2. include all required appendix record fields
+3. do not add alias names for SSOT fields
+4. do not add appendix fields that restate primary gate outcomes
 
 ## High-Risk Simulation Record
 
@@ -115,14 +142,15 @@ For each scenario `R*`, record:
 
 Record at final close:
 
+same names as SSOT primary status block plus:
+
 1. stability-slo-window-minutes
 2. uncontrolled-drift-events
-3. final-gate
-4. final-pollution-delta
-5. final-stage-sync
-6. cleanup-check
-7. hardening-result: pass|fail
-8. hardening-fail-action (required when hardening-result=fail)
+3. final-pollution-delta
+4. final-stage-sync
+5. final-remaining-risk
+6. hardening-result: pass|fail
+7. hardening-fail-action (required when hardening-result=fail)
 
 Final-close gate:
 

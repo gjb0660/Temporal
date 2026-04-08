@@ -20,6 +20,7 @@
 - ownership 切片原则：`<按文件/模块/子域>`
 - 约束：`<例如 不改QML/不新增测试/仅backend>`
 - 阶段门禁来源：`<feature/specs/contracts>`
+- delegation 准入快照：`source/category/stage/sync-risk/delegation`
 
 ## Global Contract
 
@@ -31,7 +32,7 @@
 
 1. 阶段启动前冻结（目标、ownership、门禁、提交策略）。
 2. 阶段收敛评审（semantic + pollution）。
-3. supervisor 原子提交。
+3. 通过 `$converge-commit` 完成 stage close 原子提交。
 4. stage-sync checkpoint。
 5. 下一阶段准入判定。
 
@@ -163,8 +164,8 @@ Failure Handling：
 
 使用规则式提交策略，不固定提交笔数。
 
-- 主阶段策略：`one atomic commit per main stage`
-- 集群阶段策略：`one atomic commit per approved stage cluster`
+- 主阶段策略：`main stage close must converge through $converge-commit before atomic submit`
+- 集群阶段策略：`approved cluster close must converge through $converge-commit before atomic submit`
 
 Commit Mapping（按实际阶段填写）：
 
@@ -179,17 +180,36 @@ Commit Mapping（按实际阶段填写）：
 
 ### Stage Record Template
 
-每个阶段/集群至少记录：
+主契约块（required）：
+
+1. `source`
+2. `category`
+3. `stage`
+4. `sync-risk`
+5. `delegation`
+6. `semantic-gate`
+7. `pollution-gate`
+8. `static-gate`
+9. `atomic-submit`
+10. `cleanup`
+
+附录块（required）：
 
 1. `task-slice`
-2. `red-findings`
-3. `green-fixes`
-4. `refactor-cleanups`
-5. `acceptance-mapping`
-6. `pollution-check`
-7. `atomic-commit-summary`
-8. `stage-sync-check`
-9. `cleanup-check`
+2. `acceptance-mapping`
+3. `pollution-check`
+4. `ownership-check`
+5. `atomic-commit-summary`
+6. `stage-sync`
+7. `remaining-risk`
+8. `divergence-events`
+9. `lookahead`
+
+可选执行痕迹（optional）：
+
+1. `red-findings`
+2. `green-fixes`
+3. `refactor-cleanups`
 
 ### High-Risk Simulation (Mandatory Final Round)
 
@@ -203,14 +223,28 @@ Commit Mapping（按实际阶段填写）：
 
 最终收口必须填写：
 
+主契约块（required）：
+
+1. `source`
+2. `category`
+3. `stage`
+4. `sync-risk`
+5. `delegation`
+6. `semantic-gate`
+7. `pollution-gate`
+8. `static-gate`
+9. `atomic-submit`
+10. `cleanup`
+
+附录块（required）：
+
 1. `stability-slo-window-minutes`
 2. `uncontrolled-drift-events`
-3. `final-gate`
-4. `final-pollution-delta`
-5. `final-stage-sync`
-6. `cleanup-check`
-7. `hardening-result: pass|fail`
-8. `hardening-fail-action`（当 `hardening-result=fail` 必填）
+3. `final-pollution-delta`
+4. `stage-sync`
+5. `remaining-risk`
+6. `hardening-result: pass|fail`
+7. `hardening-fail-action`（当 `hardening-result=fail` 必填）
 
 关闭规则：
 

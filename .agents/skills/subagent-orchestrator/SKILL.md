@@ -14,10 +14,19 @@ Hard lines:
 
 1. strict ownership boundaries
 2. serial stage gates with bounded parallel windows
-3. supervisor-only atomic stage close
+3. main stage or approved cluster close through `$converge-commit` atomic submit
 4. immediate freeze on divergence
 5. lookahead is a light gate at each stage close (record `none` with reason if no safe prep exists)
 6. final hardening is a final-close gate (if fail, final close is blocked until revalidated)
+
+## Boundary With Minimal ESPC
+
+`$minimal-espc` decides whether delegated mode is enabled.
+This skill executes multi-agent orchestration only after delegation is on.
+Use `$minimal-espc` admission status block as input:
+`source/category/stage/sync-risk/delegation`.
+Do not redefine delegated trigger rules here
+(`cross-layer + contract/Acceptance`) to avoid parallel decision sources.
 
 ## Supervisor Role
 
@@ -26,8 +35,8 @@ Main duties:
 
 1. freeze objective, constraints, ownership, and admission gates
 2. open/close parallel windows and arbitrate conflicts serially
-3. run gate/pollution evaluation and stage-sync checkpoints
-4. close each main stage with one atomic commit
+3. run gate, pollution, and stage-sync evaluation
+4. execute stage close according to hard line #3
 
 ## Worker Handoff
 
@@ -43,6 +52,12 @@ Avoid passing full orchestration narrative unless required.
 ## Gates, Tools, and SLO
 
 Use `fast` (in-stage) and `full` (stage-close) gates with baseline-exempt pollution checks.
+Stage-close field names and pass/fail semantics are defined only in
+[Stage-Close Output Contract (SSOT)](references/supervisor-stage-playbook.md#stage-close-output-contract-ssot).
+Do not restate gate field lists in this file.
+
+`fast/full` are execution profiles, not replacement terms for final pass/fail semantics.
+
 Prefer built-in scripts; equivalent mechanisms are allowed:
 
 - `scripts/run_stage_gate.py`
@@ -68,6 +83,10 @@ Before publishing updates, verify supervisor rules and worker card remain aligne
 2. pass/fail semantics
 3. divergence behavior
 4. ownership language
+5. output contract source
+   ([Stage-Close Output Contract (SSOT)](references/supervisor-stage-playbook.md#stage-close-output-contract-ssot) only)
+6. appendix records stay evidence-only
+   (no primary-field aliases or derived gate-summary fields)
 
 ## References
 

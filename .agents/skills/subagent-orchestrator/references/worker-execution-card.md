@@ -33,14 +33,16 @@ Return exactly these sections:
 
 1. `acceptance-mapping`
 2. `pollution-check`
-3. `unresolved-risks`
-4. `evidence-summary`
+3. `ownership-check`
+4. `remaining-risk`
+5. `evidence-summary`
 
 Recommended minimal content:
 
 - `acceptance-mapping`: criterion -> proof
 - `pollution-check`: pass/fail + delta summary
-- `unresolved-risks`: none or concise list
+- `ownership-check`: pass/fail + overlap notes
+- `remaining-risk`: none or concise list
 - `evidence-summary`: changed files + gate/test outcomes
 
 ## Escalation Trigger
