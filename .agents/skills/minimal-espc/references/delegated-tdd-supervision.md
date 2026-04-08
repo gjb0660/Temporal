@@ -45,6 +45,7 @@ When `delegation: on`, completion requires all conditions:
 
 - `semantic-gate: pass`
 - `pollution-gate: pass`
+- `static-gate: pass`
 - `atomic-submit: pass`
 - `cleanup: pass`
 

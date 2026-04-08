@@ -11,7 +11,7 @@ Agents MUST load and follow `$minimal-espc` before:
 
 Repository-specific constraints remain in `.github/copilot-instructions.md`.
 
-For staged-diff review and pre-commit convergence,
-agents SHOULD use `$converge-commit` as the required code-last workflow.
+For requests that explicitly target staged review or pre-commit convergence,
+agents SHOULD use `$converge-commit` as the default code-last workflow.
 
 Do not create parallel workflow rules outside the skill.
