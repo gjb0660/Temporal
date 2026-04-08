@@ -79,12 +79,21 @@ Return a compact status block:
 - `sync-risk`: yes / no
 - `delegation`: on / off
 
+For `code` and `review` stage reporting, use the same unified gate block:
+
+- `semantic-gate`: pass / fail
+- `pollution-gate`: pass / fail
+- `static-gate`: pass / fail
+- `atomic-submit`: pass / fail
+- `cleanup`: pass / fail
+
 If `delegation` is `on`,
 state additional compact status block for each subagent:
 
 - `workspace`: shared / isolated-worktree
 - `semantic-gate`: pass / fail
 - `pollution-gate`: pass / fail
+- `static-gate`: pass / fail
 - `atomic-submit`: pass / fail
 - `cleanup`: pass / fail
 
