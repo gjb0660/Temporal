@@ -316,6 +316,10 @@ class AppBridge(QObject):
         remote_lifecycle.toggle_remote_odas(self)
 
     @qt_slot()
+    def clearRemoteLog(self) -> None:
+        remote_lifecycle.clear_remote_log(self)
+
+    @qt_slot()
     def startStreams(self) -> None:
         stream_projection.start_streams(self)
 
@@ -428,8 +432,8 @@ class AppBridge(QObject):
     def _set_recording_source_count(self, value: int) -> None:
         status_state.set_recording_source_count(self, value)
 
-    def _set_remote_log_lines(self, lines: list[str]) -> None:
-        status_state.set_remote_log_lines(self, lines)
+    def _set_remote_log_lines(self, lines: list[str], *, include_warning: bool = True) -> None:
+        status_state.set_remote_log_lines(self, lines, include_warning=include_warning)
 
     def _set_recording_sessions(self, sessions: list[str]) -> None:
         recording_audio.set_recording_sessions(self, sessions)

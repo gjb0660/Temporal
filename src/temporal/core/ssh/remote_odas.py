@@ -532,6 +532,14 @@ temporal_log_tail() {
     fi
 }
 
+temporal_log_clear() {
+    resolve_runtime_paths >/dev/null 2>&1 || return 1
+    if ! : > "$resolved_log"; then
+        printf "failed to clear log file %s\n" "$resolved_log" >&2
+        return 1
+    fi
+}
+
 temporal_run() {
     request_id="$1"
     shift
@@ -801,3 +809,6 @@ temporal_run() {
     def read_log_tail(self, lines: int = 80) -> CommandResult:
         safe_lines = str(max(1, min(lines, 200)))
         return self._run_shell_function("temporal_log_tail", safe_lines)
+
+    def clear_log(self) -> CommandResult:
+        return self._run_shell_function("temporal_log_clear")

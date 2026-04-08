@@ -3,7 +3,7 @@ title: remote-control
 tracker: primary-feature
 status: active
 owner: codex/core
-updated: 2026-03-31
+updated: 2026-04-08
 ---
 
 ## Goal
@@ -23,6 +23,7 @@ updated: 2026-03-31
 - rootless 环境下 `/proc/$pid/cwd` 与 `/proc/$pid/exe` 不能作为稳定门控。
 - 远端运行态主真值模型已收敛为 pid-only。
 - 在 pid-only 下，无 `odaslive.pid` 的存量进程不会被自动接管。
+- 远端日志清空必须以远端文件截断成功为前置，UI 不能先行清空。
 
 ## Decision
 
@@ -33,6 +34,8 @@ updated: 2026-03-31
 - `temporal_stop` 先按进程组停止，失败回退按 pid 停止；仅在确认停止后清理 pid 文件。
 - 将监听按钮与远端启动按钮拆为不同控制语义，避免错误耦合。
 - 日志读取异常但控制通道存活时，仍需继续执行状态同步收敛。
+- 远端日志清空通过控制通道执行原地截断；仅当远端返回成功时才更新 UI 为空日志。
+- 远端日志清空成功后，日志区应仅保留空态占位；本地注入 warning 不应残留在日志区。
 
 ## Acceptance
 
@@ -41,6 +44,7 @@ updated: 2026-03-31
 3. 本地监听启停不会隐式停止远端 odaslive 或断开 SSH。
 4. `temporal_start` 在 pid 文件持久化失败时必须显式失败，不允许静默成功。
 5. 日志读取异常（非断链）场景下，控制状态仍会同步收敛，避免按钮误回退。
+6. “清空日志”操作在远端截断失败时必须保留原日志内容，并给出失败状态。
 
 ## Plan
 
@@ -56,6 +60,7 @@ updated: 2026-03-31
 - [x] 已固化 pid-only 真值模型：pid 文件存在、数字校验通过，且 `kill -0` 成功。
 - [x] 已完成 start 的 pid 持久化失败显式报错与 stop 的清理时序约束。
 - [x] 已完成日志读取异常路径的状态同步收敛补强。
+- [x] 已新增远端日志清空语义：远端成功后再清空 UI，失败保留原日志。
 - [x] 已确认远端运行验证与重连风险属于 remote-control owner。
 
 ## Todo

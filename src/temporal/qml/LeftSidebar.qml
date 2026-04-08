@@ -80,6 +80,21 @@ Rectangle {
                                 }
                             }
                         }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Item {
+                                Layout.fillWidth: true
+                            }
+
+                            AppActionButton {
+                                theme: root.theme
+                                text: "清空日志"
+                                onClicked: root.appBridge.clearRemoteLog()
+                            }
+                        }
                     }
                 }
 

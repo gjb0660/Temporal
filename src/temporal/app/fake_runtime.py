@@ -99,6 +99,11 @@ class FakeRemote:
         stdout = "odaslive ready\n" if self.running else "connected\n"
         return CommandResult(code=0, stdout=stdout, stderr="")
 
+    def clear_log(self) -> CommandResult:
+        if not self.connected:
+            raise RuntimeError("SSH is not connected")
+        return CommandResult(code=0, stdout="", stderr="")
+
     def recording_sample_rates(self) -> dict[str, int]:
         return dict(self.sample_rates)
 

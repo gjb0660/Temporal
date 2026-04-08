@@ -112,10 +112,11 @@ def set_recording_source_count(bridge: Any, value: int) -> None:
     refresh_control_summary(bridge)
 
 
-def set_remote_log_lines(bridge: Any, lines: list[str]) -> None:
+def set_remote_log_lines(bridge: Any, lines: list[str], *, include_warning: bool = True) -> None:
     clean_lines = lines[-120:] if lines else ["远程日志为空，等待 odaslive 输出..."]
     if (
-        bridge._recording_sample_rate_warning
+        include_warning
+        and bridge._recording_sample_rate_warning
         and bridge._recording_sample_rate_warning not in clean_lines
     ):
         clean_lines = [*clean_lines, bridge._recording_sample_rate_warning][-120:]

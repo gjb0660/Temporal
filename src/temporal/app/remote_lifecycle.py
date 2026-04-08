@@ -24,6 +24,7 @@ __all__ = [
     "RemoteLifecycleBridge",
     "apply_state_status",
     "cancel_odas_startup",
+    "clear_remote_log",
     "connect_remote",
     "humanize_control_channel_error",
     "humanize_startup_failure_reason",
@@ -203,6 +204,32 @@ def toggle_remote_odas(bridge: RemoteLifecycleBridge) -> None:
         if not bridge._remote_connected:
             return
     start_remote_odas(bridge)
+
+
+def clear_remote_log(bridge: RemoteLifecycleBridge) -> None:
+    if not refresh_remote_connection_state(bridge):
+        _set_control_disconnected(bridge, "SSH 未连接")
+        return
+
+    try:
+        result = bridge._remote.clear_log()
+    except Exception as exc:
+        refresh_remote_connection_state(bridge)
+        reason = humanize_control_channel_error(str(exc))
+        summary = f"清空远程日志失败: {reason}"
+        if "断开" in reason:
+            _set_control_disconnected(bridge, summary)
+        else:
+            _set_control_error(bridge, summary)
+        return
+
+    if result.code != 0:
+        reason = result.stderr.strip() or "远程日志清空失败"
+        _set_control_error(bridge, f"清空远程日志失败: {reason}")
+        return
+
+    bridge._set_remote_log_lines([], include_warning=False)
+    apply_state_status(bridge)
 
 
 def sync_remote_odas_state(

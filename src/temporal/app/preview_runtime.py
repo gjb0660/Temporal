@@ -79,6 +79,10 @@ class PreviewRemoteController:
     def read_log_tail(self, _lines: int = 80) -> CommandResult:
         return CommandResult(code=0, stdout="\n".join(self.log_lines), stderr="")
 
+    def clear_log(self) -> CommandResult:
+        self.log_lines = []
+        return CommandResult(code=0, stdout="", stderr="")
+
 
 def build_preview_config() -> TemporalConfig:
     remote = RemoteOdasConfig(
