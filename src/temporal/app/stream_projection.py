@@ -49,7 +49,10 @@ class StreamProjectionBridge(Protocol):
     _potential_max: float
     _potential_count: int
     _recording_source_count: int
-    _recording_sessions: list[str]
+    _recording_sessions: list[dict[str, Any]]
+    _recording_recent_closed_by_target: dict[int, list[dict[str, Any]]]
+    _recording_active_sessions_by_key: dict[tuple[int, str, str], tuple[int, dict[str, Any]]]
+    _recording_session_target_by_key: dict[tuple[int, str, str], int]
     _recording_sample_rate_warning: str
     _streams_active: bool
     _last_sst_monotonic: float | None
@@ -148,6 +151,7 @@ def stop_streams(bridge: StreamProjectionBridge) -> None:
     reset_runtime_chart_clock(bridge)
     status_state.set_streams_active(bridge, False)
     status_state.set_recording_source_count(bridge, 0)
+    recording_audio.reset_recording_runtime_state(bridge)
     recording_audio.set_recording_sessions(bridge, [])
     remote_lifecycle.apply_state_status(bridge)
 

@@ -4,6 +4,8 @@ from typing import Any
 
 from .status_state import set_recording_source_count, set_remote_log_lines
 
+_RECENT_CLOSED_LIMIT = 2
+
 
 def sync_recording_state_from_sources(bridge: Any, source_ids: list[int]) -> None:
     update_source_channel_map(bridge, source_ids)
@@ -90,16 +92,100 @@ def refresh_recording_sessions(bridge: Any) -> None:
         set_recording_sessions(bridge, [])
         return
 
-    items = [f"Source {item.source_id} [{item.mode}] {item.filepath.name}" for item in sessions]
+    active_by_key: dict[tuple[int, str, str], tuple[int, dict[str, Any]]] = {}
+    source_target_alias = {
+        int(source_id): int(target_id)
+        for source_id, target_id in bridge._runtime_source_target_alias.items()
+    }
+    valid_target_ids = {int(target_id) for target_id in bridge._runtime_catalog_by_target}
+    for item in sessions:
+        key = _session_key(item)
+        source_id = int(item.source_id)
+        target_id = bridge._recording_session_target_by_key.get(
+            key,
+            source_target_alias.get(source_id),
+        )
+        if target_id is None:
+            continue
+        active_by_key[key] = (int(target_id), _session_detail(item))
+
+    previous_active = dict(bridge._recording_active_sessions_by_key)
+    for key in set(previous_active) - set(active_by_key):
+        target_id, detail = previous_active[key]
+        if int(target_id) not in valid_target_ids:
+            continue
+        recent = list(bridge._recording_recent_closed_by_target.get(int(target_id), []))
+        recent.insert(0, detail)
+        bridge._recording_recent_closed_by_target[int(target_id)] = recent[:_RECENT_CLOSED_LIMIT]
+
+    bridge._recording_active_sessions_by_key = active_by_key
+    bridge._recording_session_target_by_key = {
+        key: int(target_id) for key, (target_id, _detail) in active_by_key.items()
+    }
+    prune_recording_target_caches(bridge, valid_target_ids)
+
+    grouped_active: dict[int, list[dict[str, Any]]] = {}
+    for target_id, detail in active_by_key.values():
+        grouped_active.setdefault(int(target_id), []).append(detail)
+
+    items: list[dict[str, Any]] = []
+    for target_id in sorted(valid_target_ids):
+        active_details = sorted(
+            grouped_active.get(target_id, []),
+            key=lambda item: (int(item["sourceId"]), str(item["filename"])),
+        )
+        recent_details = list(bridge._recording_recent_closed_by_target.get(target_id, []))
+        if not active_details and not recent_details:
+            continue
+        details = [*active_details, *recent_details]
+        summary_source_id = int(details[0]["sourceId"])
+        details_text = "\n".join(str(item["line"]) for item in details)
+        items.append(
+            {
+                "targetId": int(target_id),
+                "summary": (
+                    f"Target {int(target_id)} | "
+                    f"Source {summary_source_id} | "
+                    f"files: {len(active_details)}"
+                ),
+                "details": details_text,
+                "hasActive": bool(active_details),
+            }
+        )
     set_recording_sessions(bridge, items)
 
 
-def set_recording_sessions(bridge: Any, sessions: list[str]) -> None:
+def set_recording_sessions(bridge: Any, sessions: list[dict[str, Any]]) -> None:
     if bridge._recording_sessions == sessions:
         return
     bridge._recording_sessions = sessions
     bridge.recordingSessionsChanged.emit()
     bridge._recording_sessions_model.replace(sessions)
+
+
+def prune_recording_target_caches(bridge: Any, valid_target_ids: set[int]) -> None:
+    valid_ids = {int(target_id) for target_id in valid_target_ids}
+    bridge._recording_recent_closed_by_target = {
+        int(target_id): list(items)[:_RECENT_CLOSED_LIMIT]
+        for target_id, items in bridge._recording_recent_closed_by_target.items()
+        if int(target_id) in valid_ids
+    }
+    bridge._recording_active_sessions_by_key = {
+        key: (int(target_id), dict(detail))
+        for key, (target_id, detail) in bridge._recording_active_sessions_by_key.items()
+        if int(target_id) in valid_ids
+    }
+    bridge._recording_session_target_by_key = {
+        key: int(target_id)
+        for key, target_id in bridge._recording_session_target_by_key.items()
+        if int(target_id) in valid_ids
+    }
+
+
+def reset_recording_runtime_state(bridge: Any) -> None:
+    bridge._recording_recent_closed_by_target = {}
+    bridge._recording_active_sessions_by_key = {}
+    bridge._recording_session_target_by_key = {}
 
 
 def apply_recording_sample_rates(bridge: Any) -> None:
@@ -126,8 +212,28 @@ def apply_recording_sample_rates(bridge: Any) -> None:
         bridge._recording_sample_rate_warning = ""
 
 
+def _session_key(item: Any) -> tuple[int, str, str]:
+    return (
+        int(item.source_id),
+        str(item.mode),
+        str(item.filepath.name),
+    )
+
+
+def _session_detail(item: Any) -> dict[str, Any]:
+    source_id = int(item.source_id)
+    filename = str(item.filepath.name)
+    return {
+        "sourceId": source_id,
+        "filename": filename,
+        "line": filename,
+    }
+
+
 __all__ = [
     "apply_recording_sample_rates",
+    "prune_recording_target_caches",
+    "reset_recording_runtime_state",
     "refresh_recording_sessions",
     "route_audio_chunk",
     "set_recording_sessions",

@@ -98,7 +98,12 @@ class AppBridge(QObject):
         self._recording_sample_rate_warning = ""
         self._potential_count = 0
         self._recording_source_count = 0
-        self._recording_sessions: list[str] = []
+        self._recording_sessions: list[dict[str, Any]] = []
+        self._recording_recent_closed_by_target: dict[int, list[dict[str, Any]]] = {}
+        self._recording_active_sessions_by_key: dict[
+            tuple[int, str, str], tuple[int, dict[str, Any]]
+        ] = {}
+        self._recording_session_target_by_key: dict[tuple[int, str, str], int] = {}
         self._sources_enabled = True
         self._potentials_enabled = False
         self._potential_min = 0.0
@@ -159,7 +164,9 @@ class AppBridge(QObject):
         self._preview_scenario_options_model = QmlListModel(["key", "label"], self)
         self._chart_window_model = QmlListModel(["value"], self)
         self._header_nav_labels_model = QmlListModel(["value"], self)
-        self._recording_sessions_model = QmlListModel(["value"], self)
+        self._recording_sessions_model = QmlListModel(
+            ["targetId", "summary", "details", "hasActive"], self
+        )
 
         self._preview_scenario_options_model.replace([])
         self._chart_window_model.replace(self._RUNTIME_CHART_X_TICKS)
@@ -435,7 +442,7 @@ class AppBridge(QObject):
     def _set_remote_log_lines(self, lines: list[str], *, include_warning: bool = True) -> None:
         status_state.set_remote_log_lines(self, lines, include_warning=include_warning)
 
-    def _set_recording_sessions(self, sessions: list[str]) -> None:
+    def _set_recording_sessions(self, sessions: list[dict[str, Any]]) -> None:
         recording_audio.set_recording_sessions(self, sessions)
 
     def _set_source_positions(self, positions: list[dict[str, float | int]]) -> None:

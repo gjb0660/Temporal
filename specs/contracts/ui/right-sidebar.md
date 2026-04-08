@@ -2,7 +2,7 @@
 title: right-sidebar
 status: active
 stability: flexible
-version: 0.3
+version: 0.5
 ---
 
 ## Role
@@ -20,6 +20,13 @@ version: 0.3
 - 当同一空间目标在连续性窗口内以新 `sourceId` 重现时，右栏 MUST 合并为同一行，并以最新 `sourceId` 展示；旧 `sourceId` 行 MUST NOT 并存。
 - 声源行的 `active` 判定 MUST 基于 `targetId`，MUST NOT 由展示 `sourceId` 反推，以避免 `sourceId` 漂移或复用时误亮历史行。
 - 当没有活动声源或没有活跃录音会话时，右栏 MUST 显示稳定空态文案，MUST NOT 伪造占位列表项。
+- 录音会话摘要 MUST 按 `targetId` 分组；每个 target MUST 仅显示一行摘要。
+- 录音会话摘要格式 MUST 为 `Target <id> | Source <source_id> | files: <n>`。
+- 摘要 `<n>` MUST 仅统计当前活跃会话；MUST NOT 将最近结束会话混入摘要统计。
+- 摘要中的 `source_id` MUST 优先来自活跃会话；当无活跃会话时，MUST 来自最近结束会话中的最新 source。
+- 录音会话摘要 MUST NOT 展示 mode token。
+- 录音会话详情 MUST 通过悬停提示显示，且逐行遵循 `<filename>`。
+- 悬停详情 MAY 包含最近结束会话；当 target 仅有最近结束会话时，摘要 MUST 显示 `Target <id> | Source <source_id> | files: 0`。
 - 声源 badge 的颜色和标签 MUST 忠实反映 bridge 输出，MUST NOT 在右栏本地推导另一套身份语义。
 - 在 `1600` 样本历史窗口内，右栏行之间的 badge 颜色 MUST 唯一；当历史目标数量超过默认调色板容量（12）时，bridge 投影层 MUST 优先保留活跃目标，并按 `lastSample` 保留最新非活跃历史行，淘汰最旧非活跃历史行。
 - 筛选器开关和能量范围控件 MUST 继续通过现有 bridge 接口路由，右栏 MUST NOT 在本地重建筛选状态真源。
@@ -31,6 +38,7 @@ version: 0.3
 - 行高、分隔线、字号和分区间距 MAY 演进，只要三段层级仍然稳定且易于扫描。
 - 空态文案 MAY 调整，但空态必须继续表达“当前无可展示对象”，而不是技术错误。
 - 录音会话展示方式 MAY 演进为更丰富的摘要，但其只读信息面板语义 MUST 保持。
+- 录音会话摘要行 MAY 自动换行（wrap），但分组语义与摘要字段语义 MUST 保持不变。
 - preview 自检区正文字体 MAY 调整，但 MUST 保持“小字号可读、不过度抢占右栏标题层级”。
 
 ## Rationale

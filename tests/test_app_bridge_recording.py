@@ -24,8 +24,8 @@ class _FakeRecorder(FakeRecorder):
         self.sample_rates: dict[str, int] = {"sp": 16000, "pf": 16000}
 
     def update_active_sources(self, source_ids) -> None:
-        self._active = {int(source_id) for source_id in source_ids if int(source_id) > 0}
-        for source_id in self._active:
+        next_active = {int(source_id) for source_id in source_ids if int(source_id) > 0}
+        for source_id in next_active:
             self._sessions[(source_id, "sp")] = _Session(
                 source_id=source_id,
                 mode="sp",
@@ -36,6 +36,12 @@ class _FakeRecorder(FakeRecorder):
                 mode="pf",
                 filepath=Path(f"ODAS_{source_id}_pf.wav"),
             )
+        for source_id in list(self._active):
+            if source_id in next_active:
+                continue
+            self._sessions.pop((source_id, "sp"), None)
+            self._sessions.pop((source_id, "pf"), None)
+        self._active = next_active
 
     def sweep_inactive(self):
         return []
@@ -44,6 +50,8 @@ class _FakeRecorder(FakeRecorder):
         return set(self._active)
 
     def push(self, source_id: int, mode: str, pcm_chunk: bytes) -> None:
+        if (int(source_id), str(mode)) not in self._sessions:
+            return
         self.pushed.append((source_id, mode, pcm_chunk))
 
     def stop_all(self) -> None:
@@ -87,6 +95,9 @@ class TestAppBridgeRecording(unittest.TestCase):
             remote_cls=FakeRemote,
             recorder_cls=_FakeRecorder,
         )
+
+    def _target_id_for_source(self, bridge: AppBridge, source_id: int) -> int:
+        return int(bridge._runtime_source_target_alias.get(int(source_id), 0))
 
     def test_sst_updates_recording_count(self) -> None:
         bridge = self._make_bridge()
@@ -147,15 +158,58 @@ class TestAppBridgeRecording(unittest.TestCase):
     def test_recording_sessions_updates_on_sst_and_stop(self) -> None:
         bridge = self._make_bridge()
 
-        bridge._on_sst({"src": [{"id": 2}]})
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
 
-        self.assertEqual(len(bridge._recording_sessions), 2)
-        self.assertTrue(any("Source 2 [sp]" in item for item in bridge._recording_sessions))
-        self.assertTrue(any("Source 2 [pf]" in item for item in bridge._recording_sessions))
+        self.assertEqual(len(bridge._recording_sessions), 1)
+        session_row = bridge._recording_sessions[0]
+        target_id = int(session_row.get("targetId", 0))
+        self.assertGreater(target_id, 0)
+        self.assertEqual(
+            str(session_row.get("summary", "")),
+            f"Target {target_id} | Source 2 | files: 2",
+        )
+        details = str(session_row.get("details", ""))
+        self.assertNotIn("Source ", details)
+        self.assertIn("ODAS_2_sp.wav", details)
+        self.assertIn("ODAS_2_pf.wav", details)
+        self.assertTrue(bool(session_row.get("hasActive")))
+
+        bridge._on_sst({"timeStamp": 19, "src": []})
+        self.assertEqual(len(bridge._recording_sessions), 1)
+        recent_only = bridge._recording_sessions[0]
+        self.assertEqual(
+            str(recent_only.get("summary", "")),
+            f"Target {target_id} | Source 2 | files: 0",
+        )
+        recent_details = str(recent_only.get("details", ""))
+        self.assertNotIn("Source ", recent_details)
+        self.assertIn("ODAS_2_sp.wav", recent_details)
+        self.assertIn("ODAS_2_pf.wav", recent_details)
+        self.assertFalse(bool(recent_only.get("hasActive")))
 
         bridge.stopStreams()
 
         self.assertEqual(bridge._recording_sessions, [])
+
+    def test_source_id_drift_keeps_target_grouped_recording_sessions(self) -> None:
+        bridge = self._make_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        first_target_id = self._target_id_for_source(bridge, 7)
+        self.assertGreater(first_target_id, 0)
+
+        bridge._on_sst({"timeStamp": 19, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge._on_sst({"timeStamp": 38, "src": [{"id": 17, "x": 1.0, "y": 0.0, "z": 0.0}]})
+
+        self.assertEqual(len(bridge._recording_sessions), 1)
+        session_row = bridge._recording_sessions[0]
+        self.assertEqual(int(session_row.get("targetId", 0)), first_target_id)
+        self.assertEqual(
+            str(session_row.get("summary", "")),
+            f"Target {first_target_id} | Source 17 | files: 2",
+        )
+        details = str(session_row.get("details", ""))
+        self.assertIn("ODAS_17_sp.wav", details)
+        self.assertIn("ODAS_7_sp.wav", details)
 
     def test_toggle_remote_odas_connects_then_starts(self) -> None:
         bridge = self._make_bridge()
@@ -228,7 +282,10 @@ class TestAppBridgeRecording(unittest.TestCase):
 
         self.assertEqual(len(bridge._source_channel_map), 4)
         self.assertEqual(bridge.recordingSourceCount, 4)
-        self.assertFalse(any("Source 5" in item for item in bridge._recording_sessions))
+        details_blob = "\n".join(
+            str(item.get("details", "")) for item in bridge._recording_sessions
+        )
+        self.assertNotIn("ODAS_5_", details_blob)
 
     def test_unchecked_last_source_keeps_rows_but_clears_visible_outputs(self) -> None:
         bridge = self._make_bridge()

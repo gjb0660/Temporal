@@ -228,13 +228,33 @@ Rectangle {
         Repeater {
             model: root.appBridge.recordingSessionsModel
 
-            delegate: Label {
-                required property string value
+            delegate: Item {
+                id: sessionItem
+                required property int targetId
+                required property string summary
+                required property string details
+                required property bool hasActive
                 Layout.fillWidth: true
-                text: value
-                color: theme.mutedText
-                font.pixelSize: theme.codeFont
-                wrapMode: Text.WordWrap
+
+                implicitHeight: summaryLabel.implicitHeight
+
+                Label {
+                    id: summaryLabel
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    text: sessionItem.summary
+                    color: theme.mutedText
+                    font.pixelSize: theme.codeFont
+                    wrapMode: Text.WordWrap
+                }
+
+                HoverHandler {
+                    id: sessionHover
+                }
+
+                ToolTip.visible: sessionHover.hovered && sessionItem.details.length > 0
+                ToolTip.text: sessionItem.details
+                ToolTip.delay: 200
             }
         }
 
