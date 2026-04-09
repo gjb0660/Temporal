@@ -1,8 +1,9 @@
 # Commit Log Specification
 
-## Baseline Evidence
+## Baseline Source
 
-This specification is derived from repository history sampling.
+This specification is derived from repository commit-format conventions.
+It governs commit subject formatting only, not semantic review evidence.
 
 ## Required Format For New Commits
 

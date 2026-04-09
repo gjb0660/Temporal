@@ -20,13 +20,32 @@ Use fixed 2-worker parallel topology:
 1. worker A:
    - run first-principles review on staged changes
    - classify Chapter 3 smells in mandatory range
+   - submit `input-fingerprint`, `proof-fingerprint` and `review-round`
    - submit mandatory `first-principles-proof`
    - return semantic and sustainability risk model
 2. worker B:
    - apply Occam reduction proposals on staged scope
    - propose Chapter 6 micro-refactors for safe local cleanup
+   - submit `input-fingerprint`, `proof-fingerprint` and `review-round`
    - submit mandatory `occam-reduction-proof`
    - return minimalization diff and tradeoffs
+
+## Fingerprint Consistency Lock (Hard)
+
+For every convergence round, worker A, worker B, and supervisor MUST use the
+same `input-fingerprint`.
+
+Hard mapping:
+
+1. missing `input-fingerprint`, `proof-fingerprint`, or `review-round` in any
+   role -> `semantic-gate=fail` and `pollution-gate=fail`
+2. any worker `input-fingerprint` differs from supervisor `input-fingerprint` ->
+   `semantic-gate=fail` and `pollution-gate=fail`
+3. any role with `proof-fingerprint != input-fingerprint` -> `semantic-gate=fail`
+   and `pollution-gate=fail`
+4. staged fingerprint changes but any role misses `stale-proof-reset` with
+   rewritten proofs -> `semantic-gate=fail` and `cleanup=fail`
+5. if this lock fails, `round-closure=pass` is forbidden
 
 ## Socratic Challenge Lock (Hard)
 
@@ -51,17 +70,18 @@ Supervising agent responsibilities:
 
 1. keep ownership boundaries explicit
 2. enforce the Socratic Challenge Lock for each round before closure
-3. enforce mandatory review range = touched plus one-hop
-4. enforce two-layer policy:
+3. enforce Fingerprint Consistency Lock and stale-proof invalidation before closure
+4. enforce mandatory review range = touched plus one-hop
+5. enforce two-layer policy:
    - safely fixable in mandatory range: clear all before exit
    - cross-boundary or large-scope: record `remaining-risk` and propose focused
      `refactor-plan-suggestions`
-5. resolve conflicts and preserve acceptance semantics
-6. repeat multi-round convergence until all hard gates are `pass`
-7. block commit if any gate fails inside mandatory range
-8. do not directly block on out-of-range historical failures; record risk
-9. execute one final atomic commit after gates pass
-10. do not close a round if either worker evidence is missing:
+6. resolve conflicts and preserve acceptance semantics
+7. repeat multi-round convergence until all hard gates are `pass`
+8. block commit if any gate fails inside mandatory range
+9. do not directly block on out-of-range historical failures; record risk
+10. execute one final atomic commit after gates pass
+11. do not close a round if either worker evidence is missing:
     missing worker A proof -> `semantic-gate=fail`
     missing worker B proof -> `pollution-gate=fail` and `cleanup=fail`
 
@@ -85,8 +105,11 @@ Subagent extension fields:
 1. `assumption-challenges`
 2. `round-closure`
 3. `worker-verdicts`
-4. `first-principles-proof`
-5. `occam-reduction-proof`
+4. `input-fingerprint`
+5. `proof-fingerprint`
+6. `review-round`
+7. `first-principles-proof`
+8. `occam-reduction-proof`
 
 ## Completion Gate
 
@@ -101,6 +124,7 @@ Subagent mode is complete only when all are true:
 7. final delivery is one atomic commit
 8. acceptance semantics remain aligned with active specs/contracts
 9. both worker proofs are present and non-empty for the final round
+10. all role fingerprints match in the final round
 
 If any condition fails, do not commit.
 

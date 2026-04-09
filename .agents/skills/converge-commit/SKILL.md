@@ -5,29 +5,29 @@ description: Review staged changes and prepare one atomic commit by first-princi
 
 # Converge Commit
 
-## Trigger Signals
+## Step 0: Freshness and Proof Lock (Hard)
 
-Activate `$converge-commit` when requests include commit-time review intent:
+Before any gate/check/commit, fill core freshness and both proof fields for the current round:
 
-1. `review staged changes`
-2. `commit`
-3. `复查`
-4. `提交前审查`
+1. `input-fingerprint`
+2. `proof-fingerprint`
+3. `review-round`
+4. `first-principles-proof`
+5. `occam-reduction-proof`
 
-## Step 0: Method Lock (Hard)
-
-Before any gate/check/commit, fill both evidence fields:
-
-1. `first-principles-proof`
-2. `occam-reduction-proof`
+fingerprint is derived from current staged snapshot by `git write-tree`
 
 Hard mapping:
 
-1. missing `first-principles-proof` -> `semantic-gate=fail`
-2. missing `occam-reduction-proof` -> `pollution-gate=fail` and `cleanup=fail`
+1. missing `input-fingerprint`, `proof-fingerprint`, or `review-round` ->
+   `semantic-gate=fail` and `pollution-gate=fail`
+2. `proof-fingerprint != input-fingerprint` -> `semantic-gate=fail` and `pollution-gate=fail`
+3. missing `first-principles-proof` -> `semantic-gate=fail`
+4. missing `occam-reduction-proof` -> `pollution-gate=fail` and `cleanup=fail`
 
-If either field is missing or empty, stop. Do not run quick gate, full gate, or
-commit.
+If Freshness Lock fails or any required proof field is missing or empty,
+restart from Step 0.
+Do not run quick gate, full gate, or commit.
 
 ## Output Template (Fill First)
 
@@ -37,21 +37,25 @@ Primary status keys (fixed):
 
 Required evidence keys (mandatory):
 
-1. `first-principles-proof`: invalidated assumption, preserved semantic invariants, one to three iteration decay risk
-2. `occam-reduction-proof`: removed or merged entities, or explicit "no safe reduction" proof in mandatory range
-3. `findings`
-4. `reduction-decisions`
-5. `remaining-risk`
-6. `refactor-plan-suggestions`
-7. `final-commit-subject`
+1. `input-fingerprint`: staged snapshot fingerprint for this round
+2. `proof-fingerprint`: fingerprint the proof is bound to; equals `input-fingerprint`
+3. `review-round`: integer round index, starts at `1`, increments per convergence round
+4. `first-principles-proof`: invalidated assumption, preserved semantic invariants, one to three iteration decay risk
+5. `occam-reduction-proof`: removed or merged entities, or explicit "no safe reduction" proof in mandatory range
+6. `findings`
+7. `reduction-decisions`
+8. `remaining-risk`
+9. `refactor-plan-suggestions`
+10. `final-commit-subject`
 
 ## Core Contract
 
 1. review staged changes only
 2. mandatory range = touched files plus one-hop neighbors
 3. first-principles review before Occam reduction
-4. empty staged delta fails closed (`atomic-submit=fail`, `cleanup=fail`)
-5. allow one final atomic commit only after all gates are `pass`
+4. every review round MUST bind proof to current staged fingerprint
+5. empty staged delta fails closed (`atomic-submit=fail`, `cleanup=fail`)
+6. allow one final atomic commit only after all gates are `pass`
 
 ## Scope Gate
 
@@ -74,8 +78,8 @@ when all gates are `pass`.
 
 ## Unified Sustainability Gates (Only Decision Source)
 
-1. `semantic-gate`: acceptance semantics and assumptions are aligned
-2. `pollution-gate`: no mandatory-range dead paths or unresolved safely-fixable smells
+1. `semantic-gate`: acceptance semantics, assumptions, and freshness locks are aligned
+2. `pollution-gate`: no mandatory-range dead paths, unresolved safely-fixable smells, or freshness mismatches
 3. `static-gate`: mandatory-range and repository required checks are green
 4. `atomic-submit`: one intent, one commit action, valid subject format
 5. `cleanup`: no unresolved TODO/FIXME/HACK for this intent and diff is minimal
