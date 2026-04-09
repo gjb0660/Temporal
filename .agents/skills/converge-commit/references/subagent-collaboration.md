@@ -20,21 +20,37 @@ Use fixed 2-worker parallel topology:
 1. worker A:
    - run first-principles review on staged changes
    - classify Chapter 3 smells in mandatory range
+   - submit mandatory `first-principles-proof`
    - return semantic and sustainability risk model
 2. worker B:
    - apply Occam reduction proposals on staged scope
    - propose Chapter 6 micro-refactors for safe local cleanup
+   - submit mandatory `occam-reduction-proof`
    - return minimalization diff and tradeoffs
+
+## Socratic Challenge Lock (Hard)
+
+This lock applies to `mode=subagent` only.
+
+`assumption-challenges` is mandatory for every convergence round and must answer
+all fixed questions:
+
+1. removed assumption risk?
+2. can fewer entities still satisfy active Acceptance semantics?
+3. one to three iteration decay if deferred?
+
+Hard mapping:
+
+1. missing or empty `assumption-challenges` -> `semantic-gate=fail`
+2. unanswered fixed questions -> `semantic-gate=fail`
+3. if `semantic-gate=fail` from this lock, `round-closure=pass` is forbidden
 
 ## Supervisor Challenge Loop
 
 Supervising agent responsibilities:
 
 1. keep ownership boundaries explicit
-2. run Socratic challenge on both workers' assumptions:
-   - which concrete assumption risk did this change remove?
-   - can fewer entities still satisfy active Acceptance semantics?
-   - if deferred now, how can this area decay in one to three iterations?
+2. enforce the Socratic Challenge Lock for each round before closure
 3. enforce mandatory review range = touched plus one-hop
 4. enforce two-layer policy:
    - safely fixable in mandatory range: clear all before exit
@@ -45,6 +61,9 @@ Supervising agent responsibilities:
 7. block commit if any gate fails inside mandatory range
 8. do not directly block on out-of-range historical failures; record risk
 9. execute one final atomic commit after gates pass
+10. do not close a round if either worker evidence is missing:
+    missing worker A proof -> `semantic-gate=fail`
+    missing worker B proof -> `pollution-gate=fail` and `cleanup=fail`
 
 ## Unified Output Contract
 
@@ -66,6 +85,8 @@ Subagent extension fields:
 1. `assumption-challenges`
 2. `round-closure`
 3. `worker-verdicts`
+4. `first-principles-proof`
+5. `occam-reduction-proof`
 
 ## Completion Gate
 
@@ -79,6 +100,7 @@ Subagent mode is complete only when all are true:
 6. all safely fixable smells in mandatory range are cleared in this commit
 7. final delivery is one atomic commit
 8. acceptance semantics remain aligned with active specs/contracts
+9. both worker proofs are present and non-empty for the final round
 
 If any condition fails, do not commit.
 

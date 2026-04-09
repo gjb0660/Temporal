@@ -91,3 +91,22 @@ Record checklist outcomes in skill outputs:
 2. chosen Chapter 6 actions -> `reduction-decisions`
 3. unresolved cross-boundary debt -> `remaining-risk`
 4. dedicated follow-up proposal -> `refactor-plan-suggestions`
+
+## Occam Evidence Mapping (Hard)
+
+`$converge-commit` requires explicit mapping into
+`occam-reduction-proof` for each convergence round.
+
+1. if a safe local reduction exists in mandatory range:
+   - apply reduction now
+   - map each change to one item in `reduction-decisions`
+   - include removed or merged entity evidence in `occam-reduction-proof`
+2. if no safe local reduction exists:
+   - provide explicit "no safe reduction" proof in `occam-reduction-proof`
+   - include why each candidate is unsafe or cross-boundary
+   - record unresolved items in `remaining-risk`
+3. if mandatory-range `must-fix-now` smell exists but no reduction evidence is
+   provided:
+   - set `pollution-gate=fail`
+   - set `cleanup=fail`
+   - block commit exit
