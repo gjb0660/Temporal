@@ -9,7 +9,7 @@ description = "Temporal: ODAS upper-computer interaction client built with Pytho
 readme = "README.md"
 requires-python = ">=3.10,<3.11"
 dependencies = [
-    "pyside6~=6.8.0",
+    "pyside6~=6.10.0",
     "paramiko>=3.5.0,<4.0.0",
     "tomli>=2.2.0,<3.0.0",
 ]
@@ -76,7 +76,7 @@ reportUnnecessaryCast = "warning"
 reportUnnecessaryComparison = "warning"
 reportUnnecessaryContains = "warning"
 reportUnnecessaryIsInstance = "warning"
-reportUnnecessaryTypeIgnoreComment = "none"
+reportUnnecessaryTypeIgnoreComment = "warning"
 
 [[tool.pyright.executionEnvironments]]
 root = "tests"

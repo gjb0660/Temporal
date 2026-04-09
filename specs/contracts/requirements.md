@@ -2,7 +2,7 @@
 title: requirements
 status: active
 stability: semi
-version: 0.1
+version: 0.2
 ---
 
 ## Role
@@ -14,7 +14,7 @@ version: 0.1
 
 - 依赖治理 MUST 以 `project.dependencies` 和 `project.optional-dependencies` 中**直接声明**的 package 为范围；MUST NOT 以传递依赖作为约束真源。
 - runtime 依赖中的以下 package MUST 保持**版本约束**：
-  - `pyside6~=6.8.0`
+  - `pyside6~=6.10.0`
   - `paramiko>=3.5.0,<4.0.0`
   - `tomli>=2.2.0,<3.0.0`
 - dev 的以下 package MUST 保持**无版本约束**：
@@ -36,7 +36,7 @@ version: 0.1
 
 **runtime**:
 
-- `pyside6` 对齐 Qt 6.8 LTS 目标线，优先保证 QML/Qt API 稳定性并降低跨次版本回归风险。
+- `pyside6` 对齐 Qt 6.10 迁移基线，为 `QtGraphs` 目标态提供依赖前提，并保持 `6.10.x` 小版本内稳定升级空间。
 - `paramiko` 保持在 3.x 主线，避免 4.x 主版本语义变化对 SSH 行为造成不可控回归。
 - `tomli`: 当前运行时为 Python 3.10，仍需第三方 TOML 解析库；固定 2.x 主线以确保兼容与稳定。
 

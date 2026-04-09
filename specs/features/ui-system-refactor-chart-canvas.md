@@ -3,7 +3,7 @@ title: ui-system-refactor-chart-canvas
 tracker: refactor
 status: active
 owner: codex/ui
-updated: 2026-04-02
+updated: 2026-04-10
 ---
 
 ## Goal
@@ -34,7 +34,8 @@ updated: 2026-04-02
   1) 刻度与折线缺少“画卷式”左移效果；
   2) `latest` 非 200 整除时，左侧点位可能出现越界；
   3) preview 固定 200 sample 步长会掩盖非整除边界问题。
-- 当前仓库版本窗口为 `PySide6 6.8.x`（当前锁定 `6.8.3`）。
+- 当前仓库依赖声明仍为 `pyside6~=6.8.0`，与目标 `QtGraphs` 迁移版本窗口不一致。
+- 本执行单元目标是将版本窗口升级到 `PySide6 6.10.x`，并同步锁文件。
 - 苏格拉底式假设挑战 1：我们要优化的是“现在看起来可用”，还是“跨版本仍可验证并可维护”？
 - 苏格拉底式假设挑战 2：若一阶问题是启动崩溃前提，是否应先消除该前提，再讨论后端美学偏好？
 - 苏格拉底式假设挑战 3：在禁用 `QtCharts` 的前提下，我们是否接受 `Canvas` 仅作为短期过渡并承担可控性能约束？
@@ -44,6 +45,7 @@ updated: 2026-04-02
 - 采用奥卡姆剃刀：`ChartCanvas` 仅负责绘制，不再承担业务推导或 JSON 解码。
 - 路线三元锁定：目标态为 `QtGraphs`，过渡态为 `Canvas`（仅风险控制用途），禁止态为 `QtCharts`。
 - 过渡态前置条件是启动路径必须先移除 `QtCharts` 运行依赖，不得保留 `QGuiApplication + QtCharts` 崩溃链路。
+- 迁移前置条件新增：先把 Qt 依赖窗口从 `6.8` 升级到 `6.10`，作为 `QtGraphs` 目标态的版本基线。
 - 过渡态使用边界是：`Canvas` 仅作为短期风险缓冲，继续执行固定窗口、固定主刻度、`<=8` 可见序列与节流刷新约束，不在过渡期扩展交互能力。
 - 在 `Canvas` 过渡态下，点与刻度必须共享窗口域 `[latest-1600, latest]` 映射。
 - 在 `Canvas` 过渡态下，禁止以刻度索引等分替代 sample 值映射。
@@ -65,6 +67,9 @@ updated: 2026-04-02
 8. 后续实现预置验收已写入本 feature：迁移完成前启动路径不再触发当前崩溃前提；迁移后保持 chart contract 与 runtime/preview parity 通过。
 9. `latest=1661`（非 200 整除）场景下，图表左侧点位不越界，刻度线、标签与折线随时间保持同速左移。
 10. preview 运行时满足固定质数步长（19）与 190ms 推进，且数据循环时 `timeStamp` 仍单调递增。
+11. `pyproject.toml` 中 `pyside6` 依赖升级为 `~=6.10.0`。
+12. `uv.lock` 中 Qt for Python 相关包（`pyside6`、`pyside6-addons`、`pyside6-essentials`、`shiboken6`）同步到 `6.10.x`。
+13. 升级后最小运行验证通过：`uv run python -c "import PySide6; print(PySide6.__version__)"` 输出 `6.10.x`。
 
 ## Plan
 
@@ -73,6 +78,7 @@ updated: 2026-04-02
 3. 对齐 `ui-system` owner 规范，确保上层语义与本 feature 一致。
 4. 复核 `chart-canvas` contract 是否冲突；若无冲突保持 contract 后端无关。
 5. 为后续代码阶段预置迁移门槛与回归门槛，避免再次出现路线摇摆。
+6. 将 Qt 依赖版本窗口升级到 `6.10` 并同步锁文件，作为后续 `QtGraphs` 迁移基线。
 
 ## Progress
 
@@ -80,6 +86,7 @@ updated: 2026-04-02
 - [x] 已将第一性原理、奥卡姆剃刀与苏格拉底假设挑战写入 Facts/Decision。
 - [x] 已在本 feature 锁定“目标态/过渡态/禁止态”路线结论。
 - [x] 已定义过渡态前置条件与退出触发条件。
+- [x] Qt 依赖版本窗口已从 `6.8` 升级到 `6.10`，并通过最小运行验证（PySide6=`6.10.3`、chart 相关单测通过）。
 
 ## Todo
 
@@ -89,6 +96,6 @@ updated: 2026-04-02
 
 ## Assumptions
 
-- 版本窗口短期维持 `PySide6 6.8.x`。
+- 版本窗口在本执行单元升级并固定到 `PySide6 6.10.x`。
 - `QtCharts` 在当前路线中被禁用，不作为过渡态或长期路线。
 - `Canvas` 仅作为短期过渡态；进入目标态后不保留并行双轨。
