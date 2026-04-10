@@ -40,10 +40,13 @@ Do not proceed as code-ready if this skill has not been applied.
 1. Confirm governing sources.
    - Read `AGENTS.md`
    - Read repository constraints from `.github/copilot-instructions.md`
-   - Route domain instructions by `ApplyTo` before editing or testing:
-     - `src/**/*.py` -> `.github/instructions/backend.instructions.md`
-     - `src/**/*.qml` -> `.github/instructions/qml.instructions.md`
-     - `tests/**` -> `.github/instructions/tests.instructions.md`
+   - Route domain instructions by `applyTo` before editing or testing:
+     - Scan `applyTo` frontmatter from `.github/instructions/*.instructions.md`
+     - Apply all matched instruction files (multi-match is allowed)
+     - Example routing by domain, not fixed file names:
+       - `.github/instructions/core.instructions.md`  : `applyTo: "src/**/*.py"`
+       - `.github/instructions/ui.instructions.md`    : `applyTo: "src/**/*.qml"`
+       - `.github/instructions/tests.instructions.md` : `applyTo: "tests/**"`
 
 2. Resolve spec entry path.
    - Follow [spec-entry](./references/spec-entry.md) details
@@ -86,6 +89,9 @@ For `code` and `review` stage reporting, use the same unified gate block:
 - `static-gate`: pass / fail
 - `atomic-submit`: pass / fail
 - `cleanup`: pass / fail
+
+If no instruction file matches current edit/test targets by `applyTo`,
+set `sync-risk: yes` warn and continue.
 
 If `delegation` is `on`,
 state additional compact status block for each subagent:
