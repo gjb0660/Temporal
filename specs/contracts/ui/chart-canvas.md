@@ -2,7 +2,7 @@
 title: chart-canvas
 status: active
 stability: flexible
-version: 0.8
+version: 0.9
 ---
 
 ## Role
@@ -15,8 +15,10 @@ version: 0.8
 - 图表画布 MUST 渲染稳定的网格、纵轴刻度、横轴刻度和底部横轴标签。
 - 图表画布 MUST 支持零条或多条折线序列，并保持空数据时仍然安全显示空网格。
 - 图表输入 MUST 使用结构化 `points` 数值模型（`x=sample`, `y=value|null`），MUST NOT 回退到 `values` 或 `valuesJson`。
+- 图表序列输入 MUST 支持 tracked 与 potential 混合渲染语义。
 - 每条折线 MUST 使用与输入空间目标身份一致的颜色语义，MUST NOT 在组件内部重新发明颜色规则。
-- 图表可见目标上限、候选裁剪与 `dropped_source_ids` 语义 MUST 引用 `specs/contracts/tracking-identity.md`；图表层 MUST NOT 并行重写匹配/排序规则。
+- potential 的色阶、点形、半径、节流与层级语义 MUST 引用 `specs/contracts/potential-overlay.md`；图表层 MUST NOT 并行重写这些规则。
+- 图表可见目标上限与 `dropped_source_ids` 语义 MUST 引用 `specs/contracts/tracking-identity.md`；图表层 MUST NOT 并行重写匹配/排序规则。
 - 图表身份连续性与颜色连续性 MUST 引用 `specs/contracts/tracking-identity.md`；图表层只消费上游 `targetId` 与颜色输出。
 - 在 `1600` 样本历史窗口内，bridge 历史目录颜色 MUST 保持唯一；当前活跃的 `<=8` 条序列之间 MUST NOT 出现重复颜色。
 - 当历史目录目标数超过默认调色板容量（12）时，bridge 投影层 MUST 先裁剪目录（活跃优先 + 最新历史优先），再投影到图表，MUST NOT 通过同色复用解决溢出。
@@ -50,3 +52,4 @@ version: 0.8
 - 在空数据时直接显示空白区域而不是稳定网格。
 - 在组件内部重算 source 颜色，导致与其他视图不一致。
 - 默认加入缩放、拖拽或悬停分析，破坏当前只读语义。
+- 把 potential 散点渲染成连续折线，误导为稳定 source 轨迹。

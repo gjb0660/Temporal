@@ -3,7 +3,7 @@ title: ui-system
 tracker: primary-feature
 status: active
 owner: codex/ui
-updated: 2026-04-09
+updated: 2026-04-10
 ---
 
 ## Goal
@@ -23,6 +23,7 @@ updated: 2026-04-09
 - runtime/preview 的语义分工已固定：preview 负责 scenario 数据推进，runtime 负责 SST 输入与窗口维护；展示投影共享。
 - 当前可视化语义已固定：row/3D 基于 current frame，chart 基于共享时间窗，三者共享同一过滤语义。
 - 图表固定窗口、主刻度与颜色一致性等稳定约束已由 `specs/contracts/ui/chart-canvas.md` 承接。
+- potential 叠加层的过滤、节流、色阶与层级语义已由 `specs/contracts/potential-overlay.md` 单一拥有。
 - 图表后端路线结论已由 `ui-system-refactor-chart-canvas` 承接，`ui-system` 只消费其上层展示边界。
 - row 的对象目录语义与可见过滤语义已解耦：row 可保留共享历史窗口内的历史 source，chart/3D 仅消费当前可见子集。
 - tracking 身份映射约束由 `specs/contracts/tracking-identity.md` 单一拥有；`ui-system` 仅消费 `targetId` 身份输出。
@@ -38,6 +39,7 @@ updated: 2026-04-09
 - QML 只消费 bridge 输出，不复制业务推导；runtime/preview 继续在同一 projection 层演进。
 - row/chart/3D 的过滤与空态契约保持冻结，后续演进只能走 shared projection 单路径收敛。
 - 颜色语义与图表时间窗只通过共享 bridge/projection 输出消费，不在 QML 或下游 feature 中复制业务语义。
+- potential 语义只通过共享 bridge/projection 输出消费，并统一引用 `specs/contracts/potential-overlay.md`。
 - 颜色语义由 bridge 颜色账本单一路径维护；MUST NOT 在 projection/QML 引入并行颜色业务语义或业务 fallback。
 - `sourceId` 漂移与 `targetId` 连续性语义由 `specs/contracts/tracking-identity.md` 拥有；`ui-system` 仅定义展示消费行为。
 - 行状态（`active`/灰态）由 `targetId` 判定；MUST NOT 按展示 `sourceId` 推导。

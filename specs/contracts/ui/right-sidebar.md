@@ -2,7 +2,7 @@
 title: right-sidebar
 status: active
 stability: flexible
-version: 0.7
+version: 0.8
 ---
 
 ## Role
@@ -33,6 +33,9 @@ version: 0.7
 - 在 `1600` 样本历史窗口内，右栏行之间的 badge 颜色 MUST 唯一；当历史目标数量超过默认调色板容量（12）时，bridge 投影层 MUST 优先保留活跃目标，并按 `lastSample` 保留最新非活跃历史行，淘汰最旧非活跃历史行。
 - 筛选器开关和能量范围控件 MUST 继续通过现有 bridge 接口路由，右栏 MUST NOT 在本地重建筛选状态真源。
 - “筛选器-声源”总开关 MUST NOT 清空声源列表；它只影响图表与 3D 可见输出。
+- “筛选器-声源”与“筛选器-potential”开关 MUST 并行独立：前者只影响 tracked 层，后者只影响 potential 层。
+- potential 声源能量范围控件 MUST 仅作用于 potential 层；MUST NOT 影响 tracked 层可见性。
+- potential 的筛选与可见性规则 MUST 引用 `specs/contracts/potential-overlay.md`；右栏 MUST NOT 并行复写。
 - 右栏 MUST 作为对象状态面板，而不是图表或球体时序数据的生产者。
 
 ## Variation Space
@@ -54,3 +57,4 @@ version: 0.7
 - 在右栏本地拼接 preview/runtime 占位行或另一套 badge 颜色规则。
 - 用户取消勾选后直接删除 row，导致对象与可见性状态混淆。
 - 把场景切换器、图表时序控制或录音逻辑实现塞进右栏。
+- 用右栏 source 勾选去驱动 potential 可见集，造成无 id 的 potential 语义漂移。

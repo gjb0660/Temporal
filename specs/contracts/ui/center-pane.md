@@ -2,7 +2,7 @@
 title: center-pane
 status: active
 stability: flexible
-version: 0.3
+version: 0.4
 ---
 
 ## Role
@@ -16,6 +16,8 @@ version: 0.3
 - 两张图表与球面视图 MUST 消费同一 bridge 输出的当前时间窗和同一可见声源子集。
 - 两张图表与球面视图 MUST 共享同一 bridge 提供的 `targetId` 身份与颜色语义；同一可见目标 MUST NOT 在图表与球面视图中表现为不同对象。
 - 身份连续性前提 MUST 引用 `specs/contracts/tracking-identity.md`；中栏 MUST NOT 并行定义 source/target 映射规则。
+- potential 层 MUST 由 SSL potential 投影驱动，并与 tracked 层语义分离；MUST NOT 强行复用 tracked source 身份主键。
+- potential 叠加层的渲染与过滤规则 MUST 引用 `specs/contracts/potential-overlay.md`；中栏 MUST NOT 并行定义。
 - 中栏 MUST NOT 在本地生成独立时序或 fallback 点位。
 - 中栏 MUST 只消费 bridge 已整理好的 ticks、series 和点位数据。
 - QML MUST NOT 在中栏本地推导 preview/runtime 分支数据。
@@ -46,5 +48,6 @@ version: 0.3
 - 在中栏内本地拼接 preview fixtures、运行态占位数据或额外时序分支。
 - 让图表和球面视图分别跟随不同的数据窗口或不同的可见 source 集合。
 - 让图表与球面视图各自重算颜色或身份映射，导致同一 source 在中栏内部出现语义分叉。
+- 把 potential 层硬绑定到右栏 source 勾选身份，导致无身份字段的 potential 点被伪造为 tracked source。
 - 把场景切换器或筛选控件塞进中栏标题区。
 - 让球舞台遮挡标题或破坏中栏的主观察层级。
