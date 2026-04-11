@@ -2,7 +2,7 @@
 title: chart-canvas
 status: active
 stability: flexible
-version: 0.7
+version: 0.8
 ---
 
 ## Role
@@ -16,14 +16,12 @@ version: 0.7
 - 图表画布 MUST 支持零条或多条折线序列，并保持空数据时仍然安全显示空网格。
 - 图表输入 MUST 使用结构化 `points` 数值模型（`x=sample`, `y=value|null`），MUST NOT 回退到 `values` 或 `valuesJson`。
 - 每条折线 MUST 使用与输入空间目标身份一致的颜色语义，MUST NOT 在组件内部重新发明颜色规则。
-- 图表在同一帧最多接收 8 条活跃空间目标；当候选空间目标超过 8 条时，bridge 投影层 MUST 先按“空间目标最近出现时间”降序选择前 8，若出现时间并列则按当前帧 `sourceId` 升序打破平局。
-- 当同帧候选数量 `<=8` 且默认调色池容量满足可见上限时，tracking `dropped_source_ids` MUST 为空，MUST NOT 因匹配策略误删。
-- 单连接会话内，空间目标连续映射到颜色的关系 MUST 保持稳定。
+- 图表可见目标上限、候选裁剪与 `dropped_source_ids` 语义 MUST 引用 `specs/contracts/tracking-identity.md`；图表层 MUST NOT 并行重写匹配/排序规则。
+- 图表身份连续性与颜色连续性 MUST 引用 `specs/contracts/tracking-identity.md`；图表层只消费上游 `targetId` 与颜色输出。
 - 在 `1600` 样本历史窗口内，bridge 历史目录颜色 MUST 保持唯一；当前活跃的 `<=8` 条序列之间 MUST NOT 出现重复颜色。
 - 当历史目录目标数超过默认调色板容量（12）时，bridge 投影层 MUST 先裁剪目录（活跃优先 + 最新历史优先），再投影到图表，MUST NOT 通过同色复用解决溢出。
 - 颜色映射 MUST 与 `sourceId` 数值范围解耦；`sourceId` MAY 继续用于标签展示，但 MUST NOT 作为颜色绑定主键。
 - bridge 颜色真源 MUST 仅来自空间目标连续性账本；MUST NOT 对历史行或历史序列回退到按 `sourceId` 重新取色。
-- 当同一空间目标在静默 `<=16.0s`（`1600` sample）后恢复时，上游 MUST 优先复用原颜色；当静默 `>16.0s` 时，上游 MAY 复用原颜色或分配新颜色。
 - 图表画布 MUST 保持只读可视化语义，MUST NOT 默认引入缩放、平移或点选分析交互。
 - 时间轴 MUST 以 0.01s 为显示单位，并以当前连接首帧时间作为零点。
 - 运行时 SST 摄取频率与图表模型提交频率 MAY 解耦（默认 20Hz 提交）；该解耦 MUST NOT 改变 sample 语义与 `y=null` 断点语义。

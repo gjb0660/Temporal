@@ -2,7 +2,7 @@
 title: app-side-checkbox
 status: active
 stability: flexible
-version: 0.2
+version: 0.3
 ---
 
 ## Role
@@ -16,6 +16,7 @@ version: 0.2
 - `checked` 和 `enabled` 语义 MUST 由外部状态驱动；组件 MUST NOT 在内部持有业务对象数据真源。
 - 禁用态 MUST 继续保留可读的占位语义，MUST NOT 让用户误判为行已消失。
 - 交互语义 MUST 保持为单一可预测的 toggle，MUST NOT 扩展为树形选择器或多级控制器。
+- 在高频外部刷新场景下，单次点击 toggle MUST 保持可达；组件集成方 MUST NOT 通过无意义重建破坏点击原子性。
 
 ## Variation Space
 

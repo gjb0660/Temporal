@@ -3,7 +3,7 @@ title: ui-system
 tracker: primary-feature
 status: active
 owner: codex/ui
-updated: 2026-04-04
+updated: 2026-04-09
 ---
 
 ## Goal
@@ -25,11 +25,12 @@ updated: 2026-04-04
 - 图表固定窗口、主刻度与颜色一致性等稳定约束已由 `specs/contracts/ui/chart-canvas.md` 承接。
 - 图表后端路线结论已由 `ui-system-refactor-chart-canvas` 承接，`ui-system` 只消费其上层展示边界。
 - row 的对象目录语义与可见过滤语义已解耦：row 可保留共享历史窗口内的历史 source，chart/3D 仅消费当前可见子集。
-- runtime 已收口目标身份账本：`target_id -> stable_color` 与 `source_id -> target_id` 别名映射由 bridge 单一路径维护。
+- tracking 身份映射约束由 `specs/contracts/tracking-identity.md` 单一拥有；`ui-system` 仅消费 `targetId` 身份输出。
 - runtime 已收口性能策略：SST 高频摄取与 chart 模型提交解耦，默认 20Hz 提交；row/3D 仍按当前帧实时投影。
 - source 颜色由 bridge 输出并按空间目标连续性保持稳定映射，row/3D/chart 共享同一映射；颜色身份主键为 `targetId`。
 - `sourceId` 在输入侧可作为短期跟踪标识展示，但不再作为展示身份主键。
 - bridge 已稳定输出历史行保留、颜色稳定与按活跃优先/最新历史优先裁剪所需的共享 row 语义，供右栏与跨视图展示一致消费。
+- 运行态下 row 会随 SST/tick 高频刷新；若刷新链路持续整表重建，右栏 checkbox 单击会与刷新竞争并出现“点不动/回弹”体感。
 
 ## Decision
 
@@ -38,9 +39,11 @@ updated: 2026-04-04
 - row/chart/3D 的过滤与空态契约保持冻结，后续演进只能走 shared projection 单路径收敛。
 - 颜色语义与图表时间窗只通过共享 bridge/projection 输出消费，不在 QML 或下游 feature 中复制业务语义。
 - 颜色语义由 bridge 颜色账本单一路径维护；MUST NOT 在 projection/QML 引入并行颜色业务语义或业务 fallback。
-- 当同一空间目标在连续性窗口内更换 `sourceId` 时，bridge 仅保留最新 `sourceId` 行展示，颜色持续复用同一目标颜色。
+- `sourceId` 漂移与 `targetId` 连续性语义由 `specs/contracts/tracking-identity.md` 拥有；`ui-system` 仅定义展示消费行为。
 - 行状态（`active`/灰态）由 `targetId` 判定；MUST NOT 按展示 `sourceId` 推导。
+- 右栏勾选交互写入路径以 `targetId` 为唯一身份锚点；MUST NOT 再以 `sourceId` 作为交互主键。
 - runtime 在 bridge 层保持单一行为真源；MUST NOT 并行维护两套筛选、模型刷新与状态推导逻辑。
+- 模型刷新必须保持用户单击原子性：无数据变化的刷新 MUST NOT 触发整表 reset。
 - 图表后端路线与迁移门槛由 `ui-system-refactor-chart-canvas` 单独拥有；`ui-system` 不重复承载其实现裁决。
 
 ## Acceptance
@@ -57,6 +60,8 @@ updated: 2026-04-04
 10. 同一目标短时重现且 `sourceId` 漂移时，row / chart / 3D 颜色保持稳定并与 runtime / preview 一致。
 11. 历史窗口内列表行颜色不重复；当历史目标超过调色板容量时，行集合按“活跃优先 + 最新历史优先”裁剪并与 runtime / preview 一致。
 12. `ui-system` 与 `ui-system-refactor-chart-canvas` 的 owner 边界保持一致，不出现路线冲突或重复裁决。
+13. 运行态（含 preview tick 连续推进）下右栏 checkbox 单击一次即可稳定生效，不因高频刷新出现“点不动/自动回弹”。
+14. 当同一空间目标在连续性窗口内发生 `sourceId` 漂移时，勾选状态随 `targetId` 连续保持，不因展示 `sourceId` 变化丢失。
 
 ## Plan
 
@@ -76,6 +81,7 @@ updated: 2026-04-04
 - [x] 已在 runtime `AppBridge` 收口 elevation/azimuth chart series 投影。
 - [x] 已抽离 shared projection layer，并由 runtime 与 preview 共同消费。
 - [x] 已同步 chart 后端路线 owner 边界，`ui-system` 不再重复裁决实现路线。
+- [x] 已将右栏 checkbox 写入路径收口为 `targetId` 单一路径，并消除无变化刷新触发的整表 reset。
 
 ## Todo
 

@@ -2,7 +2,7 @@
 title: center-pane
 status: active
 stability: flexible
-version: 0.2
+version: 0.3
 ---
 
 ## Role
@@ -14,7 +14,8 @@ version: 0.2
 
 - 中栏 MUST 同时呈现俯仰角图、方位角图和活动声源位置视图，作为一个连续的观察区域。
 - 两张图表与球面视图 MUST 消费同一 bridge 输出的当前时间窗和同一可见声源子集。
-- 两张图表与球面视图 MUST 共享同一 bridge 提供的 source 身份与颜色语义；同一可见 source MUST NOT 在图表与球面视图中表现为不同对象。
+- 两张图表与球面视图 MUST 共享同一 bridge 提供的 `targetId` 身份与颜色语义；同一可见目标 MUST NOT 在图表与球面视图中表现为不同对象。
+- 身份连续性前提 MUST 引用 `specs/contracts/tracking-identity.md`；中栏 MUST NOT 并行定义 source/target 映射规则。
 - 中栏 MUST NOT 在本地生成独立时序或 fallback 点位。
 - 中栏 MUST 只消费 bridge 已整理好的 ticks、series 和点位数据。
 - QML MUST NOT 在中栏本地推导 preview/runtime 分支数据。

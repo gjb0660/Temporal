@@ -2,7 +2,7 @@
 title: right-sidebar
 status: active
 stability: flexible
-version: 0.5
+version: 0.7
 ---
 
 ## Role
@@ -16,8 +16,9 @@ version: 0.5
   - 标题 MUST 保持一致字号与风格语义
   - 按内容自然排版（wrap content）
 - 声源行 MUST 直接消费 bridge 提供的 row 数据；用户取消勾选后，对应 row MUST 继续保留，仅改变勾选状态。
+- 声源行勾选写入 MUST 以 `targetId` 调用 bridge 交互接口；MUST NOT 以展示 `sourceId` 作为写入主键。
+- `sourceId`/`targetId` 身份映射与连续性前提 MUST 引用 `specs/contracts/tracking-identity.md`；右栏 MUST NOT 并行复写该规则。
 - 声源行 MAY 在对象短时消失后继续保留为历史行；历史行 MUST 明确区分为非活跃态，并在其最后样本超出 chart 的 `1600` 样本窗口后移除。
-- 当同一空间目标在连续性窗口内以新 `sourceId` 重现时，右栏 MUST 合并为同一行，并以最新 `sourceId` 展示；旧 `sourceId` 行 MUST NOT 并存。
 - 声源行的 `active` 判定 MUST 基于 `targetId`，MUST NOT 由展示 `sourceId` 反推，以避免 `sourceId` 漂移或复用时误亮历史行。
 - 当没有活动声源或没有活跃录音会话时，右栏 MUST 显示稳定空态文案，MUST NOT 伪造占位列表项。
 - 录音会话摘要 MUST 按 `targetId` 分组；每个 target MUST 仅显示一行摘要。
@@ -28,6 +29,7 @@ version: 0.5
 - 录音会话详情 MUST 通过悬停提示显示，且逐行遵循 `<filename>`。
 - 悬停详情 MAY 包含最近结束会话；当 target 仅有最近结束会话时，摘要 MUST 显示 `Target <id> | Source <source_id> | files: 0`。
 - 声源 badge 的颜色和标签 MUST 忠实反映 bridge 输出，MUST NOT 在右栏本地推导另一套身份语义。
+- 运行态高频刷新期间，右栏勾选交互 MUST 保持单击原子性；MUST NOT 因无意义整表重建导致单击失效或回弹体感。
 - 在 `1600` 样本历史窗口内，右栏行之间的 badge 颜色 MUST 唯一；当历史目标数量超过默认调色板容量（12）时，bridge 投影层 MUST 优先保留活跃目标，并按 `lastSample` 保留最新非活跃历史行，淘汰最旧非活跃历史行。
 - 筛选器开关和能量范围控件 MUST 继续通过现有 bridge 接口路由，右栏 MUST NOT 在本地重建筛选状态真源。
 - “筛选器-声源”总开关 MUST NOT 清空声源列表；它只影响图表与 3D 可见输出。
