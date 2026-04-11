@@ -314,13 +314,37 @@ class TestAppBridgeIntegration(unittest.TestCase):
             bridge._log_timer.stop()
             self.assertFalse(bridge._log_timer.isActive())
 
-            with patch.object(bridge._log_timer, "start", wraps=bridge._log_timer.start) as start_spy:
+            with patch.object(
+                bridge._log_timer, "start", wraps=bridge._log_timer.start
+            ) as start_spy:
                 bridge.clearRemoteLog()
                 start_spy.assert_called_once_with()
 
             remote.log_output = "timer restored\n"
             bridge._poll_remote_log()
             self.assertEqual(bridge.remoteLogLines, ["timer restored"])
+
+    def test_clear_recording_files_cleans_local_outputs_and_sessions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            bridge = self._make_bridge(recorder)
+            try:
+                bridge._on_sst({"timeStamp": 0, "src": [{"id": 2, "x": 1.0, "y": 0.0, "z": 0.0}]})
+                initial_phase = bridge.controlPhase
+
+                files_before = sorted(Path(temp_dir).glob("ODAS_*_*.wav"))
+                self.assertEqual(len(files_before), 2)
+                self.assertEqual(bridge.recordingSourceCount, 1)
+                self.assertTrue(bridge._recording_sessions)
+
+                bridge.clearRecordingFiles()
+
+                self.assertEqual(sorted(Path(temp_dir).glob("ODAS_*_*.wav")), [])
+                self.assertEqual(bridge.recordingSourceCount, 0)
+                self.assertEqual(bridge._recording_sessions, [])
+                self.assertEqual(bridge.controlPhase, initial_phase)
+            finally:
+                recorder.stop_all()
 
     def test_start_remote_starts_local_listeners_before_remote_launch(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -164,6 +164,22 @@ class TestAutoRecorder(unittest.TestCase):
             self.assertTrue(recorder.is_recording(9, "pf"))
             recorder.stop_all()
 
+    def test_clear_recording_files_removes_wav_outputs_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            recorder = AutoRecorder(output_dir=temp_dir)
+            recorder.start(3, "sp")
+            recorder.start(3, "pf")
+            note_path = Path(temp_dir) / "keep.txt"
+            note_path.write_text("keep", encoding="utf-8")
+
+            removed = recorder.clear_recording_files()
+
+            self.assertEqual(removed, 2)
+            self.assertEqual(recorder.sessions_snapshot(), [])
+            self.assertEqual(recorder.active_sources(), set())
+            self.assertEqual(list(Path(temp_dir).glob("ODAS_*_*.wav")), [])
+            self.assertTrue(note_path.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

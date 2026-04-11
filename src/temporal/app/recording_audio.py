@@ -188,6 +188,17 @@ def reset_recording_runtime_state(bridge: Any) -> None:
     bridge._recording_session_target_by_key = {}
 
 
+def clear_recording_files(bridge: Any) -> None:
+    clear_fn = getattr(bridge._recorder, "clear_recording_files", None)
+    if callable(clear_fn):
+        clear_fn()
+    else:
+        bridge._recorder.stop_all()
+    reset_recording_runtime_state(bridge)
+    set_recording_source_count(bridge, len(bridge._recorder.active_sources()))
+    refresh_recording_sessions(bridge)
+
+
 def apply_recording_sample_rates(bridge: Any) -> None:
     sample_rates_fn = getattr(bridge._remote, "recording_sample_rates", None)
     warning_fn = getattr(bridge._remote, "recording_sample_rate_warning", None)
@@ -232,6 +243,7 @@ def _session_detail(item: Any) -> dict[str, Any]:
 
 __all__ = [
     "apply_recording_sample_rates",
+    "clear_recording_files",
     "prune_recording_target_caches",
     "reset_recording_runtime_state",
     "refresh_recording_sessions",

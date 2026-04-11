@@ -336,6 +336,10 @@ class AppBridge(QObject):
         remote_lifecycle.clear_remote_log(self)
 
     @qt_slot()
+    def clearRecordingFiles(self) -> None:
+        recording_audio.clear_recording_files(self)
+
+    @qt_slot()
     def startStreams(self) -> None:
         stream_projection.start_streams(self)
 

@@ -134,3 +134,14 @@ class AutoRecorder:
             self._writers.clear()
             self._sessions.clear()
             self._last_seen.clear()
+
+    def clear_recording_files(self) -> int:
+        with self._lock:
+            self.stop_all()
+            removed = 0
+            for path in self._output_dir.glob("ODAS_*_*.wav"):
+                if not path.is_file():
+                    continue
+                path.unlink()
+                removed += 1
+            return removed

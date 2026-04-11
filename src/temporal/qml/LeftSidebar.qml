@@ -85,13 +85,17 @@ Rectangle {
                             Layout.fillWidth: true
                             spacing: 8
 
-                            Item {
+                            AppActionButton {
+                                theme: root.theme
+                                text: "清空录音文件"
                                 Layout.fillWidth: true
+                                onClicked: root.appBridge.clearRecordingFiles()
                             }
 
                             AppActionButton {
                                 theme: root.theme
                                 text: "清空日志"
+                                Layout.fillWidth: true
                                 onClicked: root.appBridge.clearRemoteLog()
                             }
                         }

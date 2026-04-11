@@ -2,7 +2,7 @@
 title: left-sidebar
 status: active
 stability: flexible
-version: 0.4
+version: 0.5
 ---
 
 ## Role
@@ -13,7 +13,8 @@ version: 0.4
 ## Invariants
 
 - 左侧栏 MUST 同时包含上方日志区和下方控制区，且日志区 MUST 保持比控制区更高的视觉权重。
-- 日志卡片 MUST 保持“标题 + 日志内容 + 底部操作区”三段结构；“清空日志”按钮 MUST 位于日志卡片底部操作区并右对齐。
+- 日志卡片 MUST 保持“标题 + 日志内容 + 底部操作区”三段结构。
+- 日志卡片底部操作区 MUST 同时提供“清空录音文件”和“清空日志”入口，且“清空日志”按钮 MUST 位于最右侧。
 - 控制区 MUST 只暴露一枚远程 ODAS 主动作按钮和一枚监听动作按钮；MUST NOT 回退为复杂按钮矩阵。
 - 两枚按钮的文字和启用状态 MUST 直接反映 bridge 当前状态；`启动中` 语义 MUST 通过禁用主按钮阻止重复触发。
 - 业务动作 MUST 通过 `appBridge.toggleRemoteOdas()` 和 `appBridge.toggleStreams()` 路由；左侧栏 MUST NOT 自行拼接远端状态机或 SSH 控制逻辑。
@@ -21,6 +22,7 @@ version: 0.4
 - 状态文本 MUST 采用三行固定结构：主状态、数据状态、计数，不追加独立指标区或并列状态区。
 - 状态区 MUST 只呈现摘要与计数语义；不用原始 shell 细节替代状态说明。
 - 清空日志动作 MUST 通过 `appBridge.clearRemoteLog()` 路由；UI MUST NOT 在远端确认成功前主动清空日志显示。
+- 清空录音文件动作 MUST 通过 `appBridge.clearRecordingFiles()` 路由；UI MUST NOT 直接操作录音目录。
 - 清空日志成功后，日志区 MUST 回到统一空态占位；MUST NOT 继续展示本地录音采样率 warning。
 - 清空日志成功后，日志区 MUST 继续绑定既有轮询投影链路；新增远端日志到达时 MUST 继续刷新显示。
 - 日志区 MUST 保留 shell 详细日志。

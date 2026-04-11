@@ -31,6 +31,10 @@ class FakeRecorder:
         self.stop_calls += 1
         self._active.clear()
 
+    def clear_recording_files(self) -> int:
+        self.stop_all()
+        return 0
+
     def sessions_snapshot(self) -> list[object]:
         return []
 
