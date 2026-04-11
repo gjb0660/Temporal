@@ -45,6 +45,7 @@ class TestUiProjection(unittest.TestCase):
         ]
         selected_ids = {15}
         rows = build_rows_model_items(sidebar_sources, selected_ids)
+        self.assertEqual([row["targetId"] for row in rows], [7, 15])
         self.assertEqual([row["sourceId"] for row in rows], [7, 15])
         self.assertFalse(rows[0]["checked"])
         self.assertTrue(rows[1]["checked"])
@@ -69,6 +70,7 @@ class TestUiProjection(unittest.TestCase):
             active_source_ids={202},
         )
 
+        self.assertEqual([row["targetId"] for row in rows], [101, 202])
         self.assertEqual([row["sourceId"] for row in rows], [7, 7])
         self.assertEqual([row["checked"] for row in rows], [False, True])
         self.assertEqual([row["active"] for row in rows], [False, True])

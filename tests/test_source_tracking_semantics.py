@@ -91,6 +91,38 @@ class TestSourceTrackingSemantics(unittest.TestCase):
         self.assertEqual(first.visible_targets[0].target_id, second.visible_targets[0].target_id)
         self.assertEqual(first.visible_targets[0].color, second.visible_targets[0].color)
 
+    def test_visible_targets_keep_one_to_one_source_target_mapping(self) -> None:
+        scenario = get_preview_scenario("hemisphereSpread")
+        frames = scenario["trackingFrames"]
+        session = SpaceTargetSession()
+
+        for tick in range(200):
+            frame = frames[tick % len(frames)]
+            observations = [
+                SourceObservation(
+                    source_id=int(source["id"]),
+                    sample=tick * 19,
+                    x=float(source["x"]),
+                    y=float(source["y"]),
+                    z=float(source["z"]),
+                )
+                for source in frame["sources"]
+            ]
+            result = session.step(observations)
+
+            source_ids = [int(item.source_id) for item in result.visible_targets]
+            target_ids = [int(item.target_id) for item in result.visible_targets]
+            self.assertEqual(
+                len(source_ids),
+                len(set(source_ids)),
+                msg=f"tick={tick} duplicate-source-id",
+            )
+            self.assertEqual(
+                len(target_ids),
+                len(set(target_ids)),
+                msg=f"tick={tick} duplicate-target-id",
+            )
+
     def test_large_angle_breaks_continuity_within_window(self) -> None:
         session = SpaceTargetSession(palette=("c0", "c1"))
 

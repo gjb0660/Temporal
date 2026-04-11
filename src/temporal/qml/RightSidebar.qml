@@ -35,9 +35,11 @@ Rectangle {
 
             delegate: ColumnLayout {
                 id: sourceRow
+                required property int targetId
                 required property int sourceId
                 required property string label
                 required property bool checked
+                required property bool enabled
                 required property bool active
                 required property string badge
                 required property string badgeColor
@@ -58,7 +60,7 @@ Rectangle {
                         Layout.alignment: Qt.AlignVCenter
                         onToggled: {
                             if (sourceRow.enabled) {
-                                root.appBridge.setSourceSelected(sourceRow.sourceId, checked)
+                                root.appBridge.setTargetSelected(sourceRow.targetId, checked);
                             }
                         }
                     }

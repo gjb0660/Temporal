@@ -44,6 +44,7 @@ def build_rows_model_items(
         target_id = int(source.get("targetId", source_id))
         rows.append(
             {
+                "targetId": target_id,
                 "sourceId": source_id,
                 "label": "声源",
                 "checked": target_id in selected_source_ids,

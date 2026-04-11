@@ -150,6 +150,21 @@ class TestChartBridgeContract(unittest.TestCase):
         color_17 = next(str(item["badgeColor"]) for item in rows if int(item["sourceId"]) == 17)
         self.assertEqual(color_17, color_7)
 
+    def test_runtime_selection_follows_target_id_across_source_id_drift(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        target_id = int(bridge.sourceRowsModel.get(0)["targetId"])
+        self.assertGreater(target_id, 0)
+
+        bridge.setTargetSelected(target_id, False)
+        bridge._on_sst({"timeStamp": 19, "src": [{"id": 17, "x": 1.0, "y": 0.0, "z": 0.0}]})
+
+        row = next(
+            item for item in _model_items(bridge.sourceRowsModel) if int(item["sourceId"]) == 17
+        )
+        self.assertEqual(int(row["targetId"]), target_id)
+        self.assertFalse(bool(row["checked"]))
+
     def test_runtime_keeps_history_window_colors_unique_for_old_and_new_targets(self) -> None:
         bridge = self._make_runtime_bridge()
         bridge._on_sst({"timeStamp": 0, "src": [{"id": 3, "x": 1.0, "y": 0.0, "z": 0.0}]})

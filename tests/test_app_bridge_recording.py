@@ -97,7 +97,16 @@ class TestAppBridgeRecording(unittest.TestCase):
         )
 
     def _target_id_for_source(self, bridge: AppBridge, source_id: int) -> int:
-        return int(bridge._runtime_source_target_alias.get(int(source_id), 0))
+        fallback_target_id = 0
+        for index in range(bridge.sourceRowsModel.count):
+            row = bridge.sourceRowsModel.get(index)
+            if int(row.get("sourceId", 0)) != int(source_id):
+                continue
+            target_id = int(row.get("targetId", 0))
+            if bool(row.get("active")):
+                return target_id
+            fallback_target_id = target_id
+        return fallback_target_id
 
     def test_sst_updates_recording_count(self) -> None:
         bridge = self._make_bridge()
@@ -298,10 +307,10 @@ class TestAppBridgeRecording(unittest.TestCase):
             }
         )
 
-        bridge.setSourceSelected(2, False)
+        bridge.setTargetSelected(self._target_id_for_source(bridge, 2), False)
         self.assertEqual(bridge.sourcePositionsModel.count, 1)
 
-        bridge.setSourceSelected(5, False)
+        bridge.setTargetSelected(self._target_id_for_source(bridge, 5), False)
 
         self.assertEqual(bridge.sourceRowsModel.count, 2)
         self.assertEqual(bridge.sourcePositionsModel.count, 0)

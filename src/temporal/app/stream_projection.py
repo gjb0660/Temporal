@@ -29,7 +29,6 @@ class StreamProjectionBridge(Protocol):
     _runtime_chart_visible_rows: dict[int, dict[str, Any]]
     _runtime_chart_visible_target_ids: list[int]
     _runtime_target_colors: dict[int, str]
-    _runtime_source_target_alias: dict[int, int]
     _chart_commit_dirty: bool
     _chart_next_commit_at: float
     _chart_commit_timer: Any
@@ -104,7 +103,7 @@ __all__ = [
     "reset_runtime_chart_clock",
     "set_potential_energy_range",
     "set_potentials_enabled",
-    "set_source_selected",
+    "set_target_selected",
     "set_source_positions",
     "set_sources_enabled",
     "start_streams",
@@ -171,21 +170,20 @@ def set_sources_enabled(bridge: StreamProjectionBridge, enabled: bool) -> None:
     refresh_sources(bridge)
 
 
-def set_source_selected(bridge: StreamProjectionBridge, source_id: int, selected: bool) -> None:
-    target_id = bridge._runtime_source_target_alias.get(int(source_id))
-    if target_id is None:
+def set_target_selected(bridge: StreamProjectionBridge, target_id: int, selected: bool) -> None:
+    normalized_target_id = int(target_id)
+    if normalized_target_id not in bridge._runtime_catalog_by_target:
         return
 
-    changed = False
-    if selected and target_id not in bridge._selected_source_ids:
-        bridge._selected_source_ids.add(target_id)
-        changed = True
-    if not selected and target_id in bridge._selected_source_ids:
-        bridge._selected_source_ids.remove(target_id)
-        changed = True
-
-    if not changed:
+    next_selected = bool(selected)
+    was_selected = normalized_target_id in bridge._selected_source_ids
+    if was_selected == next_selected:
         return
+
+    if next_selected:
+        bridge._selected_source_ids.add(normalized_target_id)
+    else:
+        bridge._selected_source_ids.remove(normalized_target_id)
 
     refresh_sources(bridge)
 
@@ -315,9 +313,6 @@ def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = Tru
             bridge._selected_source_ids.add(target_id)
 
     display_source_ids = [int(row["sourceId"]) for row in catalog_rows]
-    bridge._runtime_source_target_alias = {
-        int(row["sourceId"]): int(row["targetId"]) for row in catalog_rows
-    }
     if display_source_ids != bridge._source_ids:
         bridge._source_ids = display_source_ids
         bridge.sourceIdsChanged.emit()
@@ -658,7 +653,6 @@ def reset_runtime_chart_clock(bridge: StreamProjectionBridge) -> None:
     bridge._runtime_chart_visible_rows = {}
     bridge._runtime_chart_visible_target_ids = []
     bridge._runtime_target_colors = {}
-    bridge._runtime_source_target_alias = {}
     bridge._runtime_tracking_result = TrackingResult(
         visible_targets=[],
         dropped_source_ids=[],

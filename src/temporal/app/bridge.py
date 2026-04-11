@@ -122,7 +122,6 @@ class AppBridge(QObject):
         self._runtime_chart_visible_rows: dict[int, dict[str, Any]] = {}
         self._runtime_chart_visible_target_ids: list[int] = []
         self._runtime_target_colors: dict[int, str] = {}
-        self._runtime_source_target_alias: dict[int, int] = {}
         self._chart_commit_dirty = False
         self._chart_next_commit_at = 0.0
         self._runtime_tracking_result = TrackingResult(
@@ -156,7 +155,17 @@ class AppBridge(QObject):
         self._chart_commit_timer.timeout.connect(self._on_chart_commit_timeout)
 
         self._source_rows_model = QmlListModel(
-            ["sourceId", "label", "checked", "enabled", "active", "badge", "badgeColor"], self
+            [
+                "targetId",
+                "sourceId",
+                "label",
+                "checked",
+                "enabled",
+                "active",
+                "badge",
+                "badgeColor",
+            ],
+            self,
         )
         self._source_positions_model = QmlListModel(["id", "color", "x", "y", "z"], self)
         self._elevation_chart_series_model = QmlListModel(["sourceId", "color", "points"], self)
@@ -343,8 +352,8 @@ class AppBridge(QObject):
         stream_projection.set_sources_enabled(self, enabled)
 
     @qt_slot(int, bool)
-    def setSourceSelected(self, source_id: int, selected: bool) -> None:
-        stream_projection.set_source_selected(self, source_id, selected)
+    def setTargetSelected(self, target_id: int, selected: bool) -> None:
+        stream_projection.set_target_selected(self, target_id, selected)
 
     @qt_slot(bool)
     def setPotentialsEnabled(self, enabled: bool) -> None:

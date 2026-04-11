@@ -40,6 +40,14 @@ def _source_ids(bridge: PreviewBridge) -> list[int]:
     return cast(list[int], getattr(bridge, "sourceIds"))
 
 
+def _target_id_for_source(bridge: PreviewBridge, source_id: int) -> int:
+    for row in _model_items(bridge.sourceRowsModel):
+        if int(row.get("sourceId", 0)) != int(source_id):
+            continue
+        return int(row.get("targetId", 0))
+    return 0
+
+
 class _FakeSignal:
     def __init__(self) -> None:
         self._callbacks: list[Callable[[], None]] = []
@@ -154,7 +162,9 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.setPreviewScenario("hemisphereSpread")
         bridge.toggleStreams()
         bridge.advancePreviewTick()
-        bridge.setSourceSelected(7, False)
+        target_id = _target_id_for_source(bridge, 7)
+        self.assertGreater(target_id, 0)
+        bridge.setTargetSelected(target_id, False)
 
         self.assertTrue(any(item["sourceId"] == 7 for item in _model_items(bridge.sourceRowsModel)))
         self.assertFalse(
@@ -182,7 +192,9 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.setPreviewScenario("hemisphereSpread")
 
         for source_id in [7, 15, 21, 31]:
-            bridge.setSourceSelected(source_id, False)
+            target_id = _target_id_for_source(bridge, source_id)
+            self.assertGreater(target_id, 0)
+            bridge.setTargetSelected(target_id, False)
 
         self.assertEqual(bridge.sourceRowsModel.count, 4)
         self.assertTrue(all(not item["checked"] for item in _model_items(bridge.sourceRowsModel)))
@@ -269,6 +281,29 @@ class TestPreviewBridge(unittest.TestCase):
         bridge.advancePreviewTick()
 
         self.assertNotEqual(_model_items(bridge.sourcePositionsModel), before_positions)
+
+    def test_running_tick_keeps_single_toggle_selection_stable(self) -> None:
+        bridge = PreviewBridge()
+        bridge.setPreviewScenario("hemisphereSpread")
+        bridge.toggleStreams()
+        target_id = _target_id_for_source(bridge, 7)
+
+        self.assertGreater(target_id, 0)
+        bridge.setTargetSelected(target_id, False)
+
+        for _ in range(20):
+            bridge.advancePreviewTick()
+            row = next(
+                (
+                    item
+                    for item in _model_items(bridge.sourceRowsModel)
+                    if int(item.get("targetId", 0)) == target_id
+                ),
+                None,
+            )
+            if row is None:
+                self.fail("target row disappeared during running tick selection stability check")
+            self.assertFalse(bool(row["checked"]))
 
     def test_preview_tick_uses_fixed_stride_and_interval(self) -> None:
         bridge = PreviewBridge()

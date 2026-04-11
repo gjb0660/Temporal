@@ -52,6 +52,8 @@ class QmlListModel(QAbstractListModel):
 
     def replace(self, items: list[dict[str, Any]] | list[Any]) -> None:
         normalized = [self._normalize_item(item) for item in items]
+        if normalized == self._items:
+            return
         count_before = len(self._items)
         self.beginResetModel()
         self._items = normalized

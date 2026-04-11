@@ -94,8 +94,8 @@ def refresh_recording_sessions(bridge: Any) -> None:
 
     active_by_key: dict[tuple[int, str, str], tuple[int, dict[str, Any]]] = {}
     source_target_alias = {
-        int(source_id): int(target_id)
-        for source_id, target_id in bridge._runtime_source_target_alias.items()
+        int(row.get("sourceId", 0)): int(target_id)
+        for target_id, row in bridge._runtime_catalog_by_target.items()
     }
     valid_target_ids = {int(target_id) for target_id in bridge._runtime_catalog_by_target}
     for item in sessions:
