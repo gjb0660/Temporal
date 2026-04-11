@@ -17,14 +17,20 @@ version: 0.1
 - potential 可见性 MUST 由独立开关控制，并与“声源”开关并行独立。
 - potential 能量范围控件 MUST 仅影响 potential 层；MUST NOT 影响 tracked 层可见性。
 - chart 的 potential 序列 MUST 使用 11 档能量色阶散点语义，MUST NOT 连线伪造连续身份轨迹。
+- SSL ingress MUST 使用有界缓冲 + 背压语义（默认队列容量 `256`）；MUST NOT 采用每条 SSL 一次无界 queued UI 事件的路径。
+- SSL ingress 批处理节奏默认 MUST 与 chart commit 节奏对齐（`20Hz / 50ms`）；批内 MAY 逐条摄取，但 UI 投影提交 MUST 在批末合并。
 - chart 的 potential 历史写入 MUST 使用 SSL 帧节流（默认 `stride=20`）。
+- chart 的 potential 模型提交 MUST 使用 dirty-gate + 统一提交节流（默认沿用 `50ms` commit 定时器）；MUST NOT 在每条 SSL 上全量重建 chart。
 - chart 的 potential 散点半径默认 MUST 为 `3`（对齐 `odas_web`）。
 - chart 的 potential 时序窗口 MUST 与共享图表窗口对齐（默认 `1600` samples）。
 - 3D 的 potential 点位 MUST 使用 11 档能量色阶与固定大小语义；默认大小 MUST 为 tracked 点位大小的 `0.625x`。
 - 3D 的 potential 点位 MUST 使用不透明材质与方点语义，并支持默认 `50` 帧短尾迹；`life` MUST NOT 用于透明度衰减。
+- 3D 的短尾迹 MUST 使用 sample 时间窗裁剪语义（最近 `50` 样本帧）；MUST NOT 使用每帧全量 life 衰减复制。
+- 3D 的 potential 渲染实现 MAY 使用 instancing 或 delegate；无论实现路径，potential+录音并发场景 MUST 满足结构性预算并避免冻结。
 - 3D 渲染层级 MUST 保持 potential 在下、tracked 在上；MUST NOT 让 potential 覆盖 tracked。
 - potential 颜色字面量 MUST 使用 Qt 可解析格式（如 `#RRGGBB`）；MUST NOT 使用会导致 Qt 路径退化的颜色格式。
-- runtime 与 preview MUST 共享同一 potential 投影路径与同一可见性语义；MUST NOT 引入并行 fallback 规则。
+- runtime 与 preview MUST 共享同一 potential 投影路径与同一可见性语义；MUST NOT 因性能优化引入并行语义分叉。
+- 运行态 SHOULD 暴露可观测指标（队列深度、阻塞计数、批大小、批延迟）用于验证背压与长稳态平台化。
 - 下游 UI contracts/features MUST 引用本 Contract；MUST NOT 在本 Contract 之外并行定义 potential 业务规则。
 
 ## Variation Space

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import queue
 import sys
+import threading
 from collections import deque
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
@@ -28,6 +31,8 @@ class AppBridge(QObject):
     _STARTUP_VERIFY_ATTEMPTS = 11
     _RUNTIME_CHART_X_TICKS = build_default_chart_ticks()
     _RUNTIME_CHART_COMMIT_INTERVAL_MS = 50
+    _SSL_INGRESS_QUEUE_MAX = 256
+    _SSL_INGRESS_BATCH_MAX = 256
     _HEADER_NAV_LABELS = ["配置", "录制", "相机"]
     _EMPTY_REMOTE_LOG = ["等待连接远程 odaslive..."]
 
@@ -50,14 +55,12 @@ class AppBridge(QObject):
     potentialCountChanged = Signal()
     recordingSourceCountChanged = Signal()
     recordingSessionsChanged = Signal()
+    sslIngressMetricsChanged = Signal()
     sourcesEnabledChanged = Signal()
     potentialsEnabledChanged = Signal()
     potentialRangeChanged = Signal()
     previewStateChanged = Signal()
     _sstIngressRequested = Signal(object)
-    _sslIngressRequested = Signal(object)
-    _sepAudioIngressRequested = Signal(object)
-    _pfAudioIngressRequested = Signal(object)
 
     def __init__(
         self,
@@ -106,6 +109,16 @@ class AppBridge(QObject):
             tuple[int, str, str], tuple[int, dict[str, Any]]
         ] = {}
         self._recording_session_target_by_key: dict[tuple[int, str, str], int] = {}
+        self._recording_route_lock = threading.RLock()
+        self._ssl_ingress_queue: queue.Queue[tuple[dict[str, Any], float]] = queue.Queue(
+            maxsize=self._SSL_INGRESS_QUEUE_MAX
+        )
+        self._ssl_ingress_accepting = False
+        self._ssl_ingress_queue_depth = 0
+        self._ssl_ingress_blocked_count = 0
+        self._ssl_ingress_blocked_count_emitted = 0
+        self._ssl_ingress_last_batch_size = 0
+        self._ssl_ingress_last_batch_latency_ms = 0.0
         self._sources_enabled = True
         self._potentials_enabled = False
         self._potential_min = 0.0
@@ -140,15 +153,6 @@ class AppBridge(QObject):
         self._sstIngressRequested.connect(
             self._handle_sst_ingress, Qt.ConnectionType.QueuedConnection
         )
-        self._sslIngressRequested.connect(
-            self._handle_ssl_ingress, Qt.ConnectionType.QueuedConnection
-        )
-        self._sepAudioIngressRequested.connect(
-            self._handle_sep_audio_ingress, Qt.ConnectionType.QueuedConnection
-        )
-        self._pfAudioIngressRequested.connect(
-            self._handle_pf_audio_ingress, Qt.ConnectionType.QueuedConnection
-        )
 
         self._log_timer = QTimer(self)
         self._log_timer.setInterval(1500)
@@ -159,6 +163,9 @@ class AppBridge(QObject):
         self._chart_commit_timer = QTimer(self)
         self._chart_commit_timer.setInterval(self._RUNTIME_CHART_COMMIT_INTERVAL_MS)
         self._chart_commit_timer.timeout.connect(self._on_chart_commit_timeout)
+        self._ssl_ingress_timer = QTimer(self)
+        self._ssl_ingress_timer.setInterval(self._RUNTIME_CHART_COMMIT_INTERVAL_MS)
+        self._ssl_ingress_timer.timeout.connect(self._on_ssl_ingress_timeout)
 
         self._source_rows_model = QmlListModel(
             [
@@ -174,7 +181,7 @@ class AppBridge(QObject):
             self,
         )
         self._source_positions_model = QmlListModel(["id", "color", "x", "y", "z"], self)
-        self._potential_positions_model = QmlListModel(["color", "x", "y", "z", "life"], self)
+        self._potential_positions_model = QmlListModel(["color", "x", "y", "z", "sample"], self)
         self._elevation_chart_series_model = QmlListModel(
             ["sourceId", "color", "points", "layer", "showLine", "pointRadius"], self
         )
@@ -258,6 +265,22 @@ class AppBridge(QObject):
     @qt_property(int, notify=recordingSourceCountChanged)
     def recordingSourceCount(self) -> int:
         return self._recording_source_count
+
+    @qt_property(int, notify=sslIngressMetricsChanged)
+    def sslIngressQueueDepth(self) -> int:
+        return self._ssl_ingress_queue_depth
+
+    @qt_property(int, notify=sslIngressMetricsChanged)
+    def sslIngressBlockedCount(self) -> int:
+        return self._ssl_ingress_blocked_count
+
+    @qt_property(int, notify=sslIngressMetricsChanged)
+    def sslIngressLastBatchSize(self) -> int:
+        return self._ssl_ingress_last_batch_size
+
+    @qt_property(float, notify=sslIngressMetricsChanged)
+    def sslIngressLastBatchLatencyMs(self) -> float:
+        return self._ssl_ingress_last_batch_latency_ms
 
     @qt_property(bool, notify=sourcesEnabledChanged)
     def sourcesEnabled(self) -> bool:
@@ -394,42 +417,143 @@ class AppBridge(QObject):
         self._sstIngressRequested.emit(message)
 
     def _on_ssl(self, message: dict) -> None:
-        if QThread.currentThread() is self.thread():
-            self._handle_ssl_ingress(message)
+        payload = self._coerce_ssl_message(message)
+        if payload is None:
             return
-        self._sslIngressRequested.emit(message)
+        if QThread.currentThread() is self.thread():
+            stream_projection.on_ssl(self, payload)
+            return
+        if not self._ssl_ingress_accepting:
+            return
+        enqueue_started_at = monotonic()
+        while self._ssl_ingress_accepting:
+            try:
+                self._ssl_ingress_queue.put((payload, enqueue_started_at), timeout=0.05)
+                break
+            except queue.Full:
+                self._ssl_ingress_blocked_count += 1
 
     def _on_sep_audio(self, chunk: bytes) -> None:
-        if QThread.currentThread() is self.thread():
-            self._handle_sep_audio_ingress(chunk)
+        payload = self._coerce_audio_chunk(chunk)
+        if payload is None:
             return
-        self._sepAudioIngressRequested.emit(chunk)
+        if QThread.currentThread() is self.thread():
+            stream_projection.on_sep_audio(self, payload)
+            return
+        stream_projection.on_sep_audio(self, payload)
 
     def _on_pf_audio(self, chunk: bytes) -> None:
-        if QThread.currentThread() is self.thread():
-            self._handle_pf_audio_ingress(chunk)
+        payload = self._coerce_audio_chunk(chunk)
+        if payload is None:
             return
-        self._pfAudioIngressRequested.emit(chunk)
+        if QThread.currentThread() is self.thread():
+            stream_projection.on_pf_audio(self, payload)
+            return
+        stream_projection.on_pf_audio(self, payload)
 
     @qt_slot(object)
     def _handle_sst_ingress(self, message: object) -> None:
         if isinstance(message, dict):
             stream_projection.on_sst(self, message)
 
-    @qt_slot(object)
-    def _handle_ssl_ingress(self, message: object) -> None:
-        if isinstance(message, dict):
-            stream_projection.on_ssl(self, message)
+    @qt_slot()
+    def _on_ssl_ingress_timeout(self) -> None:
+        self._drain_ssl_ingress_batch()
 
-    @qt_slot(object)
-    def _handle_sep_audio_ingress(self, chunk: object) -> None:
-        if isinstance(chunk, (bytes, bytearray, memoryview)):
-            stream_projection.on_sep_audio(self, bytes(chunk))
+    def _coerce_audio_chunk(self, chunk: object) -> bytes | None:
+        if isinstance(chunk, bytes):
+            return chunk
+        if isinstance(chunk, (bytearray, memoryview)):
+            return bytes(chunk)
+        return None
 
-    @qt_slot(object)
-    def _handle_pf_audio_ingress(self, chunk: object) -> None:
-        if isinstance(chunk, (bytes, bytearray, memoryview)):
-            stream_projection.on_pf_audio(self, bytes(chunk))
+    def _coerce_ssl_message(self, message: object) -> dict[str, Any] | None:
+        if not isinstance(message, dict):
+            return None
+        return message
+
+    def _set_ssl_ingress_accepting(self, accepting: bool) -> None:
+        self._ssl_ingress_accepting = bool(accepting)
+        if self._ssl_ingress_accepting:
+            self._ssl_ingress_timer.start()
+            return
+        self._ssl_ingress_timer.stop()
+        self._drain_ssl_ingress_batch(flush_all=True)
+        self._clear_ssl_ingress_queue()
+        self._update_ssl_ingress_metrics(
+            queue_depth=0,
+            blocked_count=self._ssl_ingress_blocked_count,
+            last_batch_size=0,
+            last_batch_latency_ms=0.0,
+        )
+
+    def _clear_ssl_ingress_queue(self) -> None:
+        while not self._ssl_ingress_queue.empty():
+            try:
+                self._ssl_ingress_queue.get_nowait()
+            except queue.Empty:
+                break
+
+    def _drain_ssl_ingress_batch(self, *, flush_all: bool = False) -> None:
+        messages: list[dict[str, Any]] = []
+        oldest_enqueue_at: float | None = None
+        remaining = self._SSL_INGRESS_BATCH_MAX
+        while flush_all or remaining > 0:
+            try:
+                message, enqueued_at = self._ssl_ingress_queue.get_nowait()
+            except queue.Empty:
+                break
+            messages.append(message)
+            if oldest_enqueue_at is None:
+                oldest_enqueue_at = float(enqueued_at)
+            if not flush_all:
+                remaining -= 1
+        if not messages:
+            self._update_ssl_ingress_metrics(
+                queue_depth=self._ssl_ingress_queue.qsize(),
+                blocked_count=self._ssl_ingress_blocked_count,
+            )
+            return
+        stream_projection.on_ssl_batch(self, messages)
+        latency_ms = 0.0
+        if oldest_enqueue_at is not None:
+            latency_ms = max(0.0, (monotonic() - oldest_enqueue_at) * 1000.0)
+        self._update_ssl_ingress_metrics(
+            queue_depth=self._ssl_ingress_queue.qsize(),
+            blocked_count=self._ssl_ingress_blocked_count,
+            last_batch_size=len(messages),
+            last_batch_latency_ms=latency_ms,
+        )
+
+    def _update_ssl_ingress_metrics(
+        self,
+        *,
+        queue_depth: int | None = None,
+        blocked_count: int | None = None,
+        last_batch_size: int | None = None,
+        last_batch_latency_ms: float | None = None,
+    ) -> None:
+        changed = False
+        if queue_depth is not None and self._ssl_ingress_queue_depth != int(queue_depth):
+            self._ssl_ingress_queue_depth = int(queue_depth)
+            changed = True
+        if last_batch_size is not None and self._ssl_ingress_last_batch_size != int(
+            last_batch_size
+        ):
+            self._ssl_ingress_last_batch_size = int(last_batch_size)
+            changed = True
+        if blocked_count is not None and self._ssl_ingress_blocked_count_emitted != int(
+            blocked_count
+        ):
+            self._ssl_ingress_blocked_count_emitted = int(blocked_count)
+            changed = True
+        if last_batch_latency_ms is not None:
+            normalized_latency = float(last_batch_latency_ms)
+            if self._ssl_ingress_last_batch_latency_ms != normalized_latency:
+                self._ssl_ingress_last_batch_latency_ms = normalized_latency
+                changed = True
+        if changed:
+            self.sslIngressMetricsChanged.emit()
 
     def _route_audio_chunk(self, chunk: bytes, mode: str) -> None:
         recording_audio.route_audio_chunk(self, chunk, mode)

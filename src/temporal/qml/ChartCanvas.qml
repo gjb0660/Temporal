@@ -9,19 +9,20 @@ Canvas {
     property var xTickModel: null
     property var seriesModel: null
     property string xAxisLabel: "时间 (0.01s)"
+    property bool paintScheduled: false
 
-    onWidthChanged: requestPaint()
-    onHeightChanged: requestPaint()
-    onYTicksChanged: requestPaint()
-    onXTickModelChanged: requestPaint()
-    onSeriesModelChanged: requestPaint()
-    onXAxisLabelChanged: requestPaint()
+    onWidthChanged: schedulePaint()
+    onHeightChanged: schedulePaint()
+    onYTicksChanged: schedulePaint()
+    onXTickModelChanged: schedulePaint()
+    onSeriesModelChanged: schedulePaint()
+    onXAxisLabelChanged: schedulePaint()
 
     Connections {
         target: root.xTickModel
 
         function onModelReset() {
-            root.requestPaint()
+            root.schedulePaint()
         }
     }
 
@@ -29,8 +30,19 @@ Canvas {
         target: root.seriesModel
 
         function onModelReset() {
-            root.requestPaint()
+            root.schedulePaint()
         }
+    }
+
+    function schedulePaint() {
+        if (paintScheduled) {
+            return
+        }
+        paintScheduled = true
+        Qt.callLater(function () {
+            paintScheduled = false
+            root.requestPaint()
+        })
     }
 
     function modelCount(model) {

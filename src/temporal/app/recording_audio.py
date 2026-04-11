@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from typing import Any
 
 from .status_state import set_recording_source_count, set_remote_log_lines
@@ -10,9 +11,10 @@ _RECENT_CLOSED_LIMIT = 2
 def sync_recording_state_from_sources(bridge: Any, source_ids: list[int]) -> None:
     update_source_channel_map(bridge, source_ids)
 
-    mapped_source_ids = [
-        source_id for source_id in source_ids if source_id in bridge._source_channel_map
-    ]
+    with _recording_route_guard(bridge):
+        mapped_source_ids = [
+            source_id for source_id in source_ids if source_id in bridge._source_channel_map
+        ]
     bridge._recorder.update_active_sources(mapped_source_ids)
     bridge._recorder.sweep_inactive()
     set_recording_source_count(bridge, len(bridge._recorder.active_sources()))
@@ -20,7 +22,9 @@ def sync_recording_state_from_sources(bridge: Any, source_ids: list[int]) -> Non
 
 
 def route_audio_chunk(bridge: Any, chunk: bytes, mode: str) -> None:
-    if not bridge._channel_source_map:
+    with _recording_route_guard(bridge):
+        channel_source_map = dict(bridge._channel_source_map)
+    if not channel_source_map:
         return
 
     frame_width = bridge._AUDIO_CHANNELS * bridge._AUDIO_SAMPLE_WIDTH
@@ -30,7 +34,7 @@ def route_audio_chunk(bridge: Any, chunk: bytes, mode: str) -> None:
 
     buffers = {
         channel_index: bytearray()
-        for channel_index in bridge._channel_source_map
+        for channel_index in channel_source_map
         if 0 <= channel_index < bridge._AUDIO_CHANNELS
     }
     if not buffers:
@@ -44,41 +48,43 @@ def route_audio_chunk(bridge: Any, chunk: bytes, mode: str) -> None:
             buffers[channel_index].extend(sample)
 
     for channel_index, channel_pcm in buffers.items():
-        source_id = bridge._channel_source_map.get(channel_index)
+        source_id = channel_source_map.get(channel_index)
         if source_id is None or not channel_pcm:
             continue
         bridge._recorder.push(source_id, mode, bytes(channel_pcm))
 
 
 def update_source_channel_map(bridge: Any, source_ids: list[int]) -> None:
-    next_source_map: dict[int, int] = {}
-    used_channels: set[int] = set()
+    with _recording_route_guard(bridge):
+        next_source_map: dict[int, int] = {}
+        used_channels: set[int] = set()
 
-    for source_id in source_ids:
-        channel_index = bridge._source_channel_map.get(source_id)
-        if channel_index is None or channel_index in used_channels:
-            continue
-        if not 0 <= channel_index < bridge._AUDIO_CHANNELS:
-            continue
-        next_source_map[source_id] = channel_index
-        used_channels.add(channel_index)
+        for source_id in source_ids:
+            channel_index = bridge._source_channel_map.get(source_id)
+            if channel_index is None or channel_index in used_channels:
+                continue
+            if not 0 <= channel_index < bridge._AUDIO_CHANNELS:
+                continue
+            next_source_map[source_id] = channel_index
+            used_channels.add(channel_index)
 
-    free_channels = [
-        channel_index
-        for channel_index in range(bridge._AUDIO_CHANNELS)
-        if channel_index not in used_channels
-    ]
-    for source_id in source_ids:
-        if source_id in next_source_map:
-            continue
-        if not free_channels:
-            break
-        next_source_map[source_id] = free_channels.pop(0)
+        free_channels = [
+            channel_index
+            for channel_index in range(bridge._AUDIO_CHANNELS)
+            if channel_index not in used_channels
+        ]
+        for source_id in source_ids:
+            if source_id in next_source_map:
+                continue
+            if not free_channels:
+                break
+            next_source_map[source_id] = free_channels.pop(0)
 
-    bridge._source_channel_map = next_source_map
-    bridge._channel_source_map = {
-        channel_index: source_id for source_id, channel_index in bridge._source_channel_map.items()
-    }
+        bridge._source_channel_map = next_source_map
+        bridge._channel_source_map = {
+            channel_index: source_id
+            for source_id, channel_index in bridge._source_channel_map.items()
+        }
 
 
 def refresh_recording_sessions(bridge: Any) -> None:
@@ -239,6 +245,13 @@ def _session_detail(item: Any) -> dict[str, Any]:
         "filename": filename,
         "line": filename,
     }
+
+
+def _recording_route_guard(bridge: Any):
+    lock = getattr(bridge, "_recording_route_lock", None)
+    if lock is None:
+        return nullcontext()
+    return lock
 
 
 __all__ = [

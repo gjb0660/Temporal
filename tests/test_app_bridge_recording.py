@@ -1,3 +1,4 @@
+import threading
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
@@ -163,6 +164,58 @@ class TestAppBridgeRecording(unittest.TestCase):
         actual = {(source_id, mode): pcm for source_id, mode, pcm in recorder.pushed}
         self.assertEqual(actual.get((1, "pf")), b"\x11\x00")
         self.assertEqual(actual.get((2, "pf")), b"\x22\x00")
+
+    def test_sep_audio_ingress_from_background_thread_routes_without_ui_queue(self) -> None:
+        bridge = self._make_bridge()
+        recorder = bridge._recorder
+        self.assertIsInstance(recorder, _FakeRecorder)
+        bridge._on_sst({"src": [{"id": 101}, {"id": 202}]})
+        chunk = b"\x01\x00\x02\x00\x03\x00\x04\x00"
+
+        worker = threading.Thread(target=lambda: bridge._on_sep_audio(chunk), daemon=True)
+        worker.start()
+        worker.join(timeout=2.0)
+
+        self.assertFalse(worker.is_alive())
+        actual = {(source_id, mode): pcm for source_id, mode, pcm in recorder.pushed}
+        self.assertEqual(actual.get((101, "sp")), b"\x01\x00")
+        self.assertEqual(actual.get((202, "sp")), b"\x02\x00")
+
+    def test_potential_and_recording_long_run_keeps_bounded_runtime_structures(self) -> None:
+        bridge = self._make_bridge()
+        recorder = bridge._recorder
+        self.assertIsInstance(recorder, _FakeRecorder)
+        bridge.setPotentialsEnabled(True)
+        bridge._set_streams_active(True)
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 101}, {"id": 202}]})
+        chunk = b"\x01\x00\x02\x00\x03\x00\x04\x00"
+
+        for sample in range(3000):
+            bridge._on_ssl(
+                {
+                    "timeStamp": sample,
+                    "src": [
+                        {"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.92},
+                        {"x": 0.0, "y": 1.0, "z": 0.0, "E": 0.77},
+                        {"x": 0.0, "y": 0.0, "z": 1.0, "E": 0.55},
+                    ],
+                }
+            )
+            if sample % 2 == 0:
+                bridge._on_sep_audio(chunk)
+            else:
+                bridge._on_pf_audio(chunk)
+            if sample % 10 == 0:
+                bridge._chart_next_commit_at = 0.0
+                bridge._on_chart_commit_timeout()
+
+        self.assertEqual(len(recorder.pushed), 6000)
+        self.assertLessEqual(len(bridge._runtime_potential_trail), 150)
+        self.assertLessEqual(len(bridge._runtime_potential_history), 300)
+        self.assertEqual(bridge.potentialPositionsModel.count, 150)
+        samples = [int(bridge.potentialPositionsModel.get(index)["sample"]) for index in range(150)]
+        self.assertEqual(min(samples), 2950)
+        self.assertEqual(max(samples), 2999)
 
     def test_recording_sessions_updates_on_sst_and_stop(self) -> None:
         bridge = self._make_bridge()

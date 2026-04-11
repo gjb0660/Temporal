@@ -102,7 +102,6 @@ Rectangle {
             const x = Number(item.x)
             const y = Number(item.y)
             const z = Number(item.z)
-            const life = Math.max(1, Number(item.life) || 1)
             if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
                 continue
             }
@@ -113,7 +112,6 @@ Rectangle {
                 x: x * scale,
                 y: y * scale,
                 z: z * scale,
-                life: life,
                 revision: revision
             })
         }
@@ -213,22 +211,18 @@ Rectangle {
 
         function onModelReset() {
             root.sourceModelRevision += 1
-            axisOverlay.requestPaint()
         }
 
         function onRowsInserted() {
             root.sourceModelRevision += 1
-            axisOverlay.requestPaint()
         }
 
         function onRowsRemoved() {
             root.sourceModelRevision += 1
-            axisOverlay.requestPaint()
         }
 
         function onDataChanged() {
             root.sourceModelRevision += 1
-            axisOverlay.requestPaint()
         }
     }
 
@@ -237,29 +231,23 @@ Rectangle {
 
         function onModelReset() {
             root.potentialModelRevision += 1
-            axisOverlay.requestPaint()
         }
 
         function onRowsInserted() {
             root.potentialModelRevision += 1
-            axisOverlay.requestPaint()
         }
 
         function onRowsRemoved() {
             root.potentialModelRevision += 1
-            axisOverlay.requestPaint()
         }
 
         function onDataChanged() {
             root.potentialModelRevision += 1
-            axisOverlay.requestPaint()
         }
     }
 
     onSphereYawChanged: axisOverlay.requestPaint()
     onSpherePitchChanged: axisOverlay.requestPaint()
-    onVisibleSourcesChanged: axisOverlay.requestPaint()
-    onVisiblePotentialsChanged: axisOverlay.requestPaint()
 
     View3D {
         id: sphereView

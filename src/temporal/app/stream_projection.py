@@ -91,6 +91,7 @@ class StreamProjectionBridge(Protocol):
     def setStatus(self, status: str) -> None: ...
     def startStreams(self) -> None: ...
     def stopStreams(self) -> None: ...
+    def _set_ssl_ingress_accepting(self, accepting: bool) -> None: ...
 
     def _refresh_recording_sessions(self) -> None: ...
     def _apply_recording_sample_rates(self) -> None: ...
@@ -104,6 +105,7 @@ __all__ = [
     "on_sep_audio",
     "on_sst",
     "on_ssl",
+    "on_ssl_batch",
     "refresh_chart_models",
     "flush_chart_models_if_due",
     "refresh_potentials",
@@ -123,6 +125,7 @@ __all__ = [
 _HISTORY_ROW_LIMIT = len(SOURCE_COLOR_PALETTE)
 _CHART_WINDOW_SAMPLES = 1600
 _POTENTIAL_TRAIL_LIFE = 50
+_POTENTIAL_TRAIL_WINDOW_SAMPLES = _POTENTIAL_TRAIL_LIFE
 _POTENTIAL_LAYER = "potential"
 _TRACKED_LAYER = "tracked"
 _POTENTIAL_POINT_RADIUS = 3.0
@@ -166,10 +169,12 @@ def start_streams(bridge: StreamProjectionBridge) -> None:
     status_state.set_streams_active(bridge, True)
     bridge._chart_next_commit_at = 0.0
     bridge._chart_commit_timer.start()
+    bridge._set_ssl_ingress_accepting(True)
     remote_lifecycle.apply_state_status(bridge)
 
 
 def stop_streams(bridge: StreamProjectionBridge) -> None:
+    bridge._set_ssl_ingress_accepting(False)
     flush_chart_models_if_due(bridge, force=True)
     bridge._chart_commit_timer.stop()
     bridge._client.stop()
@@ -258,10 +263,22 @@ def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
 
 
 def on_ssl(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
-    bridge._last_ssl = message
-    append_runtime_potential_frame(bridge, message)
+    on_ssl_batch(bridge, [message])
+
+
+def on_ssl_batch(bridge: StreamProjectionBridge, messages: Sequence[dict[str, Any]]) -> None:
+    if not messages:
+        return
+    chart_dirty = False
+    for message in messages:
+        bridge._last_ssl = message
+        chart_dirty = append_runtime_potential_frame(bridge, message) or chart_dirty
     refresh_potentials(bridge)
-    refresh_potential_outputs(bridge, refresh_chart=True)
+    refresh_potential_outputs(bridge, refresh_chart=False)
+    if chart_dirty:
+        bridge._chart_commit_dirty = True
+        if not bridge._streams_active:
+            flush_chart_models_if_due(bridge, force=True)
 
 
 def on_sep_audio(bridge: StreamProjectionBridge, chunk: bytes) -> None:
@@ -306,7 +323,7 @@ def set_potential_positions(
                 "x": float(item["x"]),
                 "y": float(item["y"]),
                 "z": float(item["z"]),
-                "life": int(item["life"]),
+                "sample": int(item["sample"]),
             }
             for item in positions
         ]
@@ -739,22 +756,21 @@ def append_runtime_chart_frame(bridge: StreamProjectionBridge, message: dict[str
     return True
 
 
-def append_runtime_potential_frame(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
+def append_runtime_potential_frame(bridge: StreamProjectionBridge, message: dict[str, Any]) -> bool:
     sample = _resolve_potential_sample(bridge, message)
     bridge._runtime_last_ssl_sample = int(sample)
     emit_chart_sample = _should_emit_potential_chart_sample(bridge)
+    chart_dirty = False
     points = extract_potential_points(
         message,
         min_energy=float("-inf"),
         max_energy=float("inf"),
         enabled=True,
     )
+    _prune_potential_trail_window(bridge, latest_sample=int(sample))
     if not points:
-        _decay_potential_trail(bridge)
-        _prune_potential_history_window(bridge, latest_sample=int(sample))
-        return
+        return _prune_potential_history_window(bridge, latest_sample=int(sample))
 
-    _decay_potential_trail(bridge)
     for point in points:
         x = float(point["x"])
         y = float(point["y"])
@@ -769,16 +785,17 @@ def append_runtime_potential_frame(bridge: StreamProjectionBridge, message: dict
                     "azimuth": _axis_value({"x": x, "y": y, "z": z}, axis="azimuth"),
                 }
             )
+            chart_dirty = True
         bridge._runtime_potential_trail.append(
             {
                 "x": x,
                 "y": y,
                 "z": z,
                 "energy": energy,
-                "life": _POTENTIAL_TRAIL_LIFE,
+                "sample": int(sample),
             }
         )
-    _prune_potential_history_window(bridge, latest_sample=int(sample))
+    return _prune_potential_history_window(bridge, latest_sample=int(sample)) or chart_dirty
 
 
 def _resolve_potential_sample(bridge: StreamProjectionBridge, message: dict[str, Any]) -> int:
@@ -798,24 +815,7 @@ def _should_emit_potential_chart_sample(bridge: StreamProjectionBridge) -> bool:
     return should_emit
 
 
-def _decay_potential_trail(bridge: StreamProjectionBridge) -> None:
-    updated = deque(
-        (
-            {
-                "x": float(point["x"]),
-                "y": float(point["y"]),
-                "z": float(point["z"]),
-                "energy": float(point["energy"]),
-                "life": int(point["life"]) - 1,
-            }
-            for point in bridge._runtime_potential_trail
-            if int(point.get("life", 0)) - 1 > 0
-        )
-    )
-    bridge._runtime_potential_trail = updated
-
-
-def _prune_potential_history_window(
+def _prune_potential_trail_window(
     bridge: StreamProjectionBridge,
     *,
     latest_sample: int | None = None,
@@ -827,12 +827,35 @@ def _prune_potential_history_window(
         latest = bridge._runtime_last_ssl_sample
     if latest is None:
         return
+    min_sample = int(latest) - (_POTENTIAL_TRAIL_WINDOW_SAMPLES - 1)
+    while bridge._runtime_potential_trail:
+        point_sample = int(bridge._runtime_potential_trail[0].get("sample", min_sample))
+        if point_sample >= min_sample:
+            break
+        bridge._runtime_potential_trail.popleft()
+
+
+def _prune_potential_history_window(
+    bridge: StreamProjectionBridge,
+    *,
+    latest_sample: int | None = None,
+) -> bool:
+    latest = latest_sample
+    if latest is None:
+        latest = _latest_chart_sample(bridge)
+    if latest is None:
+        latest = bridge._runtime_last_ssl_sample
+    if latest is None:
+        return False
     min_sample = int(latest) - _CHART_WINDOW_SAMPLES
-    bridge._runtime_potential_history = deque(
-        point
-        for point in bridge._runtime_potential_history
-        if int(point.get("sample", min_sample)) >= min_sample
-    )
+    changed = False
+    while bridge._runtime_potential_history:
+        point_sample = int(bridge._runtime_potential_history[0].get("sample", min_sample))
+        if point_sample >= min_sample:
+            break
+        bridge._runtime_potential_history.popleft()
+        changed = True
+    return changed
 
 
 def refresh_potential_outputs(
@@ -870,7 +893,7 @@ def build_potential_position_items(
                 "x": float(point["x"]),
                 "y": float(point["y"]),
                 "z": float(point["z"]),
-                "life": int(point["life"]),
+                "sample": int(point["sample"]),
             }
         )
     return items

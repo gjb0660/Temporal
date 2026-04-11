@@ -22,6 +22,7 @@ version: 0.2
 - 组件 MUST NOT 本地生成 preview fallback 点位或并行业务真源轨迹。
 - 空模型或缺失模型 MUST 仍能安全渲染空球体；MUST NOT 产生运行时警告或伪造数据。
 - 鼠标左键拖拽旋转 MUST 保持可用，且缩略坐标框 MUST 随当前朝向同步更新。
+- 缩略坐标框重绘 MUST 由姿态变化触发；MUST NOT 绑定 source/potential 数据模型变更而重复重绘。
 - 在转到背面后，上下拖拽语义 MUST 继续稳定；MUST NOT 出现 pitch 方向反转。
 - 经线与纬线 MUST 保持均匀角度划分，MUST NOT 出现手工不等距分段。
 - 水平盘 MUST 继续表达赤道参考面语义，且 MUST NOT 让背面的网壳和点位完全失去可辨认性。

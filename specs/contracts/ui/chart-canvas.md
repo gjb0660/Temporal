@@ -35,6 +35,7 @@ version: 0.9
 - 可见区间内所有可被 200 整除的刻度值 MUST 同时绘制刻度线与标签。
 - latest 刻度值 MUST 始终显示标签；当 latest 本身可被 200 整除时，MUST NOT 产生重复刻度线或重复标签。
 - 当 latest 不可被 200 整除时，窗口左侧样本点仍 MUST 位于绘图区内，MUST NOT 出现左侧越界或裁切。
+- 组件内部重绘请求 MUST 合并同事件循环内的重复触发（coalesced repaint）；MUST NOT 因连续 model reset 导致冗余 requestPaint 风暴。
 
 ## Variation Space
 

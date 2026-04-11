@@ -1,5 +1,8 @@
+import queue
 import os
 import re
+import threading
+import time
 import unittest
 from math import cos, radians, sin
 from pathlib import Path
@@ -502,6 +505,113 @@ class TestChartBridgeContract(unittest.TestCase):
 
         self.assertEqual(refresh_mock.call_count, 2)
 
+    def test_ssl_ingress_queue_is_bounded_and_applies_backpressure(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge.setPotentialsEnabled(True)
+        bridge._ssl_ingress_queue = queue.Queue(maxsize=1)
+        bridge._set_ssl_ingress_accepting(True)
+        done = threading.Event()
+
+        def _producer() -> None:
+            bridge._on_ssl({"timeStamp": 0, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]})
+            bridge._on_ssl({"timeStamp": 1, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]})
+            done.set()
+
+        worker = threading.Thread(target=_producer, daemon=True)
+        worker.start()
+        time.sleep(0.15)
+
+        self.assertLessEqual(bridge._ssl_ingress_queue.qsize(), 1)
+        self.assertGreater(bridge._ssl_ingress_blocked_count, 0)
+        self.assertFalse(done.is_set())
+
+        bridge._drain_ssl_ingress_batch(flush_all=True)
+        worker.join(timeout=1.0)
+        self.assertFalse(worker.is_alive())
+        bridge._set_ssl_ingress_accepting(False)
+
+    def test_ssl_ingress_tick_batches_messages_before_projection(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge.setPotentialsEnabled(True)
+        bridge._set_ssl_ingress_accepting(True)
+        now = time.monotonic()
+        for sample in range(5):
+            bridge._ssl_ingress_queue.put(
+                (
+                    {"timeStamp": sample, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]},
+                    now,
+                )
+            )
+
+        with patch("temporal.app.stream_projection.on_ssl_batch") as batch_mock:
+            bridge._on_ssl_ingress_timeout()
+
+        self.assertEqual(batch_mock.call_count, 1)
+        self.assertEqual(len(batch_mock.call_args.args[1]), 5)
+        self.assertEqual(bridge._ssl_ingress_queue.qsize(), 0)
+        bridge._set_ssl_ingress_accepting(False)
+
+    def test_ssl_ingress_backpressure_path_keeps_full_frame_sequence(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge.setPotentialsEnabled(True)
+        bridge._ssl_ingress_queue = queue.Queue(maxsize=8)
+        bridge._set_ssl_ingress_accepting(True)
+        frame_total = 200
+
+        def _producer() -> None:
+            for sample in range(frame_total):
+                bridge._on_ssl(
+                    {"timeStamp": sample, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]}
+                )
+
+        worker = threading.Thread(target=_producer, daemon=True)
+        worker.start()
+        while worker.is_alive():
+            bridge._drain_ssl_ingress_batch()
+            time.sleep(0.001)
+        bridge._drain_ssl_ingress_batch(flush_all=True)
+
+        self.assertEqual(bridge._runtime_last_ssl_sample, frame_total - 1)
+        bridge._set_ssl_ingress_accepting(False)
+
+    def test_ssl_chart_commit_uses_dirty_gate_and_interval_throttle(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge.setPotentialsEnabled(True)
+        bridge._set_streams_active(True)
+        bridge._chart_next_commit_at = 0.0
+        with (
+            patch("temporal.app.stream_projection.refresh_chart_models") as refresh_mock,
+            patch("temporal.app.stream_projection.monotonic", side_effect=[1.00, 1.01, 1.02]),
+        ):
+            for sample in range(60):
+                bridge._on_ssl(
+                    {"timeStamp": sample, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]}
+                )
+
+        self.assertEqual(refresh_mock.call_count, 0)
+        self.assertTrue(bridge._chart_commit_dirty)
+
+    def test_potential_trail_keeps_only_latest_50_samples(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge.setPotentialsEnabled(True)
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        for sample in range(200):
+            bridge._on_ssl(
+                {
+                    "timeStamp": sample,
+                    "src": [
+                        {"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88},
+                        {"x": 0.0, "y": 1.0, "z": 0.0, "E": 0.66},
+                    ],
+                }
+            )
+
+        items = _model_items(bridge.potentialPositionsModel)
+        self.assertEqual(len(items), 100)
+        samples = [int(item["sample"]) for item in items]
+        self.assertEqual(min(samples), 150)
+        self.assertEqual(max(samples), 199)
+
     def test_runtime_and_preview_chart_models_match_for_same_frame(self) -> None:
         runtime = self._make_runtime_bridge()
         runtime._on_sst({"timeStamp": 0, "src": [{"id": 15, "x": 1.0, "y": 0.0, "z": 0.0}]})
@@ -621,6 +731,9 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertIn("item.showLine", qml_text)
         self.assertIn("item.pointRadius", qml_text)
         self.assertIn("drawScatter", qml_text)
+        self.assertIn("function schedulePaint()", qml_text)
+        self.assertIn("Qt.callLater", qml_text)
+        self.assertIn("onWidthChanged: schedulePaint()", qml_text)
 
     def test_source_sphere_potential_marker_scale_matches_odas_ratio(self) -> None:
         qml_text = (_QML_DIR / "SourceSphereView.qml").read_text(encoding="utf-8")
@@ -653,6 +766,20 @@ class TestChartBridgeContract(unittest.TestCase):
                 r"eulerRotation:\s*Qt\.vector3d\(-root\.spherePitch,\s*0,\s*0\)[\s\S]*?"
                 r'source:\s*"#Rectangle"',
             ),
+        )
+
+    def test_source_sphere_axis_overlay_repaint_only_on_pose_changes(self) -> None:
+        qml_text = (_QML_DIR / "SourceSphereView.qml").read_text(encoding="utf-8")
+
+        self.assertNotIn("onVisibleSourcesChanged: axisOverlay.requestPaint()", qml_text)
+        self.assertNotIn("onVisiblePotentialsChanged: axisOverlay.requestPaint()", qml_text)
+        self.assertNotIn(
+            "onModelReset() {\n            root.sourceModelRevision += 1\n            axisOverlay.requestPaint()",
+            qml_text,
+        )
+        self.assertNotIn(
+            "onModelReset() {\n            root.potentialModelRevision += 1\n            axisOverlay.requestPaint()",
+            qml_text,
         )
 
     def test_chart_canvas_handles_array_like_points_from_qml_model(self) -> None:
