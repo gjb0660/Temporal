@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from time import monotonic
 from typing import TYPE_CHECKING, Any
+from weakref import ReferenceType, ref
 
 from PySide6.QtCore import QTimer
 
@@ -109,10 +110,16 @@ class PreviewRuntime:
     _PREVIEW_TIMER_INTERVAL_MS = 190
 
     def __init__(self, bridge: "PreviewBridge") -> None:
-        self._bridge = bridge
+        self._bridge_ref: ReferenceType["PreviewBridge"] = ref(bridge)
+
+    def _bridge(self) -> "PreviewBridge":
+        bridge = self._bridge_ref()
+        if bridge is None:
+            raise RuntimeError("PreviewBridge 已释放，无法继续预览运行时操作")
+        return bridge
 
     def initialize(self) -> None:
-        bridge = self._bridge
+        bridge = self._bridge()
         bridge._preview_scenario_keys = preview_scenario_keys()
         bridge._preview_scenario_key = DEFAULT_PREVIEW_SCENARIO_KEY
         bridge._scenario = get_preview_scenario(bridge._preview_scenario_key)
@@ -130,7 +137,7 @@ class PreviewRuntime:
         bridge._apply_state_status()
 
     def start_streams(self, was_active: bool) -> None:
-        bridge = self._bridge
+        bridge = self._bridge()
         if not bridge._streams_active:
             return
         if not was_active:
@@ -142,13 +149,13 @@ class PreviewRuntime:
         bridge._apply_state_status()
 
     def stop_streams(self) -> None:
-        bridge = self._bridge
+        bridge = self._bridge()
         if bridge._preview_tick_timer.isActive():
             bridge._preview_tick_timer.stop()
         bridge._set_remote_log_lines(self.scenario_remote_lines())
 
     def set_preview_scenario(self, key: str) -> None:
-        bridge = self._bridge
+        bridge = self._bridge()
         if key not in bridge._preview_scenario_keys or key == bridge._preview_scenario_key:
             return
 
@@ -175,7 +182,7 @@ class PreviewRuntime:
         bridge._apply_state_status()
 
     def advance_preview_tick(self) -> None:
-        bridge = self._bridge
+        bridge = self._bridge()
         if not bridge._streams_active:
             return
         frames = self.tracking_frames()
@@ -186,32 +193,34 @@ class PreviewRuntime:
         self.refresh_preview_models()
 
     def scenario_sources(self) -> list[dict[str, Any]]:
-        return list(self._bridge._scenario.get("sources", []))
+        return list(self._bridge()._scenario.get("sources", []))
 
     def tracking_frames(self) -> list[dict[str, Any]]:
-        frames = self._bridge._scenario.get("trackingFrames", [])
+        frames = self._bridge()._scenario.get("trackingFrames", [])
         return list(frames) if isinstance(frames, list) else []
 
     def reset_selected_sources(self) -> None:
-        self._bridge._selected_source_ids = {
+        self._bridge()._selected_source_ids = {
             int(source["id"]) for source in self.scenario_sources()
         }
 
     def reset_preview_sample_window(self) -> None:
-        self._bridge._preview_sample_cursor = 0
-        self._bridge._preview_frame_cursor = 0
+        bridge = self._bridge()
+        bridge._preview_sample_cursor = 0
+        bridge._preview_frame_cursor = 0
 
     def scenario_remote_lines(self) -> list[str]:
-        lines = self._bridge._scenario.get("remoteLogLines", ["等待连接远程 odaslive..."])
+        lines = self._bridge()._scenario.get("remoteLogLines", ["等待连接远程 odaslive..."])
         return list(lines) if isinstance(lines, list) else ["等待连接远程 odaslive..."]
 
     def apply_scenario_metadata(self) -> None:
         lines = self.scenario_remote_lines()
-        self._bridge._preview_remote.log_lines = lines
-        self._bridge._set_remote_log_lines(lines)
+        bridge = self._bridge()
+        bridge._preview_remote.log_lines = lines
+        bridge._set_remote_log_lines(lines)
 
     def refresh_preview_models(self, *, reset_chart: bool = False) -> None:
-        bridge = self._bridge
+        bridge = self._bridge()
         if reset_chart:
             bridge._reset_runtime_chart_clock()
         sst = self.current_preview_sst_message()
@@ -220,12 +229,11 @@ class PreviewRuntime:
         bridge._last_sst_monotonic = monotonic()
         bridge._last_sst = sst
         bridge._refresh_sources()
-        bridge._last_ssl = self.current_preview_ssl_message()
-        bridge._refresh_potentials()
+        bridge._on_ssl(self.current_preview_ssl_message())
         bridge._apply_state_status()
 
     def current_preview_sst_message(self) -> dict[str, Any]:
-        bridge = self._bridge
+        bridge = self._bridge()
         frames = self.tracking_frames()
         if not frames:
             return {
@@ -249,6 +257,21 @@ class PreviewRuntime:
         }
 
     def current_preview_ssl_message(self) -> dict[str, Any]:
+        bridge = self._bridge()
+        energy_by_id = {
+            int(source.get("id", 0)): float(source.get("energy", 0.0))
+            for source in self.scenario_sources()
+        }
+        current_sst = self.current_preview_sst_message()
         return {
-            "src": [{"E": float(source.get("energy", 0.0))} for source in self.scenario_sources()]
+            "timeStamp": bridge._preview_sample_cursor,
+            "src": [
+                {
+                    "x": float(source.get("x", 0.0)),
+                    "y": float(source.get("y", 0.0)),
+                    "z": float(source.get("z", 0.0)),
+                    "E": float(energy_by_id.get(int(source.get("id", 0)), 0.0)),
+                }
+                for source in current_sst.get("src", [])
+            ],
         }

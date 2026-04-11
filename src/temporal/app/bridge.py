@@ -44,6 +44,7 @@ class AppBridge(QObject):
     sourceIdsChanged = Signal()
     sourceCountChanged = Signal()
     sourcePositionsChanged = Signal()
+    potentialPositionsChanged = Signal()
     remoteLogLinesChanged = Signal()
     remoteLogTextChanged = Signal()
     potentialCountChanged = Signal()
@@ -94,6 +95,7 @@ class AppBridge(QObject):
         self._channel_source_map: dict[int, int] = {}
         self._source_items: list[str] = []
         self._source_positions: list[dict[str, float | int]] = []
+        self._potential_positions: list[dict[str, float | int | str]] = []
         self._remote_log_lines = list(self._EMPTY_REMOTE_LOG)
         self._recording_sample_rate_warning = ""
         self._potential_count = 0
@@ -122,6 +124,10 @@ class AppBridge(QObject):
         self._runtime_chart_visible_rows: dict[int, dict[str, Any]] = {}
         self._runtime_chart_visible_target_ids: list[int] = []
         self._runtime_target_colors: dict[int, str] = {}
+        self._runtime_potential_history: deque[dict[str, float | int]] = deque()
+        self._runtime_potential_trail: deque[dict[str, float | int]] = deque()
+        self._runtime_last_ssl_sample: int | None = None
+        self._runtime_potential_frame_count: int = 0
         self._chart_commit_dirty = False
         self._chart_next_commit_at = 0.0
         self._runtime_tracking_result = TrackingResult(
@@ -168,8 +174,13 @@ class AppBridge(QObject):
             self,
         )
         self._source_positions_model = QmlListModel(["id", "color", "x", "y", "z"], self)
-        self._elevation_chart_series_model = QmlListModel(["sourceId", "color", "points"], self)
-        self._azimuth_chart_series_model = QmlListModel(["sourceId", "color", "points"], self)
+        self._potential_positions_model = QmlListModel(["color", "x", "y", "z", "life"], self)
+        self._elevation_chart_series_model = QmlListModel(
+            ["sourceId", "color", "points", "layer", "showLine", "pointRadius"], self
+        )
+        self._azimuth_chart_series_model = QmlListModel(
+            ["sourceId", "color", "points", "layer", "showLine", "pointRadius"], self
+        )
         self._preview_scenario_options_model = QmlListModel(["key", "label"], self)
         self._chart_window_model = QmlListModel(["value"], self)
         self._header_nav_labels_model = QmlListModel(["value"], self)
@@ -183,6 +194,7 @@ class AppBridge(QObject):
         self._recording_sessions_model.replace([])
         self._source_rows_model.replace([])
         self._source_positions_model.replace([])
+        self._potential_positions_model.replace([])
         self._elevation_chart_series_model.replace([])
         self._azimuth_chart_series_model.replace([])
         status_state.refresh_control_summary(self)
@@ -270,6 +282,10 @@ class AppBridge(QObject):
     @qt_property(QObject, constant=True)
     def sourcePositionsModel(self) -> QmlListModel:
         return self._source_positions_model
+
+    @qt_property(QObject, constant=True)
+    def potentialPositionsModel(self) -> QmlListModel:
+        return self._potential_positions_model
 
     @qt_property(QObject, constant=True)
     def elevationChartSeriesModel(self) -> QmlListModel:
@@ -460,6 +476,9 @@ class AppBridge(QObject):
 
     def _set_source_positions(self, positions: list[dict[str, float | int]]) -> None:
         stream_projection.set_source_positions(self, positions)
+
+    def _set_potential_positions(self, positions: list[dict[str, float | int | str]]) -> None:
+        stream_projection.set_potential_positions(self, positions)
 
     def _sync_remote_odas_state(self, update_status: bool = False) -> bool | None:
         return remote_lifecycle.sync_remote_odas_state(self, update_status=update_status)

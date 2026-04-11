@@ -1,4 +1,5 @@
 import os
+import re
 import unittest
 from math import cos, radians, sin
 from pathlib import Path
@@ -8,7 +9,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QUrl
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QColor, QGuiApplication
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
 from temporal.app.bridge import AppBridge
@@ -48,6 +49,7 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertTrue(hasattr(bridge, "chartWindowModel"))
         self.assertTrue(hasattr(bridge, "elevationChartSeriesModel"))
         self.assertTrue(hasattr(bridge, "azimuthChartSeriesModel"))
+        self.assertTrue(hasattr(bridge, "potentialPositionsModel"))
         self.assertEqual(
             [item["value"] for item in _model_items(bridge.chartWindowModel)],
             [tick["value"] for tick in build_chart_window_model([{"timeStamp": 0}])["ticks"]],
@@ -57,6 +59,9 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertGreaterEqual(len(elevation_series), 1)
         self.assertGreaterEqual(len(azimuth_series), 1)
         self.assertIn("points", elevation_series[0])
+        self.assertIn("layer", elevation_series[0])
+        self.assertIn("showLine", elevation_series[0])
+        self.assertIn("pointRadius", elevation_series[0])
         self.assertNotIn("values", elevation_series[0])
         self.assertEqual(elevation_series[0]["points"][0]["x"], 0)
         self.assertEqual(azimuth_series[0]["points"][0]["x"], 0)
@@ -103,6 +108,161 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertEqual(bridge.sourcePositionsModel.count, 0)
         self.assertEqual(bridge.elevationChartSeriesModel.count, 0)
         self.assertEqual(bridge.azimuthChartSeriesModel.count, 0)
+
+    def test_potential_overlay_respects_independent_source_and_potential_toggles(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge.setPotentialsEnabled(True)
+        bridge._on_ssl({"timeStamp": 0, "src": [{"x": 0.0, "y": 1.0, "z": 0.0, "E": 0.9}]})
+
+        self.assertEqual(bridge.sourcePositionsModel.count, 1)
+        self.assertGreaterEqual(bridge.potentialPositionsModel.count, 1)
+        baseline_layers = {item["layer"] for item in _model_items(bridge.elevationChartSeriesModel)}
+        self.assertIn("tracked", baseline_layers)
+        self.assertIn("potential", baseline_layers)
+
+        bridge.setSourcesEnabled(False)
+
+        self.assertEqual(bridge.sourcePositionsModel.count, 0)
+        self.assertGreaterEqual(bridge.potentialPositionsModel.count, 1)
+        layers_after_source_off = {
+            item["layer"] for item in _model_items(bridge.elevationChartSeriesModel)
+        }
+        self.assertNotIn("tracked", layers_after_source_off)
+        self.assertIn("potential", layers_after_source_off)
+
+        bridge.setPotentialsEnabled(False)
+
+        self.assertEqual(bridge.potentialPositionsModel.count, 0)
+        layers_after_potential_off = {
+            item["layer"] for item in _model_items(bridge.elevationChartSeriesModel)
+        }
+        self.assertNotIn("potential", layers_after_potential_off)
+
+    def test_potential_energy_range_filters_only_potential_layer(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge.setPotentialsEnabled(True)
+        bridge._on_ssl(
+            {
+                "timeStamp": 0,
+                "src": [
+                    {"x": 0.0, "y": 1.0, "z": 0.0, "E": 0.9},
+                    {"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.4},
+                ],
+            }
+        )
+        self.assertEqual(bridge.sourcePositionsModel.count, 1)
+        self.assertEqual(bridge.potentialPositionsModel.count, 2)
+
+        bridge.setPotentialEnergyRange(0.8, 1.0)
+
+        self.assertEqual(bridge.sourcePositionsModel.count, 1)
+        self.assertEqual(bridge.potentialPositionsModel.count, 1)
+        layers = {item["layer"] for item in _model_items(bridge.elevationChartSeriesModel)}
+        self.assertIn("tracked", layers)
+        self.assertIn("potential", layers)
+
+    def test_potential_overlay_does_not_apply_hard_cap(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge.setPotentialsEnabled(True)
+        potentials = [
+            {"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.5 + ((index % 11) / 100.0)}
+            for index in range(200)
+        ]
+        bridge._on_ssl({"timeStamp": 0, "src": potentials})
+
+        self.assertEqual(bridge.potentialPositionsModel.count, 200)
+        potential_series = [
+            item
+            for item in _model_items(bridge.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        self.assertEqual(
+            sum(len(item["points"]) for item in potential_series),
+            200,
+        )
+
+    def test_potential_overlay_throttles_chart_points_by_ssl_stride(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge.setPotentialsEnabled(True)
+        for sample in range(200):
+            bridge._on_ssl(
+                {"timeStamp": sample, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]}
+            )
+
+        potential_series = [
+            item
+            for item in _model_items(bridge.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        self.assertEqual(sum(len(item["points"]) for item in potential_series), 10)
+
+    def test_potential_overlay_stride_keeps_window_alignment(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge.setPotentialsEnabled(True)
+        for sample in range(2001):
+            bridge._on_ssl(
+                {"timeStamp": sample, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]}
+            )
+
+        potential_series = [
+            item
+            for item in _model_items(bridge.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        all_points = [
+            point
+            for item in potential_series
+            for point in item["points"]
+            if isinstance(point, dict)
+        ]
+        self.assertEqual(len(all_points), 81)
+        self.assertEqual(min(float(point["x"]) for point in all_points), 400.0)
+        self.assertEqual(max(float(point["x"]) for point in all_points), 2000.0)
+
+    def test_potential_overlay_uses_odas_web_scatter_radius(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge.setPotentialsEnabled(True)
+        bridge._on_ssl({"timeStamp": 0, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]})
+
+        potential_series = [
+            item
+            for item in _model_items(bridge.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        self.assertGreaterEqual(len(potential_series), 1)
+        self.assertEqual(float(potential_series[0]["pointRadius"]), 3.0)
+
+    def test_potential_overlay_colors_are_qt_parseable(self) -> None:
+        bridge = self._make_runtime_bridge()
+        bridge._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        bridge.setPotentialsEnabled(True)
+        bridge._on_ssl(
+            {
+                "timeStamp": 0,
+                "src": [
+                    {"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88},
+                    {"x": 0.0, "y": 1.0, "z": 0.0, "E": 0.52},
+                ],
+            }
+        )
+
+        for item in _model_items(bridge.potentialPositionsModel):
+            self.assertTrue(QColor(str(item["color"])).isValid())
+
+        potential_series = [
+            item
+            for item in _model_items(bridge.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        self.assertGreaterEqual(len(potential_series), 1)
+        for item in potential_series:
+            self.assertTrue(QColor(str(item["color"])).isValid())
 
     def test_runtime_inactive_history_row_keeps_stable_color(self) -> None:
         bridge = self._make_runtime_bridge()
@@ -374,6 +534,75 @@ class TestChartBridgeContract(unittest.TestCase):
             _model_items(preview.azimuthChartSeriesModel),
         )
 
+    def test_runtime_preview_parity_for_potential_overlay(self) -> None:
+        runtime = self._make_runtime_bridge()
+        runtime._on_sst({"timeStamp": 0, "src": [{"id": 15, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        runtime.setPotentialsEnabled(True)
+        runtime._on_ssl({"timeStamp": 0, "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}]})
+
+        preview = PreviewBridge()
+        preview._scenario = {
+            "key": "potentialParity",
+            "displayName": "PotentialParity",
+            "status": "Temporal 就绪",
+            "remoteLogLines": ["等待连接远程 odaslive..."],
+            "sources": [{"id": 15, "color": "#cf54ea", "energy": 0.88}],
+            "trackingFrames": [
+                {"sample": 0, "sources": [{"id": 15, "x": 1.0, "y": 0.0, "z": 0.0}]}
+            ],
+        }
+        preview._reset_selected_sources()
+        preview._reset_preview_sample_window()
+        preview.setPotentialsEnabled(True)
+        preview._refresh_preview_models(reset_chart=True)
+
+        self.assertEqual(
+            _model_items(runtime.potentialPositionsModel),
+            _model_items(preview.potentialPositionsModel),
+        )
+        runtime_potential = [
+            item
+            for item in _model_items(runtime.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        preview_potential = [
+            item
+            for item in _model_items(preview.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        self.assertEqual(runtime_potential, preview_potential)
+
+    def test_runtime_preview_parity_for_potential_stride_sampling(self) -> None:
+        runtime = self._make_runtime_bridge()
+        runtime._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        runtime.setPotentialsEnabled(True)
+
+        preview = PreviewBridge()
+        preview._reset_runtime_chart_clock()
+        preview._on_sst({"timeStamp": 0, "src": [{"id": 7, "x": 1.0, "y": 0.0, "z": 0.0}]})
+        preview.setPotentialsEnabled(True)
+
+        for sample in range(40):
+            message = {
+                "timeStamp": sample,
+                "src": [{"x": 1.0, "y": 0.0, "z": 0.0, "E": 0.88}],
+            }
+            runtime._on_ssl(message)
+            preview._on_ssl(message)
+
+        runtime_potential = [
+            item
+            for item in _model_items(runtime.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        preview_potential = [
+            item
+            for item in _model_items(preview.elevationChartSeriesModel)
+            if item["layer"] == "potential"
+        ]
+        self.assertEqual(runtime_potential, preview_potential)
+        self.assertEqual(sum(len(item["points"]) for item in runtime_potential), 2)
+
     def test_preview_scenarios_do_not_expose_sample_window_field(self) -> None:
         scenario = get_preview_scenario("referenceSingle")
 
@@ -385,6 +614,46 @@ class TestChartBridgeContract(unittest.TestCase):
         self.assertNotIn("valuesJson", qml_text)
         self.assertNotIn("JSON.parse", qml_text)
         self.assertNotIn("item.values", qml_text)
+
+    def test_chart_canvas_supports_mixed_line_and_scatter_series(self) -> None:
+        qml_text = (_QML_DIR / "ChartCanvas.qml").read_text(encoding="utf-8")
+
+        self.assertIn("item.showLine", qml_text)
+        self.assertIn("item.pointRadius", qml_text)
+        self.assertIn("drawScatter", qml_text)
+
+    def test_source_sphere_potential_marker_scale_matches_odas_ratio(self) -> None:
+        qml_text = (_QML_DIR / "SourceSphereView.qml").read_text(encoding="utf-8")
+
+        self.assertIn("potentialMarkerScale: sourceMarkerScale * 0.625", qml_text)
+
+    def test_source_sphere_potential_marker_is_opaque(self) -> None:
+        qml_text = (_QML_DIR / "SourceSphereView.qml").read_text(encoding="utf-8")
+
+        self.assertIn("model: root.visiblePotentials", qml_text)
+        self.assertIn("opacity: 1.0", qml_text)
+        self.assertNotIn("potentialBaseOpacity", qml_text)
+        self.assertNotIn("potentialExtraOpacity", qml_text)
+
+    def test_source_sphere_renders_potentials_below_tracked_sources(self) -> None:
+        qml_text = (_QML_DIR / "SourceSphereView.qml").read_text(encoding="utf-8")
+
+        potential_index = qml_text.index("model: root.visiblePotentials")
+        source_index = qml_text.index("model: root.visibleSources")
+        self.assertLess(potential_index, source_index)
+
+    def test_source_sphere_potential_uses_square_marker_with_rotation_compensation(self) -> None:
+        qml_text = (_QML_DIR / "SourceSphereView.qml").read_text(encoding="utf-8")
+
+        self.assertRegex(
+            qml_text,
+            re.compile(
+                r"model:\s*root\.visiblePotentials[\s\S]*?"
+                r"eulerRotation:\s*Qt\.vector3d\(0,\s*-root\.sphereYaw,\s*0\)[\s\S]*?"
+                r"eulerRotation:\s*Qt\.vector3d\(-root\.spherePitch,\s*0,\s*0\)[\s\S]*?"
+                r'source:\s*"#Rectangle"',
+            ),
+        )
 
     def test_chart_canvas_handles_array_like_points_from_qml_model(self) -> None:
         bridge = self._make_runtime_bridge()
@@ -433,6 +702,7 @@ Item {
         self.assertIn("chartWindowModel", qml_text)
         self.assertIn("elevationChartSeriesModel", qml_text)
         self.assertIn("azimuthChartSeriesModel", qml_text)
+        self.assertIn("potentialPositionsModel", qml_text)
         self.assertNotIn("chartXTicksModel", qml_text)
         self.assertNotIn("elevationSeriesModel", qml_text)
         self.assertNotIn("azimuthSeriesModel", qml_text)

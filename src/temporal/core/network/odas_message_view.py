@@ -90,6 +90,13 @@ def _read_energy(potential: dict) -> float | None:
     return None
 
 
+def _read_axis(potential: dict, key: str) -> float | None:
+    value = potential.get(key)
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
 def count_potentials(
     ssl_message: dict,
     min_energy: float = 0.0,
@@ -116,3 +123,45 @@ def count_potentials(
         if low <= energy <= high:
             count += 1
     return count
+
+
+def extract_potential_points(
+    ssl_message: dict,
+    *,
+    min_energy: float = 0.0,
+    max_energy: float = 1.0,
+    enabled: bool = True,
+) -> list[dict[str, float]]:
+    if not enabled:
+        return []
+
+    low = min(min_energy, max_energy)
+    high = max(min_energy, max_energy)
+
+    src = ssl_message.get("src", [])
+    if not isinstance(src, list):
+        return []
+
+    points: list[dict[str, float]] = []
+    for item in src:
+        if not isinstance(item, dict):
+            continue
+        energy = _read_energy(item)
+        if energy is None:
+            continue
+        if not (low <= energy <= high):
+            continue
+        x = _read_axis(item, "x")
+        y = _read_axis(item, "y")
+        z = _read_axis(item, "z")
+        if x is None or y is None or z is None:
+            continue
+        points.append(
+            {
+                "x": x,
+                "y": y,
+                "z": z,
+                "energy": energy,
+            }
+        )
+    return points

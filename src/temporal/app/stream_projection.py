@@ -7,6 +7,7 @@ from typing import Any, Protocol, Sequence
 
 from temporal.core.network.odas_message_view import (
     count_potentials,
+    extract_potential_points,
     extract_source_ids,
     extract_source_positions,
 )
@@ -29,6 +30,10 @@ class StreamProjectionBridge(Protocol):
     _runtime_chart_visible_rows: dict[int, dict[str, Any]]
     _runtime_chart_visible_target_ids: list[int]
     _runtime_target_colors: dict[int, str]
+    _runtime_potential_history: deque[dict[str, float | int]]
+    _runtime_potential_trail: deque[dict[str, float | int]]
+    _runtime_last_ssl_sample: int | None
+    _runtime_potential_frame_count: int
     _chart_commit_dirty: bool
     _chart_next_commit_at: float
     _chart_commit_timer: Any
@@ -42,6 +47,7 @@ class StreamProjectionBridge(Protocol):
     _selected_source_ids: set[int]
     _source_items: list[str]
     _source_positions: list[dict[str, float | int]]
+    _potential_positions: list[dict[str, float | int | str]]
     _sources_enabled: bool
     _potentials_enabled: bool
     _potential_min: float
@@ -59,6 +65,7 @@ class StreamProjectionBridge(Protocol):
     _recorder: Any
     _source_rows_model: Any
     _source_positions_model: Any
+    _potential_positions_model: Any
     _elevation_chart_series_model: Any
     _azimuth_chart_series_model: Any
     _chart_window_model: Any
@@ -69,6 +76,7 @@ class StreamProjectionBridge(Protocol):
     sourceItemsChanged: Any
     sourceCountChanged: Any
     sourcePositionsChanged: Any
+    potentialPositionsChanged: Any
     potentialCountChanged: Any
 
     @property
@@ -102,6 +110,7 @@ __all__ = [
     "refresh_sources",
     "reset_runtime_chart_clock",
     "set_potential_energy_range",
+    "set_potential_positions",
     "set_potentials_enabled",
     "set_target_selected",
     "set_source_positions",
@@ -112,6 +121,27 @@ __all__ = [
 ]
 
 _HISTORY_ROW_LIMIT = len(SOURCE_COLOR_PALETTE)
+_CHART_WINDOW_SAMPLES = 1600
+_POTENTIAL_TRAIL_LIFE = 50
+_POTENTIAL_LAYER = "potential"
+_TRACKED_LAYER = "tracked"
+_POTENTIAL_POINT_RADIUS = 3.0
+_POTENTIAL_CHART_STRIDE = 20
+# Qt/QML QColor does not parse CSS rgb(...) strings reliably in this path.
+# Keep palette in hex form so chart + 3D share one valid color source.
+_POTENTIAL_COLOR_SCALE: tuple[str, ...] = (
+    "#1000e5",
+    "#4003e5",
+    "#6f07e6",
+    "#9c0be6",
+    "#c80fe7",
+    "#e813dc",
+    "#e817b4",
+    "#e91b8d",
+    "#e91f67",
+    "#ea2343",
+    "#eb2e28",
+)
 
 
 def start_streams(bridge: StreamProjectionBridge) -> None:
@@ -194,6 +224,7 @@ def set_potentials_enabled(bridge: StreamProjectionBridge, enabled: bool) -> Non
     bridge._potentials_enabled = enabled
     bridge.potentialsEnabledChanged.emit()
     refresh_potentials(bridge)
+    refresh_potential_outputs(bridge, refresh_chart=True)
 
 
 def set_potential_energy_range(
@@ -207,6 +238,7 @@ def set_potential_energy_range(
     bridge._potential_max = high
     bridge.potentialRangeChanged.emit()
     refresh_potentials(bridge)
+    refresh_potential_outputs(bridge, refresh_chart=True)
 
 
 def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
@@ -214,6 +246,8 @@ def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
     bridge._last_sst = message
     remote_lifecycle.apply_state_status(bridge)
     has_chart_sample = append_runtime_chart_frame(bridge, message)
+    if has_chart_sample:
+        _prune_potential_history_window(bridge, latest_sample=int(message["timeStamp"]))
     refresh_sources(bridge, refresh_chart=False)
     if has_chart_sample:
         _append_chart_series_sample(bridge)
@@ -225,7 +259,9 @@ def on_sst(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
 
 def on_ssl(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
     bridge._last_ssl = message
+    append_runtime_potential_frame(bridge, message)
     refresh_potentials(bridge)
+    refresh_potential_outputs(bridge, refresh_chart=True)
 
 
 def on_sep_audio(bridge: StreamProjectionBridge, chunk: bytes) -> None:
@@ -256,6 +292,27 @@ def set_source_positions(
     )
 
 
+def set_potential_positions(
+    bridge: StreamProjectionBridge,
+    positions: list[dict[str, float | int | str]],
+) -> None:
+    if positions != bridge._potential_positions:
+        bridge._potential_positions = positions
+        bridge.potentialPositionsChanged.emit()
+    bridge._potential_positions_model.replace(
+        [
+            {
+                "color": str(item["color"]),
+                "x": float(item["x"]),
+                "y": float(item["y"]),
+                "z": float(item["z"]),
+                "life": int(item["life"]),
+            }
+            for item in positions
+        ]
+    )
+
+
 def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = True) -> None:
     previous_catalog_target_ids = set(int(value) for value in bridge._runtime_catalog_by_target)
     current_targets = list(bridge._runtime_tracking_result.visible_targets)
@@ -276,7 +333,7 @@ def refresh_sources(bridge: StreamProjectionBridge, *, refresh_chart: bool = Tru
         catalog_by_target = {
             int(target_id): dict(row)
             for target_id, row in catalog_by_target.items()
-            if latest_sample - int(row.get("lastSample", latest_sample)) <= 1600
+            if latest_sample - int(row.get("lastSample", latest_sample)) <= _CHART_WINDOW_SAMPLES
         }
     catalog_by_target = _trim_catalog_targets(
         catalog_by_target,
@@ -452,7 +509,7 @@ def _append_chart_series_sample(bridge: StreamProjectionBridge) -> None:
         tid = int(target_id)
         cache = bridge._runtime_series_cache.get(tid)
         if cache is None:
-            cache = deque(maxlen=1600)
+            cache = deque(maxlen=_CHART_WINDOW_SAMPLES)
             bridge._runtime_series_cache[tid] = cache
         source = current_frame_sources.get(tid)
         if source is None:
@@ -492,7 +549,7 @@ def _build_chart_window_ticks(samples: deque[int]) -> list[dict[str, Any]]:
     if not samples:
         return []
     latest = int(samples[-1])
-    window_start = latest - 1600
+    window_start = latest - _CHART_WINDOW_SAMPLES
     tick_step = 200
     first_tick = int(ceil(window_start / tick_step) * tick_step)
     ticks = [
@@ -523,22 +580,28 @@ def refresh_chart_models(
     visible_source_ids: list[int],
 ) -> None:
     bridge._chart_window_model.replace(_build_chart_window_ticks(bridge._runtime_chart_samples))
-    bridge._elevation_chart_series_model.replace(
-        chart_series_model_items(
-            bridge,
-            visible_rows,
-            visible_source_ids,
-            axis="elevation",
-        )
+    tracked_elevation = chart_series_model_items(
+        bridge,
+        visible_rows,
+        visible_source_ids,
+        axis="elevation",
     )
-    bridge._azimuth_chart_series_model.replace(
-        chart_series_model_items(
-            bridge,
-            visible_rows,
-            visible_source_ids,
-            axis="azimuth",
-        )
+    tracked_azimuth = chart_series_model_items(
+        bridge,
+        visible_rows,
+        visible_source_ids,
+        axis="azimuth",
     )
+    potential_elevation = potential_chart_series_model_items(
+        bridge,
+        axis="elevation",
+    )
+    potential_azimuth = potential_chart_series_model_items(
+        bridge,
+        axis="azimuth",
+    )
+    bridge._elevation_chart_series_model.replace(tracked_elevation + potential_elevation)
+    bridge._azimuth_chart_series_model.replace(tracked_azimuth + potential_azimuth)
 
 
 def chart_series_model_items(
@@ -570,6 +633,52 @@ def chart_series_model_items(
                 "sourceId": int(row["id"]),
                 "color": str(row.get("color", "")),
                 "points": points,
+                "layer": _TRACKED_LAYER,
+                "showLine": True,
+                "pointRadius": 0.0,
+            }
+        )
+    return items
+
+
+def potential_chart_series_model_items(
+    bridge: StreamProjectionBridge,
+    *,
+    axis: str,
+) -> list[dict[str, Any]]:
+    if not bridge._potentials_enabled or not bridge._runtime_chart_samples:
+        return []
+    low = min(float(bridge._potential_min), float(bridge._potential_max))
+    high = max(float(bridge._potential_min), float(bridge._potential_max))
+
+    axis_key = "elevation" if axis == "elevation" else "azimuth"
+    by_bin: dict[int, list[dict[str, float]]] = {}
+    for point in bridge._runtime_potential_history:
+        energy = float(point.get("energy", 0.0))
+        if not (low <= energy <= high):
+            continue
+        value = point.get(axis_key)
+        sample = point.get("sample")
+        if not isinstance(value, (int, float)) or not isinstance(sample, int):
+            continue
+        bin_index = _scale_potential_energy_bin(energy, low=low, high=high)
+        if bin_index not in by_bin:
+            by_bin[bin_index] = []
+        by_bin[bin_index].append({"x": float(sample), "y": float(value)})
+
+    items: list[dict[str, Any]] = []
+    for bin_index in sorted(by_bin):
+        points = by_bin[bin_index]
+        if not points:
+            continue
+        items.append(
+            {
+                "sourceId": -(bin_index + 1),
+                "color": _POTENTIAL_COLOR_SCALE[bin_index],
+                "points": points,
+                "layer": _POTENTIAL_LAYER,
+                "showLine": False,
+                "pointRadius": _POTENTIAL_POINT_RADIUS,
             }
         )
     return items
@@ -630,6 +739,155 @@ def append_runtime_chart_frame(bridge: StreamProjectionBridge, message: dict[str
     return True
 
 
+def append_runtime_potential_frame(bridge: StreamProjectionBridge, message: dict[str, Any]) -> None:
+    sample = _resolve_potential_sample(bridge, message)
+    bridge._runtime_last_ssl_sample = int(sample)
+    emit_chart_sample = _should_emit_potential_chart_sample(bridge)
+    points = extract_potential_points(
+        message,
+        min_energy=float("-inf"),
+        max_energy=float("inf"),
+        enabled=True,
+    )
+    if not points:
+        _decay_potential_trail(bridge)
+        _prune_potential_history_window(bridge, latest_sample=int(sample))
+        return
+
+    _decay_potential_trail(bridge)
+    for point in points:
+        x = float(point["x"])
+        y = float(point["y"])
+        z = float(point["z"])
+        energy = float(point["energy"])
+        if emit_chart_sample:
+            bridge._runtime_potential_history.append(
+                {
+                    "sample": int(sample),
+                    "energy": energy,
+                    "elevation": _axis_value({"x": x, "y": y, "z": z}, axis="elevation"),
+                    "azimuth": _axis_value({"x": x, "y": y, "z": z}, axis="azimuth"),
+                }
+            )
+        bridge._runtime_potential_trail.append(
+            {
+                "x": x,
+                "y": y,
+                "z": z,
+                "energy": energy,
+                "life": _POTENTIAL_TRAIL_LIFE,
+            }
+        )
+    _prune_potential_history_window(bridge, latest_sample=int(sample))
+
+
+def _resolve_potential_sample(bridge: StreamProjectionBridge, message: dict[str, Any]) -> int:
+    sample_raw = message.get("timeStamp")
+    if type(sample_raw) is int:
+        return int(sample_raw)
+    if bridge._runtime_chart_samples:
+        return int(bridge._runtime_chart_samples[-1])
+    if bridge._runtime_last_ssl_sample is not None:
+        return int(bridge._runtime_last_ssl_sample) + 1
+    return 0
+
+
+def _should_emit_potential_chart_sample(bridge: StreamProjectionBridge) -> bool:
+    should_emit = (bridge._runtime_potential_frame_count % _POTENTIAL_CHART_STRIDE) == 0
+    bridge._runtime_potential_frame_count += 1
+    return should_emit
+
+
+def _decay_potential_trail(bridge: StreamProjectionBridge) -> None:
+    updated = deque(
+        (
+            {
+                "x": float(point["x"]),
+                "y": float(point["y"]),
+                "z": float(point["z"]),
+                "energy": float(point["energy"]),
+                "life": int(point["life"]) - 1,
+            }
+            for point in bridge._runtime_potential_trail
+            if int(point.get("life", 0)) - 1 > 0
+        )
+    )
+    bridge._runtime_potential_trail = updated
+
+
+def _prune_potential_history_window(
+    bridge: StreamProjectionBridge,
+    *,
+    latest_sample: int | None = None,
+) -> None:
+    latest = latest_sample
+    if latest is None:
+        latest = _latest_chart_sample(bridge)
+    if latest is None:
+        latest = bridge._runtime_last_ssl_sample
+    if latest is None:
+        return
+    min_sample = int(latest) - _CHART_WINDOW_SAMPLES
+    bridge._runtime_potential_history = deque(
+        point
+        for point in bridge._runtime_potential_history
+        if int(point.get("sample", min_sample)) >= min_sample
+    )
+
+
+def refresh_potential_outputs(
+    bridge: StreamProjectionBridge,
+    *,
+    refresh_chart: bool,
+) -> None:
+    set_potential_positions(
+        bridge,
+        build_potential_position_items(bridge),
+    )
+    if refresh_chart:
+        refresh_chart_models(
+            bridge,
+            bridge._runtime_chart_visible_rows,
+            bridge._runtime_chart_visible_target_ids,
+        )
+
+
+def build_potential_position_items(
+    bridge: StreamProjectionBridge,
+) -> list[dict[str, float | int | str]]:
+    if not bridge._potentials_enabled:
+        return []
+    low = min(float(bridge._potential_min), float(bridge._potential_max))
+    high = max(float(bridge._potential_min), float(bridge._potential_max))
+    items: list[dict[str, float | int | str]] = []
+    for point in bridge._runtime_potential_trail:
+        energy = float(point["energy"])
+        if not (low <= energy <= high):
+            continue
+        items.append(
+            {
+                "color": _potential_color_for_energy(energy, low=low, high=high),
+                "x": float(point["x"]),
+                "y": float(point["y"]),
+                "z": float(point["z"]),
+                "life": int(point["life"]),
+            }
+        )
+    return items
+
+
+def _scale_potential_energy_bin(energy: float, *, low: float, high: float) -> int:
+    if high <= low:
+        return 0
+    clamped = min(high, max(low, float(energy)))
+    normalized = (clamped - low) / (high - low)
+    return min(len(_POTENTIAL_COLOR_SCALE) - 1, max(0, int(round(normalized * 10))))
+
+
+def _potential_color_for_energy(energy: float, *, low: float, high: float) -> str:
+    return _POTENTIAL_COLOR_SCALE[_scale_potential_energy_bin(energy, low=low, high=high)]
+
+
 def _next_tracking_sample(bridge: StreamProjectionBridge) -> int:
     if bridge._runtime_tracking_result.visible_targets:
         return (
@@ -653,6 +911,10 @@ def reset_runtime_chart_clock(bridge: StreamProjectionBridge) -> None:
     bridge._runtime_chart_visible_rows = {}
     bridge._runtime_chart_visible_target_ids = []
     bridge._runtime_target_colors = {}
+    bridge._runtime_potential_history = deque()
+    bridge._runtime_potential_trail = deque()
+    bridge._runtime_last_ssl_sample = None
+    bridge._runtime_potential_frame_count = 0
     bridge._runtime_tracking_result = TrackingResult(
         visible_targets=[],
         dropped_source_ids=[],
@@ -661,6 +923,7 @@ def reset_runtime_chart_clock(bridge: StreamProjectionBridge) -> None:
     bridge._chart_window_model.replace(bridge._RUNTIME_CHART_X_TICKS)
     bridge._elevation_chart_series_model.replace([])
     bridge._azimuth_chart_series_model.replace([])
+    set_potential_positions(bridge, [])
 
 
 def current_runtime_frame_sources(

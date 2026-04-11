@@ -3,6 +3,7 @@ import unittest
 from temporal.core.network.odas_message_view import (
     build_source_items,
     count_potentials,
+    extract_potential_points,
     extract_source_positions,
     extract_source_ids,
 )
@@ -89,6 +90,41 @@ class TestOdasMessageView(unittest.TestCase):
     def test_count_potentials_returns_zero_when_disabled(self) -> None:
         ssl = {"src": [{"E": 0.4}, {"E": 0.9}]}
         self.assertEqual(count_potentials(ssl, enabled=False), 0)
+
+    def test_extract_potential_points_filters_energy_and_requires_xyz(self) -> None:
+        ssl = {
+            "src": [
+                {"x": 0.1, "y": 0.2, "z": 0.3, "E": 0.9},
+                {"x": -0.2, "y": 0.0, "z": 0.4, "energy": 0.55},
+                {"x": 0.0, "y": 0.1, "E": 0.7},
+                {"x": "bad", "y": 0.1, "z": 0.2, "E": 0.7},
+            ]
+        }
+        points = extract_potential_points(
+            ssl,
+            min_energy=0.5,
+            max_energy=0.8,
+        )
+        self.assertEqual(
+            points,
+            [
+                {"x": -0.2, "y": 0.0, "z": 0.4, "energy": 0.55},
+            ],
+        )
+
+    def test_extract_potential_points_handles_equal_range(self) -> None:
+        ssl = {
+            "src": [
+                {"x": 0.1, "y": 0.2, "z": 0.3, "E": 0.6},
+                {"x": 0.1, "y": 0.2, "z": 0.3, "E": 0.7},
+            ]
+        }
+        points = extract_potential_points(
+            ssl,
+            min_energy=0.6,
+            max_energy=0.6,
+        )
+        self.assertEqual(points, [{"x": 0.1, "y": 0.2, "z": 0.3, "energy": 0.6}])
 
 
 if __name__ == "__main__":

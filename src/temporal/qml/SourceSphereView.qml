@@ -6,7 +6,9 @@ Rectangle {
 
     required property QtObject theme
     property var sourcePositionsModel: null
+    property var potentialPositionsModel: null
     property int sourceModelRevision: 0
+    property int potentialModelRevision: 0
 
     color: "#ffffff"
     border.color: "transparent"
@@ -41,9 +43,11 @@ Rectangle {
     readonly property real sourceMarkerScale: Math.max(0.16, sphereRadius / 940)
     readonly property real sourceHighlightScale: Math.max(0.065, sphereRadius / 2350)
     readonly property real sourceHighlightOffset: sphereRadius / 420
+    readonly property real potentialMarkerScale: sourceMarkerScale * 0.625
     readonly property real cameraDistance: Math.max(sphereRadius * 4.55, sphereRadius * 4.05 + Math.max(0, 320 - sphereView.height) * 0.42)
     readonly property real sceneCenterYOffset: -Math.min(28, Math.max(12, sphereRadius * 0.10 + Math.max(0, 300 - sphereView.height) * 0.06))
     readonly property var visibleSources: normalizedSourceEntries()
+    readonly property var visiblePotentials: normalizedPotentialEntries()
 
     function colorForSource(sourceId) {
         const palette = [theme.accentPurple, theme.accentCyan, "#ff9c47", "#5ac97c", "#6a88ff", "#f16f7d"]
@@ -82,6 +86,37 @@ Rectangle {
             })
         }
 
+        return entries
+    }
+
+    function normalizedPotentialEntries() {
+        const revision = potentialModelRevision
+        const entries = []
+        const model = potentialPositionsModel
+        const count = model && typeof model.count === "number" ? model.count : 0
+        for (let index = 0; index < count; index += 1) {
+            const item = model.get(index)
+            if (!item) {
+                continue
+            }
+            const x = Number(item.x)
+            const y = Number(item.y)
+            const z = Number(item.z)
+            const life = Math.max(1, Number(item.life) || 1)
+            if (!isFinite(x) || !isFinite(y) || !isFinite(z)) {
+                continue
+            }
+            const length = Math.sqrt(x * x + y * y + z * z)
+            const scale = length > 1 ? 1 / length : 1
+            entries.push({
+                color: item.color || "#ea2343",
+                x: x * scale,
+                y: y * scale,
+                z: z * scale,
+                life: life,
+                revision: revision
+            })
+        }
         return entries
     }
 
@@ -197,9 +232,34 @@ Rectangle {
         }
     }
 
+    Connections {
+        target: root.potentialPositionsModel
+
+        function onModelReset() {
+            root.potentialModelRevision += 1
+            axisOverlay.requestPaint()
+        }
+
+        function onRowsInserted() {
+            root.potentialModelRevision += 1
+            axisOverlay.requestPaint()
+        }
+
+        function onRowsRemoved() {
+            root.potentialModelRevision += 1
+            axisOverlay.requestPaint()
+        }
+
+        function onDataChanged() {
+            root.potentialModelRevision += 1
+            axisOverlay.requestPaint()
+        }
+    }
+
     onSphereYawChanged: axisOverlay.requestPaint()
     onSpherePitchChanged: axisOverlay.requestPaint()
     onVisibleSourcesChanged: axisOverlay.requestPaint()
+    onVisiblePotentialsChanged: axisOverlay.requestPaint()
 
     View3D {
         id: sphereView
@@ -396,6 +456,36 @@ Rectangle {
                                         lighting: DefaultMaterial.NoLighting
                                         opacity: root.gridLineOpacity - 0.08
                                         depthDrawMode: Material.NeverDepthDraw
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Repeater3D {
+                        model: root.visiblePotentials
+
+                        delegate: Node {
+                            required property var modelData
+
+                            position: root.sourcePositionVector(modelData)
+
+                            Node {
+                                // Counter-rotate the marker so potential squares stay view-facing.
+                                eulerRotation: Qt.vector3d(0, -root.sphereYaw, 0)
+
+                                Node {
+                                    eulerRotation: Qt.vector3d(-root.spherePitch, 0, 0)
+
+                                    Model {
+                                        source: "#Rectangle"
+                                        scale: Qt.vector3d(root.potentialMarkerScale, root.potentialMarkerScale, 1)
+                                        materials: DefaultMaterial {
+                                            diffuseColor: modelData.color
+                                            lighting: DefaultMaterial.NoLighting
+                                            opacity: 1.0
+                                            depthDrawMode: Material.NeverDepthDraw
+                                        }
                                     }
                                 }
                             }

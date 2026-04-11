@@ -151,19 +151,13 @@ Canvas {
             }
             const normalizedPoints = []
             for (let pointIndex = 0; pointIndex < points.length; pointIndex += 1) {
-                normalizedPoints.push(
-                    normalizePoint(
-                        points[pointIndex],
-                        windowStart,
-                        windowEnd,
-                        yBounds.min,
-                        yBounds.max
-                    )
-                )
+                normalizedPoints.push(normalizePoint(points[pointIndex], windowStart, windowEnd, yBounds.min, yBounds.max))
             }
             normalized.push({
                 color: item.color,
-                points: normalizedPoints
+                points: normalizedPoints,
+                showLine: item.showLine !== false,
+                pointRadius: Number(item.pointRadius || 0)
             })
         }
         return normalized
@@ -262,9 +256,31 @@ Canvas {
             }
         }
 
+        function drawScatter(points, color, radius) {
+            const pointRadius = Math.max(0.5, radius)
+            ctx.fillStyle = color
+            for (let index = 0; index < points.length; index += 1) {
+                const point = points[index]
+                if (!point) {
+                    continue
+                }
+                const px = leftPad + point.x * plotW
+                const py = topPad + plotH * (1 - point.y)
+                ctx.beginPath()
+                ctx.arc(px, py, pointRadius, 0, Math.PI * 2)
+                ctx.fill()
+            }
+        }
+
         for (let index = 0; index < visibleSeries.length; index += 1) {
             const item = visibleSeries[index]
-            plot(item.points, item.color || theme.accentPurple)
+            const color = item.color || theme.accentPurple
+            if (item.showLine) {
+                plot(item.points, color)
+            }
+            if (!item.showLine || item.pointRadius > 0) {
+                drawScatter(item.points, color, item.pointRadius > 0 ? item.pointRadius : 2)
+            }
         }
     }
 }

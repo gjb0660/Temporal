@@ -87,6 +87,7 @@ Rectangle {
     SourceSphereView {
         theme: root.theme
         sourcePositionsModel: root.appBridge.sourcePositionsModel
+        potentialPositionsModel: root.appBridge.potentialPositionsModel
         anchors.top: topContent.bottom
         anchors.left: parent.left
         anchors.right: parent.right
