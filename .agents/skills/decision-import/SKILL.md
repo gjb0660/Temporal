@@ -1,19 +1,14 @@
 ---
 name: decision-import
-description: Use this skill only when a human explicitly asks to treat the current staged diff as intentional and reconcile the feature spec from it. This is a one-shot, turn-scoped flow. Do not use for normal spec-first work.
+description: Use this skill only when a human explicitly asks to treat the current staged diff as intentional and reconcile the feature spec from it. This is a one-shot, turn-scoped exception lane and MUST hand control back to minimal-espc after reconciliation.
 ---
 
 # Decision Import Skill
 
-Use this skill as an explicit exception to Minimal ESPC.
+Use this skill as a one-shot exception lane to reconcile spec from the
+current staged diff.
 
-## Preconditions
-
-- human explicitly invokes this flow
-- changes exist in the current staged diff
-- intent is: do not revert; reconcile spec from these changes
-
-Otherwise, do not use this skill.
+It does not replace normal `$minimal-espc` execution.
 
 ## Scope
 
@@ -21,64 +16,55 @@ Otherwise, do not use this skill.
 - applies only to the current staged snapshot
 - MUST NOT persist across turns
 
-## Authority
+## Flow
 
-1. human instruction (current turn)
-2. contracts and repo rules
-3. feature spec
-4. staged diff (as decision evidence only)
+### 1) Admission
 
-Spec remains the single source of truth.
+- explicit invocation of this skill counts as human attestation
+- current staged diff MUST exist
+- if staged diff is empty, stop immediately with `not-applicable` status
+- if `not-applicable`, spec MUST NOT be modified
 
-## Behavior
+### 2) Reconcile
 
 - do not revert staged changes
-- infer the accepted decision from the diff
-- update the feature spec with minimal edits
-- restore spec–code consistency
-- continue normal Minimal ESPC execution
+- treat staged diff as conditionally accepted decision evidence for this turn
+- spec remains the single source of truth
+- apply minimal spec edits only to:
+  - Facts, Decision, Acceptance
+  - Plan, Progress, Todo
+  - metadata
+- import decision only, not completion
+- staged code may be partial or contain TODO
+- Progress MUST reflect actual state; unfinished work stays in Plan or Todo
 
-## Allowed Updates
+### 3) Guardrails (Non-Blocking Proposal Lane)
 
-- Facts, Decision, Acceptance
-- Plan, Progress, Todo
-- metadata
+- Goal, Non-Goals, and Contracts are hard-boundary fields
+- if staged diff implies changes to hard-boundary fields:
+  - continue reconciliation in this lane
+  - MUST emit an explicit governance risk proposal
+  - MUST add governance follow-up in Todo
+- MUST NOT silently claim hard-boundary changes are fully ratified
 
-## Guardrails
+### 4) Handoff
 
-MUST NOT silently change:
+- after reconciliation, hand control back to `$minimal-espc`
+- implementation, quality gates, and repository checks are governed by
+  `$minimal-espc` and repository rules, not by this skill
 
-- Goal
-- Non-Goals
-- Contracts
+## Output Contract
 
-If implied, require human confirmation.
+Return a compact status block:
 
-## Partial Code
-
-- staged code may be incomplete or contain TODO
-- import the decision, not completion
-- Progress MUST reflect reality
-- unfinished work stays in Plan or Todo
-
-## After Reconciliation
-
-Continue normal flow:
-
-- complete required implementation
-- check code quality
-- run repository gates
-- keep spec and code aligned atomically
+- `input-fingerprint`: get staged fingerprint by running `git write-tree`
+- `imported-decisions`: list of imported decisions from staged diff
+- `proposed-governance`: list of proposed governance if hard-boundary changes are implied
+- `handoff-skills`: list of skills to trigger after handoff, e.g. `"$minimal-espc"`
 
 ## Completion
 
 Done when:
 
-- spec reflects the accepted decision
-- code and validation state are consistent
-
-If incomplete:
-
-- Progress = actual state
-- Plan = remaining critical work
-- Todo = deferred work
+- spec reflects accepted decision evidence from current staged diff
+- any hard-boundary implication is captured as proposal + governance Todo
