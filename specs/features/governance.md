@@ -3,7 +3,7 @@ title: governance
 tracker: primary-feature
 status: active
 owner: copilot
-updated: 2026-03-30
+updated: 2026-04-20
 ---
 
 ## Goal
@@ -17,6 +17,7 @@ updated: 2026-03-30
 
 ## Facts
 
+- 本 feature 的 Facts 只记录当前已验证现实，不承载阶段/版本/路线时间叙述。
 - 仓库需要区分全局工作流、仓库质量门禁、feature 真源与领域指令的 owner。
 - `AGENTS.md` 属于全局工作流 authority，不属于 `specs/` 执行真源。
 - `.github/copilot-instructions.md` 与 `.github/instructions/**` 当前承接仓库级与领域级约束。

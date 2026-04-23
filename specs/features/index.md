@@ -43,13 +43,19 @@ Feature 每个 section 的语义约束如下：
 
 ### Facts
 
-- SHOULD be verified realities
+- SHOULD be verified current-state realities
+- SHOULD use present-state wording and answer: "is this true now?"
 - SHOULD NOT contain assumptions or solutions
+- SHOULD NOT contain timeline, stage, or version narrativesm, such as:
+  - `第一版` / `第二版` / `现有代码` / `后续`
+  - `v1` / `v2` / `phase-a` style stage-version labels used as facts
 
 ### Decision
 
-- SHOULD be based on Facts
+- SHOULD be based on Facts, or User Prompts
+- SHOULD use future-tense wording and answer: "what will we do?"
 - SHOULD represent the current chosen approach only
+- SHOULD NOT repeat Facts, Goals, or Acceptance
 
 ### Acceptance
 
